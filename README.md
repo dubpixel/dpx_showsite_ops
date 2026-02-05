@@ -54,7 +54,7 @@ This will:
 
 ### 3. Configure credentials
 ```bash
-nano .env
+vim .env
 ```
 
 Fill in your:
