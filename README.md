@@ -303,6 +303,8 @@ Project Link: [https://github.com/dubpixel/dpx_showsite_ops](https://github.com/
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
+- **Tim Nauss** – for giving me the Govee sensors last year and being an ever-present source of truth and strength.
+- **Sean Green** – for validating my exploration into self-built showsite tools and pushing me to go further.
 - Govee for the cloud API and sensor platform
 - Eclipse Mosquitto for reliable MQTT brokering
 - Influx Data for InfluxDB time-series database
