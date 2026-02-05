@@ -22,7 +22,7 @@ Operations stack for DPX show sites. A unified platform for IoT monitoring, envi
 
 - **OS**: Ubuntu 22.04+ (tested on Ubuntu Server 24.04)
 - **Docker**: Docker Engine 20.10+ with Compose plugin
-- **Network**: Static IP recommended (current deployment: `192.168.1.100`)
+- **Network**: Static IP recommended (set your `<server-ip>`)
 - **Optional**: Tailscale for remote access, Cloudflare Tunnel for public dashboards
 
 ---
@@ -68,9 +68,9 @@ iot up
 ```
 
 ### 5. Access services
-- **Grafana**: http://192.168.1.100:3000 (admin/grafanapass123)
-- **InfluxDB**: http://192.168.1.100:8086 (admin/influxpass123)
-- **MQTT**: 192.168.1.100:1883 (anonymous)
+- **Grafana**: http://<server-ip>:3000 (admin/grafanapass123)
+- **InfluxDB**: http://<server-ip>:8086 (admin/influxpass123)
+- **MQTT**: <server-ip>:1883 (anonymous)
 
 ---
 

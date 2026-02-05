@@ -69,7 +69,7 @@ All notable changes to dpx-showsite-ops.
 - Tags confirmed working in InfluxDB and Grafana queries
 
 ### Phase 2 - External Access & Network
-- Configured static IP (192.168.1.100)
+- Configured static IP (<server-ip>)
 - Set up mDNS via avahi-daemon (dpx-showsite-ops.local)
 - Installed and configured Tailscale for remote SSH access
 - Set up Cloudflare Tunnel for temporary public dashboard sharing

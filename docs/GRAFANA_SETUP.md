@@ -6,7 +6,7 @@ Manual configuration steps after running `iot up`.
 
 ## Connect InfluxDB Datasource
 
-1. Open Grafana: http://your-server-ip:3000 (admin/grafanapass123)
+1. Open Grafana: http://<server-ip>:3000 (admin/grafanapass123)
 2. Go to: Configuration (⚙️) → Data sources → Add data source
 3. Select: **InfluxDB**
 4. Configure:

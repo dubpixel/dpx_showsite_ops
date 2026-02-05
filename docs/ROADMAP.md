@@ -25,7 +25,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 **Goal**: Make the stack accessible remotely and fix network issues
 
 **What we built:**
-- Static IP configuration (192.168.1.100)
+- Static IP configuration (<server-ip>)
 - mDNS support via avahi-daemon (dpx-showsite-ops.local)
 - Tailscale mesh VPN for secure remote SSH
 - Cloudflare Tunnel for temporary public dashboard sharing
