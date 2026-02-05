@@ -1,80 +1,139 @@
-# dpx-showsite-ops
+<a id="readme-top"></a>
 
-Operations stack for DPX show sites. A unified platform for IoT monitoring, environmental sensors, and network infrastructure management.
+<!-- PROJECT SHIELDS -->
+<!--
+*** I'm using markdown "reference style" links for readability.
+*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
+*** See the bottom of this document for the declaration of the reference variables
+*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
+*** https://www.markdownguide.org/basic-syntax/#reference-style-links
+***
+-->
+<div align="center">
+
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
+[![LinkedIn][linkedin-shield]][linkedin-url]
+</div>
+
+<!-- PROJECT LOGO -->
+<div align="center">
+  <a href="https://github.com/dubpixel/dpx_showsite_ops">
+    <img src="images/logo.png" alt="Logo" height="120">
+  </a>
+<h1 align="center">dpx-showsite-ops</h1>
+<h3 align="center"><i>Operations stack for DPX show sites</i></h3>
+  <p align="center">
+    A unified platform for IoT monitoring, environmental sensors, and network infrastructure management
+    <br />
+     »  
+     <a href="https://github.com/dubpixel/dpx_showsite_ops"><strong>Project Here!</strong></a>
+     »  
+     <br />
+    <a href="https://github.com/dubpixel/dpx_showsite_ops/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    ·
+    <a href="https://github.com/dubpixel/dpx_showsite_ops/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    </p>
+</div>
+
+<br />
+
+<!-- TABLE OF CONTENTS -->
+<!-- ABOUT THE PROJECT -->
+<h3>About The Project</h3>
+
+Operations stack for DPX show sites. Get Govee sensor data flowing into InfluxDB with Grafana dashboards in minutes. Includes MQTT pub/sub messaging, time-series storage, and remote access via Tailscale or Cloudflare Tunnel.
 
 **Current Deployment:** Govee IoT monitoring via cloud API + planned BLE gateway integration  
 **Future:** Network device backups, additional sensor types, automation workflows
 
----
-
-## What's Running Now
-
+**Key features:**
 - **Govee IoT Stack**: Temperature/humidity monitoring via Govee H5051 sensors
 - **MQTT Broker**: Eclipse Mosquitto for sensor data pub/sub
 - **Time Series DB**: InfluxDB 2.x for storing sensor readings
 - **Visualization**: Grafana dashboards with public sharing
 - **Data Pipeline**: Telegraf for MQTT→InfluxDB routing with tag enrichment
-- **LIVE DEMO**: [HERE](https://calling-penalties-slides-timothy.trycloudflare.com/public-dashboards/21f922f1bbcb4bba81b1a7fed502d1c3)
+- **Live Demo**: [HERE](https://calling-penalties-slides-timothy.trycloudflare.com/public-dashboards/21f922f1bbcb4bba81b1a7fed502d1c3)
 
----
+<details>
+<summary>Images</summary>
 
-## Prerequisites
+### ARCHITECTURE
+![ARCHITECTURE][product-architecture]
+
+### GRAFANA DASHBOARD
+![GRAFANA][product-grafana]
+
+</details>
+
+### Built With
+
+* **Container Orchestration**: Docker Engine 20.10+ with Docker Compose
+* **Time Series Database**: InfluxDB 2.x
+* **Visualization**: Grafana
+* **Message Broker**: Eclipse Mosquitto
+* **Data Pipeline**: Telegraf
+* **Data Source**: govee2mqtt (AWS IoT bridge)
+* **Infrastructure**: Docker, systemd, cron
+* **Remote Access**: Tailscale, Cloudflare Tunnel (optional)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+
+## Getting Started
+
+### Prerequisites
 
 - **OS**: Ubuntu 22.04+ (tested on Ubuntu Server 24.04)
 - **Docker**: Docker Engine 20.10+ with Compose plugin
 - **Network**: Static IP recommended (set your `<server-ip>`)
 - **Optional**: Tailscale for remote access, Cloudflare Tunnel for public dashboards
 
----
+### Installation
 
-## Post-Deployment Setup
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/dubpixel/dpx_showsite_ops.git
+   cd dpx_showsite_ops
+   ```
 
-After running `iot up`, see [Grafana Setup Guide](docs/GRAFANA_SETUP.md) for connecting InfluxDB and creating dashboards.
+2. **Run setup**
+   ```bash
+   ./setup.sh
+   ```
+   This will:
+   - Check for Docker/Compose
+   - Create directory structure
+   - Copy `.env.example` to `.env` and prompt you to edit it
+   - Set up the `iot` management command
 
----
+3. **Configure credentials**
+   ```bash
+   vim .env
+   ```
+   Fill in your:
+   - Govee account credentials (email/password)
+   - Govee API key (from https://developer.govee.com)
+   - Timezone (e.g., `America/New_York`)
 
-## Quick Start
+4. **Start the stack**
+   ```bash
+   iot up
+   ```
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/youruser/dpx-showsite-ops.git
-cd dpx-showsite-ops
-```
+5. **Access services**
+   - **Grafana**: http://<server-ip>:3000 (admin/grafanapass123)
+   - **InfluxDB**: http://<server-ip>:8086 (admin/influxpass123)
+   - **MQTT**: <server-ip>:1883 (anonymous)
 
-### 2. Run setup
-```bash
-./setup.sh
-```
+<!-- USAGE EXAMPLES -->
+## Usage
 
-This will:
-- Check for Docker/Compose
-- Create directory structure
-- Copy `.env.example` to `.env` and prompt you to edit it
-- Set up the `iot` management command
-
-### 3. Configure credentials
-```bash
-vim .env
-```
-
-Fill in your:
-- Govee account credentials (email/password)
-- Govee API key (from https://developer.govee.com)
-- Timezone (e.g., `America/New_York`)
-
-### 4. Start the stack
-```bash
-iot up
-```
-
-### 5. Access services
-- **Grafana**: http://<server-ip>:3000 (admin/grafanapass123)
-- **InfluxDB**: http://<server-ip>:8086 (admin/influxpass123)
-- **MQTT**: <server-ip>:1883 (anonymous)
-
----
-
-## Management Commands
+### Management Commands
 
 The `iot` command is your main interface:
 ```bash
@@ -110,30 +169,7 @@ iot conf            # Show telegraf config
 iot help            # Show all commands
 ```
 
----
-
-## Architecture
-```
-Govee Devices (H5051, H6076)
-    ↓
-Govee Cloud API (polls every 10min)
-    ↓
-govee2mqtt (AWS IoT MQTT bridge)
-    ↓
-Mosquitto MQTT Broker (gv2mqtt/# topics)
-    ↓
-Telegraf (tag enrichment: device_name, room, sensor_type)
-    ↓
-InfluxDB (govee bucket)
-    ↓
-Grafana (dashboards + public links)
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed data flow, MQTT topics, and configuration notes.
-
----
-
-## Adding Devices
+### Adding Devices
 
 The stack automatically discovers Govee devices from your account:
 
@@ -145,37 +181,31 @@ The stack automatically discovers Govee devices from your account:
 
 **Note**: Devices MUST be assigned to a room in the Govee app, or the API won't return data.
 
----
+### Troubleshooting
 
-## Troubleshooting
+**govee2mqtt won't connect to AWS IoT (timeout errors)**
+- Symptom: Logs show "timeout connecting to aqm3wd1qlc3dy-ats.iot.us-east-1.amazonaws.com:8883"
+- Cause: IPv6 is enabled but can't route to internet (common on Hyper-V VMs)
+- Fix:
+  ```bash
+  sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
+  echo "net.ipv6.conf.eth0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+  iot restart govee2mqtt
+  ```
 
-### govee2mqtt won't connect to AWS IoT (timeout errors)
-**Symptom**: Logs show "timeout connecting to aqm3wd1qlc3dy-ats.iot.us-east-1.amazonaws.com:8883"
+**Telegraf shows "parsing 'Available': invalid syntax"**
+- Cause: govee2mqtt publishes status messages on sensor topics
+- Impact: Harmless noise in logs, data still flows correctly
+- Fix: Planned for Phase 4 (separate topic filtering)
 
-**Cause**: IPv6 is enabled but can't route to internet (common on Hyper-V VMs)
-
-**Fix**:
-```bash
-sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
-echo "net.ipv6.conf.eth0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
-iot restart govee2mqtt
-```
-
-### Telegraf shows "parsing 'Available': invalid syntax"
-**Cause**: govee2mqtt publishes status messages on sensor topics
-
-**Impact**: Harmless noise in logs, data still flows correctly
-
-**Fix**: Planned for Phase 4 (separate topic filtering)
-
-### No data showing up in Grafana
+**No data showing up in Grafana**
 1. Check devices are assigned to rooms in Govee app
 2. Verify govee2mqtt is running: `iot lg`
 3. Check MQTT messages: `iot mqtt "gv2mqtt/#" 10`
 4. Query InfluxDB directly: `iot query 1h 10`
 5. Make sure Grafana queries use correct tags (device_name, room, sensor_type)
 
-### Docker containers won't start
+**Docker containers won't start**
 ```bash
 # Check Docker is running
 sudo systemctl status docker
@@ -187,82 +217,103 @@ sudo netstat -tlnp | grep -E ':(3000|8086|1883)'
 docker compose logs [service-name]
 ```
 
-### iot command not working after symlink
-The `iot` command uses a wrapper script, not a direct symlink. If `iot status` fails:
-```bash
-sudo rm /usr/local/bin/iot
-sudo tee /usr/local/bin/iot > /dev/null << 'WRAPPER'
-#!/bin/bash
-cd /home/dubpixel/dpx_govee_stack
-exec /home/dubpixel/dpx_govee_stack/manage.sh "$@"
-WRAPPER
-sudo chmod +x /usr/local/bin/iot
-```
+<!-- ROADMAP -->
+## Roadmap
 
-### Logs disappeared after restart
-Docker logs are lost when containers are recreated (`docker compose down && up`). Use `iot backup` regularly to preserve Grafana dashboards and InfluxDB data.
+### ✅ Phase 1: Core Data Pipeline (Completed)
+- Docker Compose stack with 5 services
+- govee2mqtt polling Govee Cloud API every 10 minutes
+- MQTT broker for pub/sub messaging
+- Telegraf for MQTT→InfluxDB routing
+- InfluxDB 2.x for time-series storage
+- Grafana for dashboards
 
----
+### ✅ Phase 2: External Access & Network (Completed)
+- Static IP configuration (<server-ip>)
+- mDNS support via avahi-daemon (dpx-showsite-ops.local)
+- Tailscale mesh VPN for secure remote SSH
+- Cloudflare Tunnel for temporary public dashboard sharing
+- Grafana public dashboard links
 
-## Remote Access
+### ✅ Phase 2.5: Friendly Name Tags (Completed)
+- Telegraf regex processors to extract device_id from MQTT topics
+- Telegraf enum processors to map device_id → device_name and room
+- `update-device-map.sh` script to fetch device info from govee2mqtt API
+- Hourly cron job to auto-update mappings when devices change
 
-### Tailscale (Recommended)
-Secure mesh VPN for SSH and service access from anywhere:
-```bash
-# Install Tailscale
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
+### 🚧 Phase 3: Deployment & Documentation (In Progress)
+- Setup automation (setup.sh)
+- Documentation (README, ARCHITECTURE, GRAFANA_SETUP)
+- Volume backup/restore scripts
+- Full deployment testing
 
-# Connect from remote machine
-ssh dubpixel@dpx-showsite-ops
-```
+### 📋 Phase 4: BLE Gateway (Planned)
+- BLE decoder service for real-time sensor data
+- ESP32 or Windows Theengs Gateway integration
+- Unified Telegraf config with source tagging
 
-### Cloudflare Tunnel (For sharing dashboards)
-Temporary public URL for Grafana:
-```bash
-iot tunnel
-# Copy the generated URL and share
-```
+### 📋 Phase 5: Network Backups (Planned)
+- TFTP server deployment
+- M4300 automated backup scripts
+- Monitoring integration
 
-For persistent public access, use Grafana's built-in public dashboard feature.
+See the [open issues](https://github.com/dubpixel/dpx_showsite_ops/issues) for a full list of proposed features (and known issues).
 
----
-
-## Project Roadmap
-
-See [ROADMAP.md](ROADMAP.md) for detailed phase plans.
-
-**Completed:**
-- ✅ Phase 1-2: Core data pipeline, external access
-- ✅ Phase 2.5-2.7: Tag enrichment, IPv6 fix, hostname cleanup
-
-**In Progress:**
-- 🚧 Phase 3: Deployment automation, documentation, Git setup
-
-**Planned:**
-- 📋 Phase 4: BLE gateway (ESP32 + Theengs) for local sensor reads
-- 📋 Phase 5: TFTP server + automated network device backups
-
----
-
+<!-- CONTRIBUTING -->
 ## Contributing
 
-This is a personal ops stack, but feel free to fork and adapt for your own use. If you find bugs or have suggestions, open an issue.
+_Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**._
 
----
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
 
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Top contributors:
+<a href="https://github.com/dubpixel/dpx_showsite_ops/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dubpixel/dpx_showsite_ops" alt="contrib.rocks image" />
+</a>
+
+<!-- LICENSE -->
 ## License
 
-MIT License - see LICENSE file for details
+Distributed under the MIT License. See `LICENSE.txt` for more information.
 
----
+<!-- CONTACT -->
+## Contact
 
-## Credits
+### Joshua Fleitell - i@dubpixel.tv
 
-Built with:
-- [govee2mqtt](https://github.com/wez/govee2mqtt) by Wez Furlong
-- [Eclipse Mosquitto](https://mosquitto.org/)
-- [InfluxDB](https://www.influxdata.com/)
-- [Telegraf](https://www.influxdata.com/time-series-platform/telegraf/)
-- [Grafana](https://grafana.com/)
-- [Theengs Gateway](https://github.com/theengs/gateway) (planned for Phase 4)
+Project Link: [https://github.com/dubpixel/dpx_showsite_ops](https://github.com/dubpixel/dpx_showsite_ops)
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+- Govee for the cloud API and sensor platform
+- Eclipse Mosquitto for reliable MQTT brokering
+- Influx Data for InfluxDB time-series database
+- Grafana Labs for visualization platform
+- Telegraf contributors for data pipeline
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[contributors-shield]: https://img.shields.io/github/contributors/dubpixel/dpx_showsite_ops.svg?style=flat-square
+[contributors-url]: https://github.com/dubpixel/dpx_showsite_ops/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/dubpixel/dpx_showsite_ops.svg?style=flat-square
+[forks-url]: https://github.com/dubpixel/dpx_showsite_ops/network/members
+[stars-shield]: https://img.shields.io/github/stars/dubpixel/dpx_showsite_ops.svg?style=flat-square
+[stars-url]: https://github.com/dubpixel/dpx_showsite_ops/stargazers
+[issues-shield]: https://img.shields.io/github/issues/dubpixel/dpx_showsite_ops.svg?style=flat-square
+[issues-url]: https://github.com/dubpixel/dpx_showsite_ops/issues
+[license-shield]: https://img.shields.io/github/license/dubpixel/dpx_showsite_ops.svg?style=flat-square
+[license-url]: https://github.com/dubpixel/dpx_showsite_ops/blob/main/LICENSE.txt
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
+[linkedin-url]: https://linkedin.com/in/jfleitell
+[product-architecture]: images/architecture.png
+[product-grafana]: images/grafana-dashboard.png
