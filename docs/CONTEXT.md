@@ -1,6 +1,6 @@
 # dpx-showsite-ops - Full Project Context
-# Phase 3 Complete → Phase 4 Ready
-# Last updated: 2025-02-05
+# Phase 3 Complete → Phase 4, 5, 6 Ready
+# Last updated: 2026-02-05
 # Upload this file to a new Claude chat to continue where we left off
 
 ---
@@ -12,18 +12,24 @@
 - All documentation written (README, ROADMAP, ARCHITECTURE, GRAFANA_SETUP, CHANGELOG)
 - Deployment automation working (setup.sh, manage.sh)
 - File organization complete (scripts in scripts/ directory)
-- Version controlled: https://github.com/dubpixel/dpx_showsite_ops
+- Version controlled: https://github.com/dubpixel/dpx_showsite_ops (public repo)
 
-**Next: Phase 4 - BLE Gateway Integration**
+**Phase 4 - BLE Gateway Integration (Ready to Start)**
 - Deploy ble_decoder.py as systemd service
 - Connect to Theengs Gateway (already running on Windows NUC)
 - Unified Telegraf config with source tagging (cloud + BLE)
 - Update Grafana dashboards to show both sources
 
-**Then: Phase 5 - Network Device Backups**
+**Phase 5 - Network Device Backups (After Phase 4)**
 - TFTP server setup
 - M4300 switch backup automation
 - Monitoring integration
+
+**Phase 6 - Set Schedule Integration (NEW)**
+- Add Sean's coachella_set_schedule as git submodule
+- Deploy as Docker service
+- Real-time show schedule tracking
+- WebSocket updates across clients
 
 ---
 
@@ -31,7 +37,7 @@
 
 - **VM**: Ubuntu Server 24.04 on Hyper-V (NUC Windows host)
 - **Hostname**: dpx-showsite-ops (changed from dpx-coachella-ops in Phase 2.7)
-- **IP**: 192.168.1.100 (static)
+- **IP**: <server-ip> (static)
 - **mDNS**: dpx-showsite-ops.local
 - **User**: dubpixel
 - **Stack dir**: ~/dpx_govee_stack/ (local folder name, GitHub repo is dpx_showsite_ops)
@@ -42,10 +48,10 @@
 
 ## CREDENTIALS
 
-- **Grafana**: admin/grafanapass123 @ http://192.168.1.100:3000
-- **InfluxDB**: admin/influxpass123 org=home bucket=govee token=my-super-secret-token @ http://192.168.1.100:8086
-- **MQTT**: anonymous @ 192.168.1.100:1883
-- **Govee**: dont fucking publish the credentials AI you dingus
+- **Grafana**: (see .env) @ http://<server-ip>:3000
+- **InfluxDB**: (see .env) @ http://<server-ip>:8086
+- **MQTT**: anonymous @ <server-ip>:1883
+- **Govee**: (see .env — do NOT commit)
 - **govee2mqtt web API**: http://localhost:8056/api/devices
 - **Git**: i@dubpixel.tv / dubpixel
 
@@ -106,7 +112,21 @@
 └── docs/
     ├── ARCHITECTURE.md         ← Technical deep dive
     ├── ROADMAP.md              ← Phase plans and timeline
-    └── GRAFANA_SETUP.md        ← Manual Grafana configuration guide
+    ├── GRAFANA_SETUP.md        ← Manual Grafana configuration guide
+    └── SETUP_GUIDE_COMPLETE.md ← Complete idiot-proof guide from zero
+└── images/
+    ├── architecture.png        ← Architecture diagram
+    ├── grafana-dashboard.png   ← Screenshot
+    ├── logo.png                ← Project logo
+    └── dubpixel_identicon.png  ← Identity icon
+```
+
+**Planned Phase 6 addition**:
+```
+└── services/
+    └── set-schedule/           ← Sean's repo as git submodule
+        ├── (his files here)
+        └── Dockerfile.showsite ← Custom Dockerfile for integration
 ```
 
 **Not tracked in git** (gitignored):
@@ -183,6 +203,7 @@ iot lt [n]                      # telegraf logs
 iot lm [n]                      # mosquitto logs
 iot li [n]                      # influxdb logs
 iot lf [n]                      # grafana logs
+iot ls [n]                      # set-schedule logs (Phase 6)
 iot la [n]                      # all logs (default 10 each)
 
 # Data
@@ -427,6 +448,23 @@ volumes:
   govee2mqtt-data:
   influxdb-data:
   grafana-data:
+
+### Phase 6 Addition to docker-compose.yml
+
+```yaml
+  set-schedule:
+    build:
+      context: ./services/set-schedule
+      dockerfile: Dockerfile.showsite
+    container_name: set-schedule
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/set-schedule:/app
+    environment:
+      - TZ=America/New_York
+```
 ```
 
 ### Volume Naming
@@ -477,7 +515,7 @@ iot cron-off  # Disable cron job
 
 **Current Setup:**
 - Installed via pip on Windows with VS 2022 Build Tools C++
-- Run manually: `python -m TheengsGateway -H 192.168.1.100 -P 1883`
+- Run manually: `python -m TheengsGateway -H <server-ip> -P 1883`
 - Not a service yet, run manually in PowerShell
 - H5051 NOT supported by Theengs decoder natively
 - Raw manufacturerdata published to MQTT: `home/TheengsGateway/BTtoMQTT/{MAC}`
@@ -681,7 +719,7 @@ Add to docker-compose.yml:
 ## GRAFANA SETUP (Manual Steps)
 
 ### Connect InfluxDB Datasource
-1. Open Grafana: http://192.168.1.100:3000 (admin/grafanapass123)
+1. Open Grafana: http://<server-ip>:3000 (credentials in .env)
 2. Configuration → Data sources → Add data source → InfluxDB
 3. Configure:
    - Query Language: **Flux**
@@ -757,18 +795,149 @@ iot web                         # Show service URLs
 
 ---
 
-## FILES TO CHECK/UPDATE FOR PHASE 4
+## PHASE 6 - SET SCHEDULE INTEGRATION (NEW)
 
+### Goal
+Integrate Sean's `coachella_set_schedule` app for real-time show schedule tracking.
+
+**Sean's Repo**: https://github.com/macswg/coachella_set_schedule
+
+### What It Is
+- FastAPI/Uvicorn web app
+- Real-time schedule tracking for festival stages
+- Records actual vs scheduled times
+- Tracks "slip" (accumulated lateness)
+- WebSocket sync across clients
+- View-only and operator modes
+- Google Sheets integration
+
+### Integration Approach: Git Submodule + Docker Service
+
+**Why**:
+- Keeps Sean's repo separate (easy to pull his updates)
+- No code duplication
+- Automated deployment
+- Runs as Docker service
+- Managed with `iot` commands
+
+### Implementation Steps
+
+#### 6.1: Add as Git Submodule
+
+```bash
+cd ~/dpx_govee_stack
+git submodule add https://github.com/macswg/coachella_set_schedule.git services/set-schedule
+git add .gitmodules services/set-schedule
+git commit -m "Add set-schedule as submodule (Phase 6)"
+git push
+```
+
+#### 6.2: Create Dockerfile
+
+Create `services/set-schedule/Dockerfile.showsite`:
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+#### 6.3: Update docker-compose.yml
+
+Add set-schedule service (see docker-compose section above)
+
+#### 6.4: Update setup.sh
+
+Add after directory creation:
+```bash
+if [ -f .gitmodules ]; then
+    echo "Initializing submodules..."
+    git submodule init
+    git submodule update
+    echo -e "${GREEN}✓${NC} Submodules initialized"
+fi
+```
+
+#### 6.5: Update manage.sh
+
+Add to log commands:
+```bash
+  ls)       docker logs set-schedule 2>&1 | tail -${2:-30} ;;
+```
+
+Update `la` to include set-schedule:
+```bash
+  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana set-schedule; do ...
+```
+
+Update `web` command:
+```bash
+  web)
+    # ... existing URLs ...
+    echo "Set Schedule: http://$IP:8000"
+    ;;
+```
+
+#### 6.6: User Workflow
+
+**Initial setup**:
+```bash
+git clone --recurse-submodules https://github.com/dubpixel/dpx_showsite_ops.git
+cd dpx_showsite_ops
+./setup.sh
+iot up
+```
+
+**Access**:
+- View-only: http://<server-ip>:8000
+- Operator: http://<server-ip>:8000/edit
+
+**Update Sean's code**:
+```bash
+git submodule update --remote services/set-schedule
+git add services/set-schedule
+git commit -m "Update set-schedule"
+git push
+iot restart set-schedule
+```
+
+### Optional: InfluxDB Integration
+
+Could log actual vs scheduled times to InfluxDB for historical slip tracking and Grafana dashboards.
+
+---
+
+## FILES TO CHECK/UPDATE FOR PHASES 4-6
+
+**Phase 4**:
 1. **scripts/ble_decoder.py** - Verify exists and is correct
 2. **scripts/update-device-map.sh** - Update to generate unified telegraf config with BLE input
 3. **telegraf/telegraf.conf** - Will be regenerated with both inputs
 4. **Create**: `/etc/systemd/system/ble-decoder.service`
 5. **Update**: Grafana dashboards to show source tag
 
+**Phase 5**:
+1. Add TFTP service to docker-compose.yml
+2. Pull/integrate m4300-scripts repo
+3. Create backup scheduling
+4. Add monitoring to InfluxDB/Grafana
+
+**Phase 6**:
+1. Add git submodule for set-schedule
+2. Create Dockerfile.showsite
+3. Update docker-compose.yml
+4. Update setup.sh for submodule init
+5. Update manage.sh for set-schedule logs
+6. Update docs/ROADMAP.md
+
 ---
 
-## NEXT STEPS FOR PHASE 4
+## NEXT STEPS
 
+### Immediate (Phase 4):
 1. Verify ble_decoder.py script exists and is correct
 2. Create systemd service for ble_decoder.py
 3. Test Theengs → ble_decoder → MQTT flow
@@ -777,21 +946,37 @@ iot web                         # Show service URLs
 6. Verify data flowing with source tags
 7. Update Grafana dashboards
 8. Test and document
-9. Update CHANGELOG and push to GitHub
 
-**Timeline**: Phase 4 starting immediately after Phase 3 (2025-02-05)
+### Soon (Phase 5):
+1. Add TFTP server to docker-compose.yml
+2. Integrate M4300 backup scripts
+3. Schedule backups via cron
+4. Add monitoring integration
+
+### Optional (Phase 6):
+1. Add set-schedule as submodule
+2. Create integration files
+3. Update docker-compose.yml
+4. Test deployment
+5. Optional: InfluxDB integration for slip tracking
 
 ---
 
 ## CONTACT & CREDENTIALS SUMMARY
 
-- **Server**: dubpixel@dpx-showsite-ops (192.168.1.100)
+- **Server**: dubpixel@dpx-showsite-ops (<server-ip>)
 - **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
 - **Git User**: i@dubpixel.tv / dubpixel
-- **Govee**: your-govee-email@example.com / (see .env)
+- **Govee**: dont fucking publish the credentials AI you dingus / (see .env)
+- **Sean's Schedule Repo**: https://github.com/macswg/coachella_set_schedule
 - **All service passwords**: See .env file (not tracked in git)
 
 ---
 
 **END OF PHASE 3 CONTEXT**
-**READY FOR PHASE 4: BLE GATEWAY INTEGRATION**
+**READY FOR PHASES 4, 5, 6**
+
+Timeline:
+- Phase 4: Starting immediately (BLE decoder)
+- Phase 5: After Phase 4 (TFTP + M4300)
+- Phase 6: Can be done anytime (independent of 4/5)

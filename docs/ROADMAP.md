@@ -88,25 +88,25 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [x] Create `.env.example` template with comments
 - [x] Enhance `manage.sh` with better help and error handling
 - [x] Fix `iot` wrapper script (not symlink) to handle paths correctly
-- [ ] Create `backup-restore.sh` script for volume backups
-- [ ] Test full deployment from scratch
+- [x] Create `backup-restore.sh` script for volume backups
+- [x] Test full deployment from scratch
 
 ### Phase 3.2: Documentation
 - [x] Write README.md with quick start guide
 - [x] Write ROADMAP.md (this file)
-- [ ] Write ARCHITECTURE.md with technical deep dive
-- [ ] Create CHANGELOG.md for version history
-- [ ] Document all known issues and fixes
-- [ ] Create service-specific docs (Govee quirks, etc.)
+- [x] Write ARCHITECTURE.md with technical deep dive
+- [x] Create CHANGELOG.md for version history
+- [x] Document all known issues and fixes
+- [x] Create service-specific docs (Govee quirks, etc.)
 
 ### Phase 3.3: Version Control
 - [x] Create .gitignore
-- [ ] Initialize Git repository
-- [ ] Tag v1.0 release
-- [ ] Push to GitHub as `dpx-showsite-ops`
-- [ ] Set up GitHub Actions for validation (optional)
+- [x] Initialize Git repository
+- [x] Tag v1.0 release
+- [x] Push to GitHub as `dpx-showsite-ops`
+- [x] Set up comprehensive documentation links
 
-**Status**: 🚧 In Progress - core docs done, testing pending
+**Status**: ✅ Complete - all deliverables shipped
 
 ---
 
@@ -116,14 +116,13 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **What we'll build:**
 
-### Phase 4.1: ESP32 BLE Gateway
-- ESP32 + W5500 ethernet module (or WT32-ETH01)
-- Flash with Theengs firmware
-- Publishes raw BLE advertisements to MQTT
-- Hardwired to network for reliability
-- Alternative: Continue using Theengs Gateway on Windows NUC
+### Phase 4.1: BLE Gateway (Parallel Paths)
+- **Windows NUC Path**: Use existing Theengs Gateway on Windows NUC (ready now)
+- **ESP32 Path**: Optional WT32-ETH01 or similar with Theengs firmware (future)
+- Both paths publish to standardized MQTT topics
+- Either can work independently; both together = redundancy
 
-**Hardware Options:**
+**Hardware Options** (ESP32 path, optional):
 - WT32-ETH01 (ethernet + BLE built-in) - easiest
 - Olimex ESP32-POE (PoE power + ethernet + BLE)
 - ESP32 DevKit + W5500 module (most flexible, needs wiring)
@@ -138,7 +137,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 ### Phase 4.3: Unified Telegraf Config
 - Single telegraf.conf with two MQTT inputs:
   - Cloud source: gv2mqtt/# topics (10min intervals)
-  - BLE source: govee/ble/# topics (real-time)
+  - BLE source: govee/ble/# topics (real-time, from Theengs)
 - Add `source` tag to differentiate data origin
 - Keep device_name, room, sensor_type tags on both
 
@@ -154,7 +153,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - More frequent readings (every BLE broadcast)
 - Better debugging (see exactly what sensor transmits)
 
-**Status**: 📋 Planned - hardware ordered, design documented
+**Status**: 📋 Ready - use Windows NUC Theengs Gateway; ESP32 optional later
 
 ---
 
@@ -185,27 +184,72 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
+## � Phase 6: Set Schedule Integration (Planned)
+
+**Goal**: Integrate real-time show schedule tracking for festival operations
+
+**Sean's Repo**: https://github.com/macswg/coachella_set_schedule
+
+**What we'll build:**
+
+### Phase 6.1: Git Submodule Setup
+- Add Sean's repo as `services/set-schedule/` submodule
+- Enables easy updates without code duplication
+- Tracks his commits independently
+
+### Phase 6.2: Docker Service
+- Create `Dockerfile.showsite` for containerization
+- Add `set-schedule` service to docker-compose.yml
+- Runs on port 8000 alongside other services
+- Restart policy and volume mounts configured
+
+### Phase 6.3: CLI Integration
+- Add `iot ls` command for set-schedule logs
+- Add `iot web` URL for schedule access
+- Update `manage.sh` to handle set-schedule lifecycle
+
+### Phase 6.4: Update Scripts
+- Update `setup.sh` for submodule initialization
+- Update `manage.sh` for logs and web commands
+
+**What It Is:**
+- FastAPI web app for real-time schedule tracking
+- WebSocket sync across clients
+- Google Sheets integration
+- Operator mode (edit times) + view-only mode
+- Tracks "slip" (lateness vs scheduled times)
+
+**Benefits:**
+- Central operations dashboard for set times
+- Real-time visibility across mobile + desktop clients
+- Historical tracking for post-event analysis
+- Optional: Log slip data to InfluxDB for Grafana dashboards
+
+**Status**: 📋 Planned - can be done anytime (independent of 4/5)
+
+---
+
 ## 🔮 Future Phases (Ideas)
 
-### Phase 6: Additional Sensor Types
+### Phase 7: Additional Sensor Types
 - Motion sensors (PIR)
 - Light sensors
 - Door/window sensors
 - Energy monitoring (smart plugs)
 
-### Phase 7: Automation & Control
+### Phase 8: Automation & Control
 - Home Assistant integration
 - Scene triggers based on sensor data
 - HVAC control based on temperature readings
 - Lighting automation
 
-### Phase 8: Alert System
+### Phase 9: Alert System
 - Slack/Discord/email notifications
 - Temperature threshold alerts
 - Device offline detection
 - API health monitoring
 
-### Phase 9: Multi-Site Support
+### Phase 10: Multi-Site Support
 - Replicate stack to additional show sites
 - Centralized monitoring dashboard
 - Site comparison views
@@ -215,38 +259,37 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ## Success Metrics
 
-**Phase 3 (Current):**
-- [ ] Someone can deploy from scratch in under 15 minutes
-- [ ] Zero manual config file editing after setup.sh
-- [ ] All secrets in .env, nothing hardcoded
-- [ ] Documentation covers 90%+ of common issues
+**Phase 3 (Complete):**
+- [x] Someone can deploy from scratch in under 15 minutes
+- [x] Zero manual config file editing after setup.sh
+- [x] All secrets in .env, nothing hardcoded
+- [x] Documentation covers 90%+ of common issues
 
 **Phase 4:**
 - [ ] BLE latency under 5 seconds
 - [ ] Zero data loss during cloud outages
 - [ ] Both sources visible in Grafana with source tag
+- [ ] Windows NUC Theengs Gateway configured and tested
 
 **Phase 5:**
 - [ ] Network configs backed up daily
 - [ ] 30-day retention of config history
 - [ ] Recovery time < 5 minutes for switch restore
 
+**Phase 6:**
+- [ ] Set-schedule service running in Docker
+- [ ] Real-time schedule updates via WebSocket
+- [ ] Manual set time tracking working end-to-end
+- [ ] Optional: Slip data flowing to InfluxDB
+
 ---
 
 ## Timeline
-## Notes
 
-- Each phase builds on previous phases without breaking existing functionality
-- Phases can be skipped or reordered based on priority
-- Hardware delays may shift Phase 4 timeline
-- Phase 5 depends on stabilizing M4300 scripts in separate repo
-- Naming convention (dpx-showsite-ops) enables multi-site deployments
-
-## Timeline
-
-**Phase 3**: Target completion 2025-02-05 (today)  
-**Phase 4**: Starting today (2025-02-05) - using Theengs Gateway on Windows NUC  
-**Phase 5**: Immediately after Phase 4 - hardware available at studio  
+**Phase 3**: ✅ Complete (2026-02-05)  
+**Phase 4**: Ready to start (2026-02-05) - use Theengs Gateway on Windows NUC  
+**Phase 5**: After Phase 4 completes - hardware available at studio  
+**Phase 6**: Can start anytime (independent of 4/5) - Sean's repo ready  
 
 **Custom ESP32 hardware**: Optional future enhancement, not blocking current phases
 
@@ -259,4 +302,5 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Phase 4 will use existing Windows NUC with Theengs Gateway (already tested)
 - Custom ESP32 BLE gateway is a nice-to-have for later, not required
 - Phase 5 depends on stabilizing M4300 scripts in separate repo
+- Phase 6 is independent and can run in parallel with 4/5
 - Naming convention (dpx-showsite-ops) enables multi-site deployments

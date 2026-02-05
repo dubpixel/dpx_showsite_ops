@@ -244,21 +244,27 @@ docker compose logs [service-name]
 - `update-device-map.sh` script to fetch device info from govee2mqtt API
 - Hourly cron job to auto-update mappings when devices change
 
-### 🚧 Phase 3: Deployment & Documentation (In Progress)
+### ✅ Phase 3: Deployment & Documentation (Completed)
 - Setup automation (setup.sh)
 - Documentation (README, ARCHITECTURE, GRAFANA_SETUP)
 - Volume backup/restore scripts
 - Full deployment testing
 
-### 📋 Phase 4: BLE Gateway (Planned)
+### 📋 Phase 4: BLE Gateway (Ready)
 - BLE decoder service for real-time sensor data
-- ESP32 or Windows Theengs Gateway integration
+- ESP32 or Windows Theengs Gateway integration (parallel paths)
 - Unified Telegraf config with source tagging
 
 ### 📋 Phase 5: Network Backups (Planned)
 - TFTP server deployment
 - M4300 automated backup scripts
 - Monitoring integration
+
+### 📋 Phase 6: Set Schedule Integration (Planned)
+- Integration of Sean's coachella_set_schedule app
+- Git submodule + Docker service deployment
+- Real-time show schedule tracking and WebSocket updates
+- Optional InfluxDB integration for slip tracking
 
 See the [open issues](https://github.com/dubpixel/dpx_showsite_ops/issues) for a full list of proposed features (and known issues).
 
