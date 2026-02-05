@@ -1,4 +1,4 @@
-# The Complete Idiot's Guide to dpx-showsite-ops
+# The First Timer's Guide to dpx-showsite-ops
 ## From Bare Metal to Beautiful Graphs
 
 **Target Audience**: Someone who has never touched Docker, Linux, or IoT before  
