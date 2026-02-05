@@ -40,3 +40,4 @@ telegraf/backups/
 # Local backup/temp files
 .env_bu
 hostname
+zz_archive/
