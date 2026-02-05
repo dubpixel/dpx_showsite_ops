@@ -6,6 +6,34 @@ All notable changes to dpx-showsite-ops.
 
 ## [Unreleased]
 
+### Phase 4 - BLE Gateway (Planned)
+- BLE decoder service for real-time sensor data
+- ESP32 or Windows Theengs Gateway integration
+- Unified Telegraf config with source tagging
+
+### Phase 5 - Network Backups (Planned)  
+- TFTP server deployment
+- M4300 automated backup scripts
+- Monitoring integration
+
+---
+
+## [1.0.1] - 2025-02-05
+
+### Phase 3 - Final Touches
+- Added docs/GRAFANA_SETUP.md with complete datasource and dashboard setup guide
+- Reorganized repository structure: moved scripts to scripts/ directory
+- Fixed all path references in manage.sh, update-device-map.sh, and iot wrapper
+- Updated .gitignore to exclude backup and temporary files
+- Tested all iot commands working correctly after reorganization
+
+---
+
+## [1.0.0] - 2025-02-05
+---
+
+## [Unreleased]
+
 ### Phase 3 - Deployment & Documentation (In Progress)
 - Added README.md with quick start guide
 - Added ROADMAP.md with phase tracking
