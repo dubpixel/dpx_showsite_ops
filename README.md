@@ -14,6 +14,7 @@ Operations stack for DPX show sites. A unified platform for IoT monitoring, envi
 - **Time Series DB**: InfluxDB 2.x for storing sensor readings
 - **Visualization**: Grafana dashboards with public sharing
 - **Data Pipeline**: Telegraf for MQTT→InfluxDB routing with tag enrichment
+- **LIVE DEMO**: [HERE](https://calling-penalties-slides-timothy.trycloudflare.com/public-dashboards/21f922f1bbcb4bba81b1a7fed502d1c3)
 
 ---
 
