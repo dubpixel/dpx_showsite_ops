@@ -29,8 +29,8 @@ case "$1" in
   nuke)     docker exec influxdb influx delete --org home --token my-super-secret-token --bucket govee --start 1970-01-01T00:00:00Z --stop 2030-01-01T00:00:00Z && echo "Bucket nuked." ;;
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
-  update)   ~/dpx_govee_stack/update-device-map.sh ;;
-  cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $HOME/dpx_govee_stack/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
+  update)   ~/dpx_govee_stack/scripts/update-device-map.sh ;;
+  cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $HOME/dpx_govee_stack/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
   env)      cat ~/dpx_govee_stack/.env ;;
   conf)     cat ~/dpx_govee_stack/telegraf/telegraf.conf ;;

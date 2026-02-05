@@ -26,6 +26,12 @@ Operations stack for DPX show sites. A unified platform for IoT monitoring, envi
 
 ---
 
+## Post-Deployment Setup
+
+After running `iot up`, see [Grafana Setup Guide](docs/GRAFANA_SETUP.md) for connecting InfluxDB and creating dashboards.
+
+---
+
 ## Quick Start
 
 ### 1. Clone the repository
