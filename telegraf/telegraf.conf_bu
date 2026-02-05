@@ -1,0 +1,17 @@
+[agent]
+  interval = "10s"
+
+[[outputs.influxdb_v2]]
+  urls = ["http://influxdb:8086"]
+  token = "my-super-secret-token"
+  organization = "home"
+  bucket = "govee"
+
+[[inputs.mqtt_consumer]]
+  servers = ["tcp://mosquitto:1883"]
+  topics = [
+    "gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state",
+    "gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state"
+  ]
+  data_format = "value"
+  data_type = "float"

@@ -1,0 +1,42 @@
+# Environment and secrets
+.env
+*.key
+*.pem
+
+# Logs
+*.log
+logs/
+update-device-map.log
+
+# Backups
+backups/
+*.bak
+*.backup
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Telegraf backups
+telegraf/backups/
+
+# Local backup/temp files
+.env_bu
+hostname
