@@ -41,3 +41,5 @@ telegraf/backups/
 .env_bu
 hostname
 zz_archive/
+context_private/
+*context*.md
