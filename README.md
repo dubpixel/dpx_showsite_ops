@@ -87,7 +87,7 @@ Operations stack for DPX show sites. Get Govee sensor data flowing into InfluxDB
 
 ## Getting Started
 
-> **🆕 First time?** See the [Complete Setup Guide](docs/SETUP_GUIDE_COMPLETE.md) — covers everything from creating the VM to Cloudflare tunnels, step by step.
+> **🆕 First time?** See the [Complete Setup Guide](https://github.com/dubpixel/dpx_showsite_ops/blob/master/docs/SETUP_GUIDE_COMPLETE.md) — covers everything from creating the VM to Cloudflare tunnels, step by step.
 
 ### Prerequisites
 
