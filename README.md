@@ -48,16 +48,31 @@
 
 Operations stack for DPX show sites. Get Govee sensor data flowing into InfluxDB with Grafana dashboards in minutes. Includes MQTT pub/sub messaging, time-series storage, and remote access via Tailscale or Cloudflare Tunnel.
 
-**Current Deployment:** Govee IoT monitoring via cloud API + planned BLE gateway integration  
+**Current Deployment:** Govee IoT monitoring via cloud API + ESP32 BLE gateways (OpenMQTTGateway)
 **Future:** Network device backups, additional sensor types, automation workflows
 
 **Key features:**
 - **Govee IoT Stack**: Temperature/humidity monitoring via Govee H5051 sensors
+- **ESP32 BLE Gateways**: Real-time BLE data collection (<5 sec latency)
 - **MQTT Broker**: Eclipse Mosquitto for sensor data pub/sub
 - **Time Series DB**: InfluxDB 2.x for storing sensor readings
 - **Visualization**: Grafana dashboards with public sharing
 - **Data Pipeline**: Telegraf for MQTT→InfluxDB routing with tag enrichment
 - **Live Demo**: [HERE](https://calling-penalties-slides-timothy.trycloudflare.com/public-dashboards/21f922f1bbcb4bba81b1a7fed502d1c3)
+
+### Hardware: ESP32 BLE Gateways
+
+For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gateways running OpenMQTTGateway:
+
+- **Board**: Custom ESP32-based hardware (WiFi enabled)
+- **Firmware**: OpenMQTTGateway **esp32feather-ble** build
+- **Flash Tool**: Browser-based [web installer](https://docs.openmqttgateway.com/upload/web-install.html) (no code required)
+- **Setup Time**: 5-10 minutes per gateway
+- **Multi-Site**: Deploy multiple gateways for coverage
+
+**Quick Deploy**: Open the [web installer](https://docs.openmqttgateway.com/upload/web-install.html), select **esp32feather-ble**, flash, and configure WiFi + MQTT broker.
+
+**Fallback**: Theengs Gateway on Windows available for testing/development.
 
 <details>
 <summary>Images</summary>

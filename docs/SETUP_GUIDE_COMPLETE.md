@@ -771,6 +771,156 @@ You should see output about discovering devices. Leave this running.
 
 ---
 
+## Part 11: ESP32 BLE Gateway Setup (Recommended)
+
+**For real-time BLE data (<5 sec latency)**, deploy ESP32 hardware gateways instead of or alongside Theengs on Windows.
+
+### Why ESP32?
+- **Dedicated hardware**: No PC required, low power
+- **Multi-site ready**: Deploy at remote locations
+- **Faster setup**: 5-10 min per gateway
+- **Production proven**: OpenMQTTGateway firmware used worldwide
+
+### 11.1: Hardware Requirements
+
+- **Board**: ESP32-based hardware with WiFi (custom DPX boards or ESP32 DevKit)
+- **USB Cable**: For initial firmware flash
+- **Browser**: Chrome or Edge (for web installer)
+- **Network**: WiFi credentials + MQTT broker IP
+
+### 11.2: Flash Firmware
+
+1. **Open web installer**: https://docs.openmqttgateway.com/upload/web-install.html
+
+2. **Select firmware**: Choose **esp32feather-ble** (NOT esp32dev-ble)
+   - For custom DPX boards: **esp32feather-ble**
+   - For generic ESP32 DevKit: esp32dev-ble
+
+3. **Connect ESP32**: Plug into computer via USB
+
+4. **Click "Install"**: Browser will ask to select serial port
+   - Select the ESP32 port (usually "/dev/cu.usbserial-*" on Mac, "COM*" on Windows)
+   - Click "Connect"
+
+5. **Wait for flash**: Takes 2-3 minutes
+   - Progress bar shows upload status
+   - Don't disconnect during flash!
+
+6. **Flash complete**: Click "Next" when done
+
+### 11.3: Configure Gateway
+
+1. **Connect to ESP32 WiFi**:
+   - Look for WiFi network: **"OpenMQTTGateway"**
+   - Password: **"your_password"** (default)
+   - Connect from your phone or laptop
+
+2. **Open configuration portal**:
+   - Browser should auto-open to 192.168.4.1
+   - If not, manually open: http://192.168.4.1
+
+3. **Configure WiFi**:
+   - Click "Configure WiFi"
+   - Select your network SSID
+   - Enter WiFi password
+
+4. **Configure MQTT**:
+   - MQTT Server: `<your-vm-ip>` (e.g., 192.168.1.100)
+   - MQTT Port: `1883`
+   - MQTT User: (leave blank for anonymous)
+   - MQTT Password: (leave blank for anonymous)
+
+5. **Save & Reboot**:
+   - Click "Save"
+   - ESP32 reboots and connects to your WiFi
+
+### 11.4: Verify Gateway
+
+**On your VM**, check that ESP32 is publishing:
+
+```bash
+iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10
+```
+
+You should see JSON messages with BLE device data:
+```json
+{"id":"4381ECA1010A","mac_type":1,"manufacturerdata":"88ec004e06f00864e00101","rssi":-65}
+```
+
+**If you see data**: ✅ Gateway is working!
+
+**If no data**:
+- Check ESP32 LEDs (should be on/blinking)
+- Verify WiFi connection (ESP32 on same network as VM)
+- Check MQTT broker IP is correct
+- Try power cycling the ESP32
+
+### 11.5: Multi-Gateway Deployment (Optional)
+
+For larger venues or multiple rooms:
+
+1. **Flash additional ESP32s**: Repeat steps 11.2-11.3 for each gateway
+
+2. **Name your gateways**: In config portal, set unique names:
+   - Gateway 1: "omg-studio-down"
+   - Gateway 2: "omg-studio-up"
+   - Gateway 3: "omg-lobby"
+
+3. **Map coverage areas**:
+
+| Gateway Name | Location | Covers Sensors | MQTT Topic |
+|--------------|----------|----------------|------------|
+| omg-studio-down | Studio Downstairs | H5051 (4381ECA1010A) | home/omg-studio-down/BTtoMQTT/# |
+| omg-studio-up | Studio Upstairs | (future sensors) | home/omg-studio-up/BTtoMQTT/# |
+| omg-lobby | Lobby | (future sensors) | home/omg-lobby/BTtoMQTT/# |
+
+4. **Update ble_decoder.py** to subscribe to all gateways:
+   ```bash
+   iot mqtt "home/+/BTtoMQTT/#"
+   ```
+
+### 11.6: Troubleshooting
+
+**Can't connect to OpenMQTTGateway WiFi**:
+- Hold ESP32 BOOT button for 5 seconds to reset WiFi
+- Power cycle ESP32
+- Try from a different device (phone vs laptop)
+
+**Configuration portal won't open**:
+- Make sure connected to "OpenMQTTGateway" WiFi
+- Try http://192.168.4.1 manually
+- Clear browser cache
+- Try different browser (Chrome recommended)
+
+**ESP32 won't stay connected to WiFi**:
+- Check WiFi signal strength (move closer to AP)
+- Verify WiFi password is correct
+- Check router doesn't block new devices
+- Try 2.4GHz WiFi (ESP32 doesn't support 5GHz)
+
+**No BLE data appearing**:
+- BLE sensors must be within ~30 feet of ESP32
+- Remove sensor batteries for 10 sec, reinsert
+- Check sensor is broadcasting: should show in Govee app
+- Verify ESP32 is publishing *something*: `iot mqtt "home/OpenMQTTGateway/#"`
+
+**Wrong firmware flashed**:
+- Reflash with correct build: **esp32feather-ble** for DPX boards
+- Use "Erase Flash" option in web installer first
+
+### 11.7: Next Steps
+
+With ESP32 gateway(s) deployed:
+
+1. **Deploy ble_decoder.py** (see Phase 4 in main docs)
+2. **Update Telegraf** to collect both cloud + BLE data
+3. **Update Grafana** dashboards to show both sources
+4. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
+
+**Windows Theengs Gateway**: Available as fallback option (see Part 10)
+
+---
+
 ## Troubleshooting
 
 ### govee2mqtt Shows Timeout Errors

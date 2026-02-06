@@ -14,11 +14,12 @@
 - File organization complete (scripts in scripts/ directory)
 - Version controlled: https://github.com/dubpixel/dpx_showsite_ops (public repo)
 
-**Phase 4 - BLE Gateway Integration (Ready to Start)**
+**Phase 4 - BLE Gateway Integration (In Progress - ESP32 Hardware Live)**
+- ESP32 BLE gateways deployed (OpenMQTTGateway firmware)
 - Deploy ble_decoder.py as systemd service
-- Connect to Theengs Gateway (already running on Windows NUC)
 - Unified Telegraf config with source tagging (cloud + BLE)
 - Update Grafana dashboards to show both sources
+- Theengs Gateway available as Windows fallback option
 
 **Phase 5 - Network Device Backups (After Phase 4)**
 - TFTP server setup
@@ -85,6 +86,24 @@
 ### Unknown Device
 - **MAC**: A8:46:74:1A:65:62
 - Shows up in BLE scans, not yet identified
+
+### ESP32 BLE Gateway (Phase 4 Hardware)
+- **Board**: Custom ESP32-based hardware (DPX boards)
+- **Firmware**: OpenMQTTGateway v1.8+ (esp32feather-ble build)
+- **Flash Method**: Web installer at https://docs.openmqttgateway.com/upload/web-install.html
+- **MQTT Topics**: Publishes to `home/OpenMQTTGateway/BTtoMQTT/{MAC}` (raw BLE)
+- **Purpose**: Real-time BLE collection (<5 sec latency) from Govee sensors
+- **Status**: ✅ Gateway 1 deployed and publishing
+- **Config**: WiFi + MQTT broker at <server-ip>:1883
+
+**Quick Setup**:
+1. Open web installer, select **esp32feather-ble** firmware
+2. Flash to board (2-3 min)
+3. Connect to "OpenMQTTGateway" WiFi, configure at 192.168.4.1
+4. Set WiFi SSID/password + MQTT broker IP
+5. Verify: `iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10`
+
+**Fallback**: Theengs Gateway on Windows (see THEENGS GATEWAY section)
 
 ---
 
@@ -260,8 +279,8 @@ Grafana
 ```
 Govee H5051 Sensor
   ↓ (BLE broadcast every ~1min)
-Theengs Gateway (Windows NUC)
-  ↓ (publishes raw to: home/TheengsGateway/BTtoMQTT/{MAC})
+ESP32 BLE Gateway (OpenMQTTGateway)
+  ↓ (publishes raw to: home/OpenMQTTGateway/BTtoMQTT/{MAC})
 ble_decoder.py (systemd service)
   ↓ (decodes, publishes to: govee/ble/{room}/{metric})
 Mosquitto MQTT Broker
@@ -273,6 +292,8 @@ InfluxDB
 Grafana (shows both sources)
 ```
 
+**Note**: Theengs Gateway on Windows available as fallback option.
+
 ---
 
 ## MQTT TOPICS
@@ -283,9 +304,10 @@ gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state  → float (°F o
 gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state     → float (%)
 ```
 
-### BLE Topics (Phase 4 - planned)
+### BLE Topics (Phase 4 - in progress)
 ```
-home/TheengsGateway/BTtoMQTT/4381ECA1010A     → JSON with manufacturerdata
+home/OpenMQTTGateway/BTtoMQTT/4381ECA1010A    → JSON with manufacturerdata (from ESP32)
+home/TheengsGateway/BTtoMQTT/4381ECA1010A     → JSON with manufacturerdata (fallback: Windows)
 govee/ble/studown/temperature                  → float (°C from ble_decoder.py)
 govee/ble/studown/humidity                     → float (%)
 govee/ble/studown/battery                      → int (%)
@@ -511,21 +533,36 @@ iot cron-off  # Disable cron job
 
 ---
 
-## THEENGS GATEWAY (Windows NUC)
+## BLE GATEWAY OPTIONS
 
-**Current Setup:**
+### Primary: ESP32 Hardware (OpenMQTTGateway)
+**Production deployment** using custom ESP32-based boards with OpenMQTTGateway firmware.
+
+**Hardware**: Custom DPX boards (ESP32-based, WiFi enabled)
+**Firmware**: OpenMQTTGateway v1.8+ (esp32feather-ble build)
+**Flash Tool**: Web installer at https://docs.openmqttgateway.com/upload/web-install.html
+**MQTT Topics**: `home/OpenMQTTGateway/BTtoMQTT/{MAC}`
+**Setup Time**: 5-10 minutes per gateway
+**Advantages**: Dedicated hardware, low power, multi-site deployment ready
+
+**Deployment Steps**:
+1. Open web installer in Chrome/Edge
+2. Select **esp32feather-ble** firmware (not esp32dev-ble)
+3. Connect ESP32 via USB, click Install
+4. Wait 2-3 min for flash
+5. Connect to "OpenMQTTGateway" WiFi
+6. Open 192.168.4.1, configure WiFi + MQTT broker
+7. Verify: `iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#"`
+
+### Fallback: Theengs Gateway (Windows)
+**Testing/fallback option** for Windows environments.
+
 - Installed via pip on Windows with VS 2022 Build Tools C++
 - Run manually: `python -m TheengsGateway -H <server-ip> -P 1883`
 - Not a service yet, run manually in PowerShell
 - H5051 NOT supported by Theengs decoder natively
 - Raw manufacturerdata published to MQTT: `home/TheengsGateway/BTtoMQTT/{MAC}`
-- Needs custom decoder (ble_decoder.py) on VM to parse
-
-**Phase 4 Tasks:**
-- Keep using Theengs on Windows (already working)
-- Deploy ble_decoder.py as systemd service on VM
-- Subscribe to `home/TheengsGateway/BTtoMQTT/#`
-- Decode and republish to `govee/ble/{room}/{metric}`
+- Same ble_decoder.py handles both ESP32 and Theengs topics
 
 ---
 
@@ -561,13 +598,19 @@ iot cron-off  # Disable cron job
 
 ---
 
-## PHASE 4 - BLE GATEWAY INTEGRATION (NEXT)
+## PHASE 4 - BLE GATEWAY INTEGRATION (IN PROGRESS)
 
 ### Goals
 - Real-time sensor data (<5 second latency)
 - Dual-source data (cloud + BLE)
 - No dependency on Govee cloud uptime
 - Better debugging (see raw sensor broadcasts)
+
+### Completed
+- ✅ ESP32 hardware gateway deployed (Gateway 1)
+- ✅ OpenMQTTGateway firmware flashed (esp32feather-ble)
+- ✅ WiFi + MQTT configuration complete
+- ✅ Publishing raw BLE to `home/OpenMQTTGateway/BTtoMQTT/#`
 
 ### Tasks
 
@@ -639,7 +682,10 @@ Add BLE input alongside cloud input:
 
 #### 4.4: Testing
 ```bash
-# Verify Theengs is publishing
+# Verify ESP32 gateway is publishing (primary)
+iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10
+
+# Or verify Theengs (fallback)
 iot mqtt "home/TheengsGateway/BTtoMQTT/#" 10
 
 # Verify decoder is running
