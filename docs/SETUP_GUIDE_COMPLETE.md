@@ -304,7 +304,7 @@ network:
     eth0:
       dhcp4: no
       addresses:
-        - 192.168.1.100/24
+        - 192.168.1.X/24
       routes:
         - to: default
           via: 192.168.1.1
@@ -329,7 +329,7 @@ sudo netplan apply
 ip addr show eth0 | grep 'inet '
 ```
 
-Should now show `192.168.1.100` (or whatever you set)
+Should now show `192.168.1.X` (or whatever you set)
 
 **Test internet**:
 ```bash
@@ -505,10 +505,10 @@ Grafana shows graphs. InfluxDB stores data. Let's connect them.
 On your **main computer** (not the VM), open a web browser and go to:
 
 ```
-http://192.168.1.100:3000
+http://192.168.1.X:3000
 ```
 
-(Replace 192.168.1.100 with your VM's IP if you used something different)
+(Replace 192.168.1.X with your VM's IP if you used something different)
 
 You should see the Grafana login page.
 
@@ -758,10 +758,10 @@ pip install TheengsGateway
 ### 10.4: Run Theengs Gateway
 
 ```powershell
-python -m TheengsGateway -H 192.168.1.100 -P 1883
+python -m TheengsGateway -H 192.168.1.X -P 1883
 ```
 
-(Replace 192.168.1.100 with your VM's IP)
+(Replace 192.168.1.X with your VM's IP)
 
 You should see output about discovering devices. Leave this running.
 
@@ -825,7 +825,7 @@ You should see output about discovering devices. Leave this running.
    - Enter WiFi password
 
 4. **Configure MQTT**:
-   - MQTT Server: `<your-vm-ip>` (e.g., 192.168.1.100)
+   - MQTT Server: `<your-vm-ip>` (e.g., 192.168.1.X)
    - MQTT Port: `1883`
    - MQTT User: (leave blank for anonymous)
    - MQTT Password: (leave blank for anonymous)
