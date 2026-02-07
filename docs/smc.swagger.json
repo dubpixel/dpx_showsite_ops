@@ -1,0 +1,878 @@
+{
+    "swagger": "2.0",
+    "basePath": "/api",
+    "paths": {
+      "/chassis/power/cycle": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Power cycle the disguise server via the IPMI interface.\n\n Note: This will not gracefully shut down the OS",
+          "operationId": "post_chassis_power_cycle",
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/chassis/power/off": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Turn off the disguise server via the IPMI interface.\n\n Note: This will not gracefully shut down the OS",
+          "operationId": "post_chassis_power_off",
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/chassis/power/on": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Turn on the disguise server via the IPMI interface.",
+          "operationId": "post_chassis_power_on",
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/chassis/power/status": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Get the chassis status information via the IPMI interface.",
+          "operationId": "get_chassis_power_status",
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/chassis/stats": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Get the current system stats - fan speeds, temps etc.",
+          "operationId": "get_chassis_stats",
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/chassis/whoami": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Blink the OLED screen and rear LED strip to help with server identification",
+          "operationId": "post_chassis_id",
+          "tags": [
+            "chassis"
+          ]
+        }
+      },
+      "/ledstrip": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "$ref": "#/definitions/Rear_LED_Strip"
+              }
+            }
+          },
+          "description": "Get the current settings of the rear LED strip at the back of the disguise server \n\n  - static: entire strip is set to the same colour\n - colour_id: 6 pixels at each side are set to the given RGB colour, the rest are white\n - rainbow: a rainbow moves across the ledstrip, RGB values have no effect",
+          "operationId": "get_ledstrip_control_all",
+          "tags": [
+            "ledstrip"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - please login for access"
+            },
+            "400": {
+              "description": "Bad request - check body for compatibility"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Set the colour and mode of the rear LED strip at the back of the disguise server \n\n  - static: entire strip is set to the same colour\n - colour_id: 6 pixels at each side are set to the given RGB colour, the rest are white\n - rainbow: a rainbow moves across the ledstrip, RGB values have no effect",
+          "operationId": "post_ledstrip_control_all",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/Rear_LED_Strip"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "ledstrip"
+          ]
+        }
+      },
+      "/localmachine": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "$ref": "#/definitions/Local_Machine"
+              }
+            }
+          },
+          "description": "Get the status of the d3 host",
+          "operationId": "get_local_machine",
+          "tags": [
+            "localmachine"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update with the status of the d3 host",
+          "operationId": "post_local_machine",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/Local_Machine"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "localmachine"
+          ]
+        }
+      },
+      "/networkadapters": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Network_Adapter"
+                }
+              }
+            }
+          },
+          "description": "Get the details of the disguise server's network configuration",
+          "operationId": "get_net_adapter_list",
+          "tags": [
+            "networkadapters"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update the details of the disguise server's network configuration",
+          "operationId": "post_net_adapter_list",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Network_Adapter"
+                }
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "networkadapters"
+          ]
+        }
+      },
+      "/networkadapters/{mac}": {
+        "parameters": [
+          {
+            "name": "mac",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "$ref": "#/definitions/Network_Adapter"
+              }
+            }
+          },
+          "description": "Get the details of the disguise server's network interface by mac address",
+          "operationId": "get_net_adapter",
+          "tags": [
+            "networkadapters"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update the details of the disguise server's network interface by mac address",
+          "operationId": "post_net_adapter",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/Network_Adapter"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "networkadapters"
+          ]
+        }
+      },
+      "/oled/notification": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - please login for access"
+            },
+            "400": {
+              "description": "Bad request - check body for compatibility"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Create a notification that will display on the OLED\n\n - The default time this notification displays for is 10s and can be changed with notification/time endpoint\n - The maximum length of a message is 200 characters, anything over this will be truncated",
+          "operationId": "post_oled_notification",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/OLED_Notification"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "oled"
+          ]
+        }
+      },
+      "/oled/notification/time": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - please login for access"
+            },
+            "400": {
+              "description": "Bad request - check body for compatibility"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Set the default time a notification appears on the OLED for",
+          "operationId": "post_oled_notification_time",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/OLED_Notification_Time"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "oled"
+          ]
+        }
+      },
+      "/session": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "$ref": "#/definitions/Session"
+              }
+            }
+          },
+          "description": "Get the session name of the d3 host",
+          "operationId": "get_session",
+          "tags": [
+            "session"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update with the session name of the d3 host",
+          "operationId": "post_session",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/Session"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "session"
+          ]
+        }
+      },
+      "/smc": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "404": {
+              "description": "Not found"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "$ref": "#/definitions/SMC"
+              }
+            }
+          },
+          "description": "Get the current status of the SMC system",
+          "operationId": "get_remora",
+          "tags": [
+            "smc"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update the status of the SMC system \n\n Note: Here for consistency but of no real use in practice",
+          "operationId": "post_remora",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "$ref": "#/definitions/SMC"
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "smc"
+          ]
+        }
+      },
+      "/smc/clear/all": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Clears all the data in the SMC database including user accounts \n\n - There is no undo",
+          "operationId": "post_remora_data_reset",
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "smc"
+          ]
+        }
+      },
+      "/smc/enable/downgrade": {
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthroized - Please login for access"
+            },
+            "200": {
+              "description": "Success - Ok"
+            }
+          },
+          "description": "Restart SWUpdate process to permit downgrading SMC version below permitted version \n\n - WARNING: This may cause unrecoverable error",
+          "operationId": "post_remora_enable_downgrade",
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "smc"
+          ]
+        }
+      },
+      "/vfcs": {
+        "get": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "200": {
+              "description": "Success - Ok",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/VFC_Slot"
+                }
+              }
+            }
+          },
+          "description": "Get a list of all the vfc cards installed in the disguise server",
+          "operationId": "get_vfc_slot_list",
+          "tags": [
+            "vfcs"
+          ]
+        },
+        "post": {
+          "responses": {
+            "500": {
+              "description": "Check the response body for error details"
+            },
+            "401": {
+              "description": "Unauthorized - Please login for access"
+            },
+            "201": {
+              "description": "Success - Created"
+            }
+          },
+          "description": "Update with a list of all the vfc cards installed in the disguise server \n\n - The POSTed list replaces the entire current list in the database",
+          "operationId": "post_vfc_slot_list",
+          "parameters": [
+            {
+              "name": "payload",
+              "required": true,
+              "in": "body",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/VFC_Slot"
+                }
+              }
+            }
+          ],
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "tags": [
+            "vfcs"
+          ]
+        }
+      }
+    },
+    "info": {
+      "title": "SMC API",
+      "version": "1.0.0",
+      "description": "An API for the SMC system",
+      "termsOfService": "https://www.disguise.one/en/learn-support/contact-support/",
+      "license": {
+        "name": "Apache 2.0",
+        "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+      }
+    },
+    "produces": [
+      "application/json"
+    ],
+    "consumes": [
+      "application/json"
+    ],
+    "securityDefinitions": {
+      "basicAuth": {
+        "type": "basic"
+      }
+    },
+    "tags": [
+      {
+        "name": "chassis",
+        "description": "Interact with the physical disguise server, including the IPMI interface"
+      },
+      {
+        "name": "vfcs",
+        "description": "Update and retrieve details about the vfc cards installed in the disguise server"
+      },
+      {
+        "name": "smc",
+        "description": "Update and retrieve details about the SMC system installed in the disguise server"
+      },
+      {
+        "name": "localmachine",
+        "description": "Update and retrieve details about the status of the d3 host"
+      },
+      {
+        "name": "session",
+        "description": "Update and retrieve details about session of the d3 host"
+      },
+      {
+        "name": "networkadapters",
+        "description": "Update and retrieve details about the disguise server's network configuration"
+      },
+      {
+        "name": "ledstrip",
+        "description": "Interact with the ledstrip at the rear of the disguise server"
+      },
+      {
+        "name": "oled",
+        "description": "Interact with the oled at the front of the disguise server"
+      }
+    ],
+    "definitions": {
+      "VFC_Slot": {
+        "properties": {
+          "slot": {
+            "type": "integer",
+            "example": 1,
+            "minimum": 1,
+            "maximum": 4
+          },
+          "type": {
+            "type": "string",
+            "example": "HDMI",
+            "enum": [
+              "HDMI",
+              "DP",
+              "QDVI",
+              "QSDI"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "example": " "
+          }
+        },
+        "type": "object"
+      },
+      "SMC": {
+        "properties": {
+          "[Time Elapsed (post-boot)]": {
+            "type": "string",
+            "example": "ETH_MGMT Enumerated"
+          }
+        },
+        "type": "object"
+      },
+      "Local_Machine": {
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "example": "hostname"
+          },
+          "serial": {
+            "type": "string",
+            "example": "44150"
+          },
+          "type": {
+            "type": "string",
+            "example": "vx4"
+          }
+        },
+        "type": "object"
+      },
+      "Session": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "example": "understudy"
+          }
+        },
+        "type": "object"
+      },
+      "Network_Adapter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "d3net"
+          },
+          "ip": {
+            "type": "string",
+            "example": "xxx.xxx.xxx.xxx"
+          },
+          "mac": {
+            "type": "string",
+            "example": "hh-hh-hh-hh-hh"
+          },
+          "netmask": {
+            "type": "string",
+            "example": "xxx.xxx.xxx.xxx"
+          }
+        },
+        "type": "object"
+      },
+      "Rear_LED_Strip": {
+        "properties": {
+          "ledMode": {
+            "type": "string",
+            "example": "static",
+            "enum": [
+              "static",
+              "colour_id",
+              "rainbow"
+            ]
+          },
+          "ledR": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "ledG": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "ledB": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "type": "object"
+      },
+      "OLED_Notification": {
+        "properties": {
+          "priority": {
+            "type": "integer",
+            "description": "0 is highest priority and will overwrite a notification being displayed of a lower priority, same priorities will enter a queue",
+            "example": 0,
+            "minimum": 0,
+            "maximum": 2
+          },
+          "title": {
+            "type": "string",
+            "example": "Display Error"
+          },
+          "message": {
+            "type": "string",
+            "example": "Could not configure output for GUI 0"
+          }
+        },
+        "type": "object"
+      },
+      "OLED_Notification_Time": {
+        "properties": {
+          "time": {
+            "type": "integer",
+            "description": "Default time for how many seconds to display the OLED notification for",
+            "example": 10,
+            "minimum": 5,
+            "maximum": 30
+          }
+        },
+        "type": "object"
+      }
+    },
+    "responses": {
+      "ParseError": {
+        "description": "When a mask can't be parsed"
+      },
+      "MaskError": {
+        "description": "When any error occurs on mask"
+      }
+    }
+  }
+  
