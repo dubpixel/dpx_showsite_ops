@@ -35,6 +35,14 @@ case "$1" in
   env)      cat ~/dpx_govee_stack/.env ;;
   conf)     cat ~/dpx_govee_stack/telegraf/telegraf.conf ;;
   edit)     nano ~/dpx_govee_stack/${2:-.env} ;;
+  esp32-enable)
+    echo "Enabling ESP32 pubadvdata..."
+    mosquitto_pub -h localhost \
+      -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true}'
+    echo "✓ ESP32 advertisement data enabled"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"

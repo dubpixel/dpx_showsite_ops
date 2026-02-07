@@ -1,15 +1,39 @@
 #!/usr/bin/env python3
-"""Auto-discover Govee devices and decode BLE data from Theengs Gateway"""
+"""
+BLE Decoder v1.2 - MQTT Payload Decoder
+Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
+
+Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
+- site: SHOWSITE_NAME from environment (default: demo_showsite)
+- node: dpx_ops_decoder (this service)
+- source_node: Gateway that captured the BLE data (dpx_ops_1, TheengsGateway, etc)
+- room: Physical location from Govee API
+- device: Device name from Govee API
+- metric: temperature, humidity, battery, rssi
+"""
+
 import json
+import os
 import urllib.request
 import paho.mqtt.client as mqtt
+import sys
 
+# Configuration
 BROKER = "localhost"
 PORT = 1883
 API = "http://localhost:8056/api/devices"
-SUB_TOPIC = "home/TheengsGateway/BTtoMQTT/#"
-PUB_PREFIX = "govee/ble"
 
+# Read showsite name from environment
+SHOWSITE = os.getenv("SHOWSITE_NAME", "demo_showsite")
+DECODER_NODE = "dpx_ops_decoder"
+
+# Subscribe to both gateway types
+SUB_TOPICS = [
+    f"{SHOWSITE}/+/BTtoMQTT/#",        # ESP32 gateways
+    "home/TheengsGateway/BTtoMQTT/#",  # Theengs gateway
+]
+
+# Decoder configuration per model
 DECODERS = {
     "H5051": lambda b: decode_h5051(b),
     "H5074": lambda b: decode_h507x(b),
@@ -17,9 +41,12 @@ DECODERS = {
     "H5072": lambda b: decode_h507x(b),
 }
 
+# Device mapping loaded from API
 DEVICES = {}
 
+
 def load_devices():
+    """Load device info from govee2mqtt API."""
     try:
         resp = urllib.request.urlopen(API, timeout=5)
         devices = json.loads(resp.read())
@@ -33,56 +60,176 @@ def load_devices():
             }
         print(f"Loaded {len(DEVICES)} devices from API:")
         for mac, info in DEVICES.items():
-            print(f"  {mac} -> {info['name']} ({info['sku']}) room={info['room']}")
+            print(f"  {mac} -> {info['name']} ({info['sku']}) in {info['room']}")
     except Exception as e:
         print(f"Failed to load devices: {e}")
+        print("Continuing with empty device map...")
+
 
 def decode_h5051(b):
+    """Decode Govee H5051 manufacturer data."""
     if len(b) < 8:
         return None
     temp_raw = b[3] | (b[4] << 8)
-    return {"temp_c": temp_raw / 100.0, "humidity": b[5] / 10.0, "battery": b[7]}
+    return {
+        "temp_c": temp_raw / 100.0,
+        "humidity": b[5] / 10.0,
+        "battery": b[7]
+    }
+
 
 def decode_h507x(b):
+    """Decode Govee H5074/H5075/H5072 manufacturer data."""
     if len(b) < 6:
         return None
     raw = (b[3] << 16) | (b[4] << 8) | b[5]
-    return {"temp_c": raw / 10000, "humidity": (raw % 1000) / 10.0, "battery": b[6]}
+    return {
+        "temp_c": raw / 10000,
+        "humidity": (raw % 1000) / 10.0,
+        "battery": b[6] if len(b) > 6 else 100
+    }
+
+
+def extract_source_node(topic):
+    """
+    Extract source node name from incoming topic.
+    
+    Topic formats:
+    - demo_showsite/dpx_ops_1/BTtoMQTT/{MAC}
+    - home/TheengsGateway/BTtoMQTT/{MAC}
+    
+    Returns: source_node name (e.g., "dpx_ops_1", "TheengsGateway")
+    """
+    parts = topic.split("/")
+    
+    if "TheengsGateway" in topic:
+        return "TheengsGateway"
+    elif len(parts) >= 2:
+        return parts[1]
+    else:
+        return "unknown"
+
 
 def on_message(client, userdata, msg):
+    """Process incoming BLE message and publish decoded data."""
     try:
-        mac = msg.topic.split("/")[-1]
+        # Extract MAC from topic (last segment)
+        mac = msg.topic.split("/")[-1].replace(":", "").upper()
+        if os.getenv("DEBUG_DECODER"): print(f"DEBUG: Received from {msg.topic}, MAC: {mac}")
+        
+        # Match device by MAC suffix
         device = None
         for suffix, info in DEVICES.items():
             if suffix.endswith(mac) or mac.endswith(suffix[-len(mac):]):
                 device = info
                 break
+        
         if not device:
-            return
+            return  # Unknown device, skip
+        
+        # Parse JSON payload
         data = json.loads(msg.payload)
         mfr = data.get("manufacturerdata")
+        
         if not mfr:
-            return
+            return  # No manufacturer data
+        
+        # Get decoder for this device model
         decoder = DECODERS.get(device["sku"])
         if not decoder:
-            return
+            return  # No decoder for this model
+        
+        # Decode the manufacturer data
         b = bytes.fromhex(mfr)
         decoded = decoder(b)
+        
         if not decoded:
-            return
+            return  # Decoding failed
+        
+        # Extract source node from incoming topic
+        source_node = extract_source_node(msg.topic)
+        
+        # Build output topic path
+        # Format: {site}/{node}/{source_node}/{room}/{device}/{metric}
         room = device["room"]
-        client.publish(f"{PUB_PREFIX}/{room}/temperature", decoded["temp_c"])
-        client.publish(f"{PUB_PREFIX}/{room}/humidity", decoded["humidity"])
+        device_name = device["name"]
+        base_topic = f"{SHOWSITE}/{DECODER_NODE}/{source_node}/{room}/{device_name}"
+        
+        # Publish each metric
+        client.publish(f"{base_topic}/temperature", decoded["temp_c"], retain=True)
+        client.publish(f"{base_topic}/humidity", decoded["humidity"], retain=True)
         if "battery" in decoded:
-            client.publish(f"{PUB_PREFIX}/{room}/battery", decoded["battery"])
-        print(f"[{device['name']}] Temp: {decoded['temp_c']:.2f}C  Hum: {decoded['humidity']:.1f}%  Batt: {decoded.get('battery', '?')}%")
+            client.publish(f"{base_topic}/battery", decoded["battery"], retain=True)
+        
+        # Optional: Publish RSSI if available
+        rssi = data.get("rssi")
+        if rssi:
+            client.publish(f"{base_topic}/rssi", rssi, retain=True)
+        
+        print(
+            f"[{source_node}] {room}/{device_name}: "
+            f"{decoded['temp_c']:.2f}°C, {decoded['humidity']:.1f}%, "
+            f"batt: {decoded.get('battery', '?')}%"
+        )
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error on {msg.topic}: {e}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error processing {msg.topic}: {e}")
 
-load_devices()
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client.on_message = on_message
-client.connect(BROKER, PORT)
-client.subscribe(SUB_TOPIC)
-print(f"\nBLE decoder running, subscribed to {SUB_TOPIC}")
-client.loop_forever()
+
+def on_connect(client, userdata, flags, rc):
+    """Callback when client connects to MQTT broker."""
+    if rc == 0:
+        print(f"Connected to MQTT broker at {BROKER}:{PORT}")
+        print(f"Showsite: {SHOWSITE}")
+        print(f"Decoder node: {DECODER_NODE}")
+        print()
+        for topic in SUB_TOPICS:
+            client.subscribe(topic)
+            print(f"Subscribed to: {topic}")
+        print()
+    else:
+        print(f"Failed to connect, return code {rc}")
+
+
+def on_disconnect(client, userdata, rc):
+    """Callback when client disconnects."""
+    if rc != 0:
+        print(f"Unexpected disconnect (code {rc}), reconnecting...")
+
+
+def main():
+    """Main entry point."""
+    print("=" * 60)
+    print("DPX BLE Decoder v1.2")
+    print("=" * 60)
+    print()
+    
+    # Load device mappings from API
+    load_devices()
+    print()
+    
+    # Create MQTT client (compatible with paho-mqtt 1.6.1)
+    client = mqtt.Client(client_id="dpx_ops_decoder")
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.on_disconnect = on_disconnect
+    
+    # Connect and start loop
+    try:
+        client.connect(BROKER, PORT, 60)
+        print("Starting decoder loop...")
+        print(f"Output: {SHOWSITE}/{DECODER_NODE}/{{source}}/{{room}}/{{device}}/{{metric}}")
+        print()
+        client.loop_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        client.disconnect()
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
