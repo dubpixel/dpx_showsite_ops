@@ -12,7 +12,7 @@ case "$1" in
   restart)  docker compose restart ${2:-} ;;
   status)   docker compose ps ;;
   fixnet)   sudo systemctl restart network-route-fix.service ;;
-  ble-decode) source .env && python3 scripts/ble_decoder.py ;;
+  ble-decode) source ../.env && python3 ble_decioder.py ;;
   lg)       docker logs govee2mqtt 2>&1 | tail -${2:-30} ;;
   lt)       docker logs telegraf 2>&1 | tail -${2:-30} ;;
   lm)       docker logs mosquitto 2>&1 | tail -${2:-30} ;;
