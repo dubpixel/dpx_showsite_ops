@@ -31,7 +31,7 @@ case "$1" in
   tunnel)   cloudflared tunnel --url http://localhost:8080 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-influxdb)   cloudflared tunnel --url http://localhost:8086 ;;
-  tunnel-mqtt)   cloudflared tunnel --url tcp://localhost:1883 ;;
+  tunnel-schedule)   cloudflared tunnel --url http://localhost:8000 ;;
   update)   ~/dpx_govee_stack/scripts/update-device-map.sh ;;
   cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $HOME/dpx_govee_stack/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
