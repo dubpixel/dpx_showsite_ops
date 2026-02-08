@@ -12,6 +12,7 @@ case "$1" in
   restart)  docker compose restart ${2:-} ;;
   status)   docker compose ps ;;
   fixnet)   sudo systemctl restart network-route-fix.service ;;
+  ble_decode) cd ~/dpx_govee_stack && source .env && python3 scripts/ble_decoder.py ;;
   lg)       docker logs govee2mqtt 2>&1 | tail -${2:-30} ;;
   lt)       docker logs telegraf 2>&1 | tail -${2:-30} ;;
   lm)       docker logs mosquitto 2>&1 | tail -${2:-30} ;;
@@ -38,7 +39,7 @@ case "$1" in
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
   env)      cat ~/dpx_govee_stack/.env ;;
   conf)     cat ~/dpx_govee_stack/telegraf/telegraf.conf ;;
-  edit)     nano ~/dpx_govee_stack/${2:-.env} ;;
+  edit)     vim ~/dpx_govee_stack/${2:-.env} ;;
   esp32-enable)
     echo "Enabling ESP32 pubadvdata..."
     mosquitto_pub -h localhost \
