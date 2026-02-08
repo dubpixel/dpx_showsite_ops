@@ -11,6 +11,7 @@ case "$1" in
   down)     docker compose down ;;
   restart)  docker compose restart ${2:-} ;;
   status)   docker compose ps ;;
+  fixnet)   sudo systemctl restart network-route-fix.service ;;
   lg)       docker logs govee2mqtt 2>&1 | tail -${2:-30} ;;
   lt)       docker logs telegraf 2>&1 | tail -${2:-30} ;;
   lm)       docker logs mosquitto 2>&1 | tail -${2:-30} ;;
