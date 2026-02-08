@@ -12,11 +12,14 @@ Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
 - metric: temperature, humidity, battery, rssi
 """
 
+from datetime import datetime
 import json
 import os
 import urllib.request
 import paho.mqtt.client as mqtt
 import sys
+from datetime import datetime
+
 
 # Configuration
 BROKER = "localhost"
@@ -167,10 +170,10 @@ def on_message(client, userdata, msg):
             client.publish(f"{base_topic}/rssi", rssi, retain=True)
         
         print(
-            f"[{source_node}] {room}/{device_name}: "
+            f"{datetime.now().strftime('%H:%M:%S')} [{source_node}] {room}/{device_name}: "
             f"{decoded['temp_c']:.2f}°C, {decoded['humidity']:.1f}%, "
             f"batt: {decoded.get('battery', '?')}%"
-        )
+            )
         
     except json.JSONDecodeError as e:
         print(f"JSON decode error on {msg.topic}: {e}")
