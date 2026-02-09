@@ -19,7 +19,7 @@ case "$1" in
   li)       docker logs influxdb 2>&1 | tail -${2:-30} ;;
   lf)       docker logs grafana 2>&1 | tail -${2:-30} ;;
   la)       for c in govee2mqtt telegraf mosquitto influxdb grafana; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
-  query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"govee\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
+  query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} ;;
   backup)
     mkdir -p ~/backups
@@ -28,7 +28,7 @@ case "$1" in
     echo "Backups saved to ~/backups/"
     ls -la ~/backups/
     ;;
-  nuke)     docker exec influxdb influx delete --org home --token my-super-secret-token --bucket govee --start 1970-01-01T00:00:00Z --stop 2030-01-01T00:00:00Z && echo "Bucket nuked." ;;
+  nuke)     docker exec influxdb influx delete --org home --token my-super-secret-token --bucket sensors --start 1970-01-01T00:00:00Z --stop 2030-01-01T00:00:00Z && echo "Bucket nuked." ;;
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:8080 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
@@ -97,7 +97,7 @@ case "$1" in
     echo ""
     echo "  CREDENTIALS"
     echo "    Grafana:   admin / grafanapass123"
-    echo "    InfluxDB:  admin / influxpass123  org=home  bucket=govee"
+    echo "    InfluxDB:  admin / influxpass123  org=home  bucket=sensors"
     echo "    MQTT:      no auth"
     echo ""
     ;;

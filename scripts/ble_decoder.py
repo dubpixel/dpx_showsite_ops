@@ -83,13 +83,15 @@ def decode_h5051(b):
 
 def decode_h507x(b):
     """Decode Govee H5074/H5075/H5072 manufacturer data."""
-    if len(b) < 6:
+    if len(b) < 8:
         return None
-    raw = (b[3] << 16) | (b[4] << 8) | b[5]
+    # Little-endian 16-bit values in hundredths
+    temp_raw = b[3] | (b[4] << 8)
+    hum_raw = b[5] | (b[6] << 8)
     return {
-        "temp_c": raw / 10000,
-        "humidity": (raw % 1000) / 10.0,
-        "battery": b[6] if len(b) > 6 else 100
+        "temp_c": temp_raw / 100.0,
+        "humidity": hum_raw / 100.0,
+        "battery": b[7] if len(b) > 7 else 100
     }
 
 
@@ -153,10 +155,10 @@ def on_message(client, userdata, msg):
         source_node = extract_source_node(msg.topic)
         
         # Build output topic path
-        # Format: {site}/{node}/{source_node}/{room}/{device}/{metric}
+        # Format: {site}/{node}/{source_node}/{room}/{device}/{mac}/{metric}
         room = device["room"]
         device_name = device["name"]
-        base_topic = f"{SHOWSITE}/{DECODER_NODE}/{source_node}/{room}/{device_name}"
+        base_topic = f"{SHOWSITE}/{DECODER_NODE}/{source_node}/{room}/{device_name}/{mac}"
         
         # Publish each metric
         client.publish(f"{base_topic}/temperature", decoded["temp_c"], retain=True)
