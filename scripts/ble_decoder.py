@@ -232,7 +232,8 @@ def main():
     try:
         client.connect(BROKER, PORT, 60)
         print("Starting decoder loop...")
-        print(f"Output: {SHOWSITE}/{DECODER_NODE}/{{source}}/{{room}}/{{device}}/{{metric}}")
+        print("Version: ESP32 extDecoder support (feature/ble-extdecoder)")
+        print(f"Output: {SHOWSITE}/{DECODER_NODE}/{{source}}/{{room}}/{{device}}/{{mac}}/{{metric}}")
         print()
         client.loop_forever()
     except KeyboardInterrupt:
