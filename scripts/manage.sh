@@ -20,7 +20,7 @@ case "$1" in
   lf)       docker logs grafana 2>&1 | tail -${2:-30} ;;
   la)       for c in govee2mqtt telegraf mosquitto influxdb grafana; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
   query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
-  query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20}) |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> keep(columns: [\"_time\", \"device_name\", \"room\", \"source\", \"source_node\", \"sensor_type\", \"z_device_id\", \"_value\"])" ;;
+  query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} | ts '[%H:%M:%S]' ;;
   backup)
     mkdir -p ~/backups
