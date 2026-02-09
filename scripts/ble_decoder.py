@@ -207,7 +207,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v1.2")
+    print("DPX BLE Decoder v1.5")
     print("=" * 60)
     print()
     
