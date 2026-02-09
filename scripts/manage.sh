@@ -31,7 +31,7 @@ case "$1" in
     ;;
   nuke)     docker exec influxdb influx delete --org home --token my-super-secret-token --bucket sensors --start 1970-01-01T00:00:00Z --stop 2030-01-01T00:00:00Z && echo "Bucket nuked." ;;
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
-  tunnel)   cloudflared tunnel --url http://localhost:8080 ;;
+  tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-influxdb)   cloudflared tunnel --url http://localhost:8086 ;;
   tunnel-schedule)   cloudflared tunnel --url http://localhost:8000 ;;
