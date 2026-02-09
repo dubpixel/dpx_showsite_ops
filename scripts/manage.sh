@@ -41,11 +41,11 @@ case "$1" in
   conf)     cat ~/dpx_govee_stack/telegraf/telegraf.conf ;;
   edit)     vim ~/dpx_govee_stack/${2:-.env} ;;
   esp32-enable)
-    echo "Enabling ESP32 pubadvdata..."
+    echo "Enabling ESP32 external decoder mode..."
     mosquitto_pub -h localhost \
       -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
-      -m '{"pubadvdata":true}'
-    echo "✓ ESP32 advertisement data enabled"
+      -m '{"pubadvdata":true,"extDecoderEnable":true}'
+    echo "✓ ESP32 configured: pubadvdata=true, extDecoderEnable=true"
     ;;
 
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"

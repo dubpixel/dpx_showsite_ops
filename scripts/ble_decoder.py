@@ -118,22 +118,29 @@ def extract_source_node(topic):
 def on_message(client, userdata, msg):
     """Process incoming BLE message and publish decoded data."""
     try:
-        # Extract MAC from topic (last segment)
-        mac = msg.topic.split("/")[-1].replace(":", "").upper()
+        # Parse JSON payload first
+        data = json.loads(msg.payload)
+
+        # Extract MAC - either from topic or from payload (if extDecoderEnable=true)
+        topic_last = msg.topic.split("/")[-1]
+        if topic_last == "undecoded":
+            # extDecoderEnable mode: MAC is in the "id" field
+            mac = data.get("id", "").replace(":", "").upper()
+        else:
+            # Normal mode: MAC is in the topic
+            mac = topic_last.replace(":", "").upper()
+
         if os.getenv("DEBUG_DECODER"): print(f"DEBUG: Received from {msg.topic}, MAC: {mac}")
-        
+
         # Match device by MAC suffix
         device = None
         for suffix, info in DEVICES.items():
             if suffix.endswith(mac) or mac.endswith(suffix[-len(mac):]):
                 device = info
                 break
-        
+
         if not device:
             return  # Unknown device, skip
-        
-        # Parse JSON payload
-        data = json.loads(msg.payload)
         mfr = data.get("manufacturerdata")
         
         if not mfr:
