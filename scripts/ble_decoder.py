@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v1.6 - MQTT Payload Decoder
+BLE Decoder v1.8 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -75,7 +75,7 @@ def decode_h5051(b):
         return None
     temp_raw = b[3] | (b[4] << 8)
     return {
-        "temp_c": temp_raw / 100.0,
+        "temp_f": (temp_raw / 100.0) * 9.0 / 5.0 + 32.0,  # Fahrenheit
         "humidity": b[5] / 10.0,
         "battery": b[7]
     }
@@ -89,7 +89,7 @@ def decode_h507x(b):
     temp_raw = b[3] | (b[4] << 8)
     hum_raw = b[5] | (b[6] << 8)
     return {
-        "temp_c": temp_raw / 100.0,
+        "temp_f": (temp_raw / 100.0) * 9.0 / 5.0 + 32.0,  # Fahrenheit
         "humidity": hum_raw / 100.0,
         "battery": b[7] if len(b) > 7 else 100
     }
@@ -168,7 +168,7 @@ def on_message(client, userdata, msg):
         base_topic = f"{SHOWSITE}/{DECODER_NODE}/{source_node}/{room}/{device_name}/{mac}"
         
         # Publish each metric
-        client.publish(f"{base_topic}/temperature", decoded["temp_c"], retain=True)
+        client.publish(f"{base_topic}/temperature", decoded["temp_f"], retain=True)
         client.publish(f"{base_topic}/humidity", decoded["humidity"], retain=True)
         if "battery" in decoded:
             client.publish(f"{base_topic}/battery", decoded["battery"], retain=True)
@@ -180,7 +180,7 @@ def on_message(client, userdata, msg):
         
         print(
             f"{datetime.now().strftime('%H:%M:%S')} [{source_node}] {room}/{device_name}: "
-            f"{decoded['temp_c']:.2f}°C, {decoded['humidity']:.1f}%, "
+            f"{decoded['temp_f']:.2f}°F, {decoded['humidity']:.1f}%, "
             f"batt: {decoded.get('battery', '?')}%"
             )
         
@@ -214,7 +214,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v1.6")
+    print("DPX BLE Decoder v1.8")
     print("=" * 60)
     print()
     
