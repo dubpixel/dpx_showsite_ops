@@ -54,7 +54,7 @@ services:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro    
       # Map to both standard and build locations to cover all bases
       - ./images/login_logo.svg:/usr/share/grafana/public/img/grafana_icon.svg:ro
-      - ./images/login_logo.svg:/usr/share/grafana/public/build/img/grafana_icon.svg:ro
+      - ./images/login_logo.svg:/usr/share/grafana/public/build/img/grafana_icon.1e0deb6b.svg:ro
       
       - ./images/menu_logo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg:ro
       - ./images/menu_logo.svg:/usr/share/grafana/public/build/img/grafana_typelogo.svg:ro
