@@ -85,6 +85,12 @@ def decode_h507x(b):
     """Decode Govee H5074/H5075/H5072 manufacturer data."""
     if len(b) < 8:
         return None
+    # Reject iBeacon packets (start with 4c00) and other non-Govee packets
+    if b[0] == 0x4c:  # Apple iBeacon
+        return None
+    # Validate Govee manufacturer header (88ec or 0188ec)
+    if not (b[0] == 0x88 and b[1] == 0xec):
+        return None
     # Little-endian 16-bit values in hundredths
     temp_raw = b[3] | (b[4] << 8)
     hum_raw = b[5] | (b[6] << 8)
