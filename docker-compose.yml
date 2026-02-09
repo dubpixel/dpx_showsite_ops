@@ -62,6 +62,10 @@ services:
     restart: unless-stopped
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf/conf.d:/etc/telegraf/telegraf.d:ro
+    command: --config /etc/telegraf/telegraf.conf --config-directory /etc/telegraf/telegraf.d
+    environment:
+      - TZ=${TZ} 
     networks:
       - iot
 networks:
