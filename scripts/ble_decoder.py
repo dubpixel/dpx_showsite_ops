@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v1.2 - MQTT Payload Decoder
+BLE Decoder v1.5 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
