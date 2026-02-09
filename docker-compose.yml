@@ -52,11 +52,14 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro    
-      # Map your login logo over the default logo
+      # Map to both standard and build locations to cover all bases
       - ./images/login_logo.svg:/usr/share/grafana/public/img/grafana_icon.svg:ro
-      # Map your sidebar/menu logo over the default text logo
-      - ./images/menu_logo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg:ro      
-      # Map your favicon (note: Grafana uses multiple sizes, but fav32 is the main one)
+      - ./images/login_logo.svg:/usr/share/grafana/public/build/img/grafana_icon.svg:ro
+      
+      - ./images/menu_logo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg:ro
+      - ./images/menu_logo.svg:/usr/share/grafana/public/build/img/grafana_typelogo.svg:ro
+
+      # Favicon (which you said is working, keep this)
       - ./images/fav_icon.png:/usr/share/grafana/public/img/fav32.png:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
