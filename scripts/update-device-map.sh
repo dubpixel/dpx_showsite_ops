@@ -43,4 +43,13 @@ ${ROOM_MAPPINGS}
 EOF
 
 docker compose -f "$HOME/dpx_govee_stack/docker-compose.yml" restart telegraf
-echo "$(date) - Device mappings updated." >> "$LOG"
+echo "$(date) - Device mappings updated:" >> "$LOG"
+echo "$DEVICES" | python3 -c "
+import json, sys
+for d in json.load(sys.stdin):
+    did = d['id'].replace(':','')
+    name = d['name'].lower().replace(' ','_')
+    room = (d.get('room') or 'unassigned').lower().replace(' ','_')
+    print(f'  {did}: {name} in {room}')
+" >> "$LOG"
+echo "" >> "$LOG"
