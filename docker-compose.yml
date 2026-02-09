@@ -52,9 +52,9 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro 
-      - ./grafana/login_logo.png:/usr/share/grafana/public/img/login_logo.png:ro
-      - ./grafana/menu_logo.png:/usr/share/grafana/public/img/menu_logo.png:ro
-      - ./grafana/fav_icon.png:/usr/share/grafana/public/img/fav_icon.png:ro   # Add this line  
+      - ./images/login_logo.png:/usr/share/grafana/public/img/login_logo.png:ro
+      - ./images/menu_logo.png:/usr/share/grafana/public/img/menu_logo.png:ro
+      - ./images/fav_icon.png:/usr/share/grafana/public/img/fav_icon.png:ro   # Add this line  
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafanapass123
