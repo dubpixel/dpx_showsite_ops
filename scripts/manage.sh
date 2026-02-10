@@ -60,6 +60,105 @@ case "$1" in
     echo "  - Scan before connect: enabled"
     ;;
   
+  schedule-up)
+    echo "Starting set-schedule service..."
+    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-test$"; then
+      docker start set-schedule-test
+      echo "✓ set-schedule-test container started"
+    else
+      echo "⚠ Container doesn't exist. Build it first with: iot schedule-build"
+      exit 1
+    fi
+    echo "Access at: http://localhost:8000"
+    ;;
+  
+  schedule-down)
+    echo "Stopping set-schedule service..."
+    docker stop set-schedule-test
+    echo "✓ set-schedule-test container stopped"
+    ;;
+  
+  schedule-restart)
+    echo "Restarting set-schedule service..."
+    docker restart set-schedule-test
+    echo "✓ set-schedule-test container restarted"
+    ;;
+  
+  schedule-status)
+    echo "Set-Schedule Service Status:"
+    echo "================================"
+    docker ps -a --filter "name=set-schedule-test" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    ;;
+  
+  schedule-logs)
+    echo "Set-Schedule Logs (last ${2:-30} lines):"
+    echo "================================"
+    docker logs set-schedule-test 2>&1 | tail -${2:-30}
+    ;;
+  
+  schedule-follow)
+    echo "Following set-schedule logs (Ctrl+C to exit)..."
+    docker logs -f set-schedule-test
+    ;;
+  
+  schedule-build)
+    SCHEDULE_DIR="$HOME/coachella_set_schedule"
+    if [ ! -d "$SCHEDULE_DIR" ]; then
+      echo "⚠ Directory not found: $SCHEDULE_DIR"
+      echo "Clone the repo first: git clone https://github.com/dubpixel/coachella_set_schedule.git ~/coachella_set_schedule"
+      exit 1
+    fi
+    
+    cd "$SCHEDULE_DIR"
+    echo "Building set-schedule image..."
+    docker build -t set-schedule:test .
+    
+    # Stop and remove old container if exists
+    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-test$"; then
+      echo "Stopping and removing old container..."
+      docker stop set-schedule-test 2>/dev/null
+      docker rm set-schedule-test
+    fi
+    
+    echo "Creating new container..."
+    docker run -d \
+      --name set-schedule-test \
+      -p 8000:8000 \
+      --env-file .env \
+      set-schedule:test
+    
+    echo "✓ set-schedule built and running"
+    echo "Access at: http://localhost:8000"
+    ;;
+  
+  schedule-rebuild)
+    echo "This will rebuild and redeploy the set-schedule service"
+    $0 schedule-build
+    ;;
+  
+  schedule-shell)
+    echo "Opening shell in set-schedule container..."
+    docker exec -it set-schedule-test /bin/sh
+    ;;
+  
+  schedule-update)
+    SCHEDULE_DIR="$HOME/coachella_set_schedule"
+    if [ ! -d "$SCHEDULE_DIR" ]; then
+      echo "⚠ Directory not found: $SCHEDULE_DIR"
+      exit 1
+    fi
+    
+    cd "$SCHEDULE_DIR"
+    echo "Updating from Sean's upstream repo..."
+    git fetch upstream
+    git checkout main
+    git pull upstream main
+    git push origin main
+    echo "✓ Updated to latest from upstream"
+    echo ""
+    echo "Rebuild container to apply changes: iot schedule-rebuild"
+    ;;
+  
   clear-retained)
     TOPIC="${2:-#}"
     echo "Clearing retained messages from topic: $TOPIC"
@@ -87,6 +186,7 @@ case "$1" in
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
             echo "govee2mqtt: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8056"
+            echo "Set-Schedule: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8000"
             ;;
   *)
     echo ""
@@ -99,6 +199,18 @@ case "$1" in
     echo "    restart [service]      Restart all, or just one service"
     echo "                           services: govee2mqtt telegraf mosquitto influxdb grafana"
     echo "    status                 Show running containers"
+    echo ""
+    echo "  SET-SCHEDULE SERVICE (Sean's coachella_set_schedule app)"
+    echo "    schedule-up            Start set-schedule service"
+    echo "    schedule-down          Stop set-schedule service"
+    echo "    schedule-restart       Restart set-schedule service"
+    echo "    schedule-status        Show set-schedule container status"
+    echo "    schedule-logs [n]      View logs (default: 30 lines)"
+    echo "    schedule-follow        Follow logs in real-time"
+    echo "    schedule-build         Build and deploy from ~/coachella_set_schedule"
+    echo "    schedule-rebuild       Rebuild and redeploy (alias for schedule-build)"
+    echo "    schedule-update        Update from Sean's upstream repo"
+    echo "    schedule-shell         Open shell in container"
     echo ""
     echo "  LOGS                     All take optional line count (default 30)"
     echo "    lg [n]                 govee2mqtt logs"
