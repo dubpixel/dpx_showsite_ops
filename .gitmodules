@@ -1,3 +1,3 @@
 [submodule "services/set-schedule"]
 	path = services/set-schedule
-	url = https://github.com/macswg/coachella_set_schedule.git
+	url = https://github.com/dubpixel/coachella_set_schedule.git
