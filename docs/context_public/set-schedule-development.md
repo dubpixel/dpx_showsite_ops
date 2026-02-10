@@ -1,4 +1,9 @@
-# Set Schedule App - Fork & Contributions Context
+# Set Schedule App - Development & Contribution Workflow
+
+**For production integration** into dpx_showsite_ops stack:  
+See [CONTEXT.md](CONTEXT.md#phase-6---set-schedule-integration)
+
+---
 
 ## Repository Info
 - **Upstream**: https://github.com/macswg/coachella_set_schedule (Sean's original)
@@ -53,6 +58,7 @@ docker run -d \
   -p 8000:8000 \
   --env-file .env \
   set-schedule:test
+  
 ```
 
 **Regular Operations** (after container exists):
@@ -160,16 +166,6 @@ git push origin feature-name
 # Go to GitHub and create PR from dubpixel:feature-name to macswg:main
 ```
 
-### Vim Quick Reference
-```bash
-# In vim:
-:set number        # Turn on line numbers
-:set nu            # Short version
-i                  # Enter insert mode
-Esc                # Exit insert mode
-:wq                # Save and quit
-:q!                # Quit without saving
-```
 
 ## Project Structure
 

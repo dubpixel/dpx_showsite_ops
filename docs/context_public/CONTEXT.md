@@ -1,49 +1,31 @@
-# dpx-showsite-ops - Full Project Context
-# Phase 3 Complete → Phase 4, 5, 6 Ready
-# Last updated: 2026-02-05
-# Upload this file to a new Claude chat to continue where we left off
-
+# dpx-showsite-ops - System Reference
+# Last updated: 2026-02-09
+# Upload this file for system context (network, sensors, configs, stack operations)
+# **For tasks/roadmap**: See [ROADMAP.md](../ROADMAP.md)
+# **For set-schedule app development**: See [set-schedule-development.md](set-schedule-development.md)
 ---
-
-## CURRENT STATUS
-
-**Phase 3: COMPLETE ✅**
-- Repository structure finalized and pushed to GitHub
-- All documentation written (README, ROADMAP, ARCHITECTURE, GRAFANA_SETUP, CHANGELOG)
-- Deployment automation working (setup.sh, manage.sh)
-- File organization complete (scripts in scripts/ directory)
-- Version controlled: https://github.com/dubpixel/dpx_showsite_ops (public repo)
-
-**Phase 4 - BLE Gateway Integration (In Progress - ESP32 Hardware Live)**
-- ESP32 BLE gateways deployed (OpenMQTTGateway firmware)
-- Deploy ble_decoder.py as systemd service
-- Unified Telegraf config with source tagging (cloud + BLE)
-- Update Grafana dashboards to show both sources
-- Theengs Gateway available as Windows fallback option
-
-**Phase 5 - Network Device Backups (After Phase 4)**
-- TFTP server setup
-- M4300 switch backup automation
-- Monitoring integration
-
-**Phase 6 - Set Schedule Integration (NEW)**
-- Add Sean's coachella_set_schedule as git submodule
-- Deploy as Docker service
-- Real-time show schedule tracking
-- WebSocket updates across clients
-
----
-
 ## ENVIRONMENT
 
 - **VM**: Ubuntu Server 24.04 on Hyper-V (NUC Windows host)
-- **Hostname**: dpx-showsite-ops (changed from dpx-coachella-ops in Phase 2.7)
-- **IP**: <server-ip> (static)
+- **Hostname**: dpx-showsite-ops
 - **mDNS**: dpx-showsite-ops.local
+- **LOCAL IP**: 192.168.1.100 (static)
 - **User**: dubpixel
 - **Stack dir**: ~/dpx_govee_stack/ (local folder name, GitHub repo is dpx_showsite_ops)
+- **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
 - **Backups**: ~/backups/
-- **GitHub**: https://github.com/dubpixel/dpx_showsite_ops (public repo)
+
+---
+
+## NETWORK MAP (192.168.1.x)
+
+- **.1**: Router
+- **.16**: Philips Hue bridge
+- **.28**: Govee H6076 Floor Lamp
+- **.68**: Windows NUC (Hyper-V host, Theengs Gateway)
+- **.100**: dpx-showsite-ops VM (main stack)
+- **.213**: ESP32 BLE Gateway (OMG_ESP32_FTH_BLE)
+- **.220**: User's Mac
 
 ---
 
@@ -61,53 +43,143 @@
 ## REMOTE ACCESS
 
 - **Tailscale**: Installed on VM + user's Mac, mesh VPN for SSH from anywhere
-- **Cloudflare Tunnel**: `iot tunnel` for temporary public dashboard sharingF1b
+- **Cloudflare Tunnel**: `iot tunnel` for temporary public dashboard sharing
 - **Public dashboard**: Requires Cloudflare Tunnel or port forwarding to work
 
 ---
 
-## DEVICE INVENTORY
+## BLE GATEWAYS
 
-### H5051 Thermometer (BLE-only)
-- **MAC**: 33:FA:43:81:EC:A1:01:0A
-- **Room**: StuDown (Studio Downstairs)
-- **Name**: "Studio 5051 Down"
-- **Type**: BLE only, no LAN API, no IoT API
-- **ble_only**: true
-- **Broadcast**: BLE every ~1min, uploads to cloud every ~10min via phone/gateway
+### ESP32 Gateway (Primary)
+- **IP**: 192.168.1.213
+- **Hostname**: OMG_ESP32_FTH_BLE
+- **Firmware**: OpenMQTTGateway v1.8.1 (esp32feather-ble)
+- **MQTT Topics**: 
+  - Publishes: `dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT/#`
+  - Config: `dpx-gateway1/dpx_showsite_gateway1/commands/MQTTtoBT/config`
+- **Status**: ✅ Live and publishing
 
-### H6076 Floor Lamp (BLE + LAN)
-- **MAC**: 17:A8:D0:03:C1:06:19:76
-- **LAN IP**: 192.168.1.28
-- **Room**: Unassigned
-- **Type**: Supports LAN API, auto-discovered, WiFi connected
-- **Broadcast**: BLE every ~1min, uploads to cloud every ~10min via WiFi
+**CRITICAL CONFIG**: `pubadvdata` setting resets on ESP32 reboot!
+```bash
+# Must re-enable after each gateway restart
+mosquitto_pub -h localhost \
+  -t "dpx-gateway1/dpx_showsite_gateway1/commands/MQTTtoBT/config" \
+  -m '{"pubadvdata":true}'
 
-### Unknown Device
-- **MAC**: A8:46:74:1A:65:62
-- Shows up in BLE scans, not yet identified
+# Verify data flowing
+iot mqtt "dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT" 5
+```
 
-### ESP32 BLE Gateway (Phase 4 Hardware)
-- **Board**: Custom ESP32-based hardware (DPX boards)
-- **Firmware**: OpenMQTTGateway v1.8+ (esp32feather-ble build)
-- **Flash Method**: Web installer at https://docs.openmqttgateway.com/upload/web-install.html
-- **MQTT Topics**: Publishes to `home/OpenMQTTGateway/BTtoMQTT/{MAC}` (raw BLE)
-- **Purpose**: Real-time BLE collection (<5 sec latency) from Govee sensors
-- **Status**: ✅ Gateway 1 deployed and publishing
-- **Config**: WiFi + MQTT broker at <server-ip>:1883
+### Theengs Gateway (Fallback)
+- **Host**: Windows NUC (192.168.1.68)
+- **MQTT Topics**: `home/TheengsGateway/BTtoMQTT/#`
+- **Status**: ✅ Running
+- **Limitation**: Does not decode H5051 (not in library)
+- **Use Case**: Backup gateway, supports H5074/H5075 decoding
 
-**Quick Setup**:
-1. Open web installer, select **esp32feather-ble** firmware
-2. Flash to board (2-3 min)
-3. Connect to "OpenMQTTGateway" WiFi, configure at 192.168.4.1
-4. Set WiFi SSID/password + MQTT broker IP
-5. Verify: `iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10`
-
-**Fallback**: Theengs Gateway on Windows (see THEENGS GATEWAY section)
+**Monitor Gateways:**
+```bash
+iot mqtt "dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT" 5  # ESP32
+iot mqtt "home/TheengsGateway/BTtoMQTT" 5                 # Theengs
+```
 
 ---
 
-## FILE STRUCTURE (as of Phase 3 completion)
+## GOVEE SENSORS
+
+### H5051 Sensors (BLE-only, RECOMMENDED)
+
+**Sensor 1 - Studio 5051 Down**
+- **Cloud ID**: 33FA4381ECA1010A
+- **BLE MAC**: 4381ECA1010A
+- **Room**: studown (Studio Downstairs)
+- **Name**: "Studio 5051 Down"
+- **Cloud Status**: ✅ Full tags in InfluxDB (device_name, room)
+- **BLE Broadcast**: Every ~1min with manufacturer data (88ec00...)
+- **Theengs Support**: ❌ Not in decoder library
+- **Solution**: Custom decoder required (simple)
+
+**Sensor 2 - New H5051**
+- **Cloud ID**: 19544381ECB1405D
+- **BLE MAC**: 4381ECB1405D
+- **Room**: Unassigned (needs Govee app configuration)
+- **Cloud Status**: ⚠️ Partial tags (missing room assignment)
+- **BLE Broadcast**: Every ~1min with manufacturer data
+
+**H5051 Advantages**:
+- Reliable BLE broadcasts every ~1 minute
+- Simple manufacturer data format
+- Stable packet structure
+- Good for real-time monitoring
+
+### H5074 Sensor (PROBLEMATIC - RETIRE)
+- **BLE MAC**: A4C138504E6F
+- **Issue**: Mostly broadcasts iBeacon ads (length 56) with no data
+- **Data Packets**: Rarely sends actual sensor data (length 40)
+- **Frequency**: Minutes between useful broadcasts
+- **Recommendation**: Replace with H5075 or keep using H5051
+
+### H6076 Floor Lamp (BLE + LAN)
+- **Cloud ID**: 17A8D003C1061976
+- **BLE MAC**: D003C1061976
+- **LAN IP**: 192.168.1.28
+- **Type**: WiFi connected, supports LAN API
+- **BLE Broadcast**: Manufacturer data format: 4388ec...
+
+---
+
+## SENSOR COMPARISON
+
+| Model | BLE Reliability | Theengs Support | Recommendation |
+|-------|----------------|-----------------|----------------|
+| **H5051** | ✅ Excellent (1min) | ❌ No | Use with custom decoder |
+| **H5074** | ❌ Poor (iBeacon spam) | ✅ Yes | **NOT RECOMMENDED** |
+| **H5075** | ✅ Excellent | ✅ Yes | **Best for future purchases** |
+| H5101/H5102 | ✅ Good | ✅ Yes | Good alternative |
+
+---
+## H5051 MANUFACTURER DATA DECODING
+
+### Packet Format
+**Example**: `88ec00TTTTHHBB`
+
+| Bytes | Field | Format | Example | Decoded |
+|-------|-------|--------|---------|---------|
+| 0-1 | Header | - | 88ec | Govee identifier |
+| 2 | Packet Type | - | 00 | Standard data |
+| 3-4 | Temperature | int16 LE ÷ 100 | 0fa4 | 0x0fa4 = 4004 = 40.04°C |
+| 5-6 | Humidity | int16 LE ÷ 100 | 1388 | 0x1388 = 5000 = 50.00% |
+| 7 | Battery | uint8 | 64 | 100% |
+
+### Python Decoder Template
+```python
+def decode_h5051_manufacturer_data(hex_string):
+    """
+    Decode H5051 manufacturer data from hex string
+    Returns: dict with temp_c, humidity, battery
+    """
+    # Convert hex string to bytes
+    data = bytes.fromhex(hex_string)
+    
+    # Validate header
+    if len(data) < 8 or data[0:2] != b'\x88\xec':
+        return None
+    
+    # Extract fields (little-endian)
+    temp_raw = int.from_bytes(data[3:5], 'little', signed=True)
+    humidity_raw = int.from_bytes(data[5:7], 'little')
+    battery = data[7]
+    
+    return {
+        'temperature': temp_raw / 100.0,  # °C
+        'humidity': humidity_raw / 100.0,  # %
+        'battery': battery  # %
+    }
+```
+
+---
+
+## FILE STRUCTURE
 
 ```
 ~/dpx_govee_stack/              (local directory)
@@ -199,8 +271,6 @@ cd /home/dubpixel/dpx_govee_stack
 exec /home/dubpixel/dpx_govee_stack/scripts/manage.sh "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/iot
-```
-
 ---
 
 ## MANAGEMENT CLI (iot command)
@@ -248,247 +318,76 @@ iot backup                      # Backup Grafana + InfluxDB volumes to ~/backups
 
 # Help
 iot help                        # Show all commands
-```
 
 ---
 
-## DATA FLOW
+## CURRENT DATA FLOW
 
-### Current: Cloud Path (10-20 min latency)
-
+### Cloud Path (Working ✅)
 ```
-Govee H5051 Sensor
-  ↓ (BLE broadcast every ~1min)
-Govee Gateway/Phone
-  ↓ (uploads to cloud every ~10min)
-Govee Cloud API (AWS IoT)
-  ↓ (govee2mqtt polls every ~10min)
-govee2mqtt container
-  ↓ (publishes to: gv2mqtt/sensor/sensor-{MAC}-sensor{type}/state)
-Mosquitto MQTT Broker
-  ↓ (subscribes, enriches tags: device_name, room, sensor_type)
-Telegraf
-  ↓ (writes to InfluxDB)
-InfluxDB (bucket: govee)
-  ↓ (Flux queries)
-Grafana
+Govee Sensors
+  ↓ BLE broadcast (~1min)
+Govee Phone/Gateway
+  ↓ Upload to cloud (~10min)
+Govee Cloud API
+  ↓ govee2mqtt polls (~10min)
+MQTT (gv2mqtt/sensor/+/state)
+  ↓ Telegraf subscribes
+InfluxDB (bucket: govee, source=cloud)
+  ↓ Grafana queries
+Dashboard
 ```
 
-### Phase 4: BLE Path (<5 sec latency)
+**Latency**: 10-20 minutes
+**Sensors Working**: 2/4 (1 with full tags, 1 missing room)
 
+### BLE Path (Hardware Ready, Software Pending)
 ```
-Govee H5051 Sensor
-  ↓ (BLE broadcast every ~1min)
-ESP32 BLE Gateway (OpenMQTTGateway)
-  ↓ (publishes raw to: home/OpenMQTTGateway/BTtoMQTT/{MAC})
-ble_decoder.py (systemd service)
-  ↓ (decodes, publishes to: govee/ble/{room}/{metric})
-Mosquitto MQTT Broker
-  ↓ (Telegraf subscribes to BOTH cloud + BLE topics)
-Telegraf (adds source tag: "cloud" or "ble")
-  ↓
-InfluxDB
-  ↓
-Grafana (shows both sources)
+Govee Sensors
+  ↓ BLE broadcast (~1min)
+ESP32/Theengs Gateway
+  ↓ Publish raw manufacturer data
+MQTT (dpx-gateway1/.../BTtoMQTT/# or home/TheengsGateway/...)
+  ↓ ble_decoder.py subscribes (NOT YET DEPLOYED)
+  ↓ Decode manufacturer data
+  ↓ Map BLE MAC to room
+MQTT (govee/ble/{room}/{metric})
+  ↓ Telegraf subscribes (NOT YET CONFIGURED)
+InfluxDB (bucket: govee, source=ble)
+  ↓ Grafana queries
+Dashboard
 ```
 
-**Note**: Theengs Gateway on Windows available as fallback option.
+**Target Latency**: <5 seconds
+**Status**: Hardware deployed, software pending
 
 ---
 
 ## MQTT TOPICS
 
-### Cloud Topics (current - working)
+### Cloud Topics (Current - Working)
 ```
-gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state  → float (°F or °C)
-gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state     → float (%)
-```
-
-### BLE Topics (Phase 4 - in progress)
-```
-home/OpenMQTTGateway/BTtoMQTT/4381ECA1010A    → JSON with manufacturerdata (from ESP32)
-home/TheengsGateway/BTtoMQTT/4381ECA1010A     → JSON with manufacturerdata (fallback: Windows)
-govee/ble/studown/temperature                  → float (°C from ble_decoder.py)
-govee/ble/studown/humidity                     → float (%)
-govee/ble/studown/battery                      → int (%)
+gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state  → float
+gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state     → float
 ```
 
----
+### BLE Topics (Raw from Gateways)
+```
+# ESP32 Gateway
+dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT/4381ECA1010A
+  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
 
-## H5051 BLE DECODE FORMAT
-
-**Example manufacturerdata**: `88ec004e06f00864e00101`
-
-| Bytes | Format | Field | Example | Decoded |
-|-------|--------|-------|---------|---------|
-| 0-2 | - | Header | 88ec00 | - |
-| 3-4 | uint16 LE | Temperature * 100 | 4e06 | 0x064E = 1614 = 16.14°C |
-| 5 | uint8 | Humidity * 10 | f0 | 0xF0 = 240 = 24.0% |
-| 6 | - | Unknown | 08 | - |
-| 7 | uint8 | Battery % | 64 | 0x64 = 100% |
-
-**Decoder logic** (used by ble_decoder.py):
-```python
-def decode_h5051(b):
-    if len(b) < 8:
-        return None
-    temp_raw = b[3] | (b[4] << 8)
-    return {
-        "temp_c": temp_raw / 100.0,
-        "humidity": b[5] / 10.0,
-        "battery": b[7]
-    }
+# Theengs Gateway (Fallback)
+home/TheengsGateway/BTtoMQTT/4381ECA1010A
+  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
 ```
 
-**Other supported models**:
-- H5074, H5075, H5072 use similar but slightly different decode logic
-
----
-
-## TELEGRAF CONFIGURATION
-
-### Current Structure (Cloud Only)
-
-```toml
-[agent]
-  interval = "10s"
-  omit_hostname = true
-
-[[outputs.influxdb_v2]]
-  urls = ["http://influxdb:8086"]
-  token = "my-super-secret-token"
-  organization = "home"
-  bucket = "govee"
-
-# Cloud source input
-[[inputs.mqtt_consumer]]
-  servers = ["tcp://mosquitto:1883"]
-  topics = [
-    "gv2mqtt/sensor/+/state"
-  ]
-  data_format = "value"
-  data_type = "float"
-  topic_tag = "topic"
-
-# Extract device_id and sensor_type from topic
-[[processors.regex]]
-  [[processors.regex.tags]]
-    key = "topic"
-    pattern = "gv2mqtt/sensor/sensor-([A-F0-9]+)-sensor([a-z]+)/state"
-    replacement = "${1}"
-    result_key = "device_id"
-
-  [[processors.regex.tags]]
-    key = "topic"
-    pattern = "gv2mqtt/sensor/sensor-([A-F0-9]+)-sensor([a-z]+)/state"
-    replacement = "${2}"
-    result_key = "sensor_type"
-
-# Map device_id to friendly names and rooms
-[[processors.enum]]
-  [[processors.enum.mapping]]
-    tag = "device_id"
-    dest = "device_name"
-    [processors.enum.mapping.value_mappings]
-      "33FA4381ECA1010A" = "studio_5051_down"
-      "17A8D003C1061976" = "h6076_1976"
-
-  [[processors.enum.mapping]]
-    tag = "device_id"
-    dest = "room"
-    [processors.enum.mapping.value_mappings]
-      "33FA4381ECA1010A" = "studown"
-      "17A8D003C1061976" = "unassigned"
+### BLE Topics (Decoded - Target Output)
 ```
-
-**Auto-generated**: Device mappings updated hourly by `scripts/update-device-map.sh` which queries govee2mqtt API at localhost:8056.
-
-### Planned Phase 4 Structure (Cloud + BLE)
-
-Will add second MQTT input for BLE topics with `source = "ble"` tag, keeping existing cloud input with `source = "cloud"` tag. Both write to same measurement with same tags (device_name, room, sensor_type) plus source differentiator.
-
----
-
-## DOCKER OPERATIONS
-
-### docker-compose.yml
-
-```yaml
-version: '3.8'
-services:
-  govee2mqtt:
-    image: ghcr.io/wez/govee2mqtt:latest
-    container_name: govee2mqtt
-    restart: unless-stopped
-    env_file: .env
-    network_mode: host              # Required for AWS IoT
-    volumes:
-      - govee2mqtt-data:/data
-
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: mosquitto
-    restart: unless-stopped
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-
-  telegraf:
-    image: telegraf:latest
-    container_name: telegraf
-    restart: unless-stopped
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-
-  influxdb:
-    image: influxdb:2
-    container_name: influxdb
-    restart: unless-stopped
-    ports:
-      - "8086:8086"
-    volumes:
-      - influxdb-data:/var/lib/influxdb2
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=influxpass123
-      - DOCKER_INFLUXDB_INIT_ORG=home
-      - DOCKER_INFLUXDB_INIT_BUCKET=govee
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-token
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-
-volumes:
-  govee2mqtt-data:
-  influxdb-data:
-  grafana-data:
-
-### Phase 6 Addition to docker-compose.yml
-
-```yaml
-  set-schedule:
-    build:
-      context: ./services/set-schedule
-      dockerfile: Dockerfile.showsite
-    container_name: set-schedule
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./services/set-schedule:/app
-    environment:
-      - TZ=America/New_York
+govee/ble/studown/temperature  → 25.48
+govee/ble/studown/humidity     → 51.19
+govee/ble/studown/battery      → 100
 ```
-```
-
 ### Volume Naming
 Docker volumes are prefixed with directory name:
 - `dpx_govee_stack_grafana-data`
@@ -533,211 +432,68 @@ iot cron-off  # Disable cron job
 
 ---
 
-## BLE GATEWAY OPTIONS
+## PHASE 6 - SET SCHEDULE INTEGRATION
 
-### Primary: ESP32 Hardware (OpenMQTTGateway)
-**Production deployment** using custom ESP32-based boards with OpenMQTTGateway firmware.
+**Sean's Repo**: https://github.com/macswg/coachella_set_schedule
 
-**Hardware**: Custom DPX boards (ESP32-based, WiFi enabled)
-**Firmware**: OpenMQTTGateway v1.8+ (esp32feather-ble build)
-**Flash Tool**: Web installer at https://docs.openmqttgateway.com/upload/web-install.html
-**MQTT Topics**: `home/OpenMQTTGateway/BTtoMQTT/{MAC}`
-**Setup Time**: 5-10 minutes per gateway
-**Advantages**: Dedicated hardware, low power, multi-site deployment ready
+### What It Is
+- FastAPI/Uvicorn web app for real-time show schedule tracking
+- Records actual vs scheduled set times for festival stages
+- Tracks "slip" (accumulated lateness throughout show)
+- WebSocket sync across multiple clients
+- View-only and operator modes
+- Google Sheets integration for schedule data
 
-**Deployment Steps**:
-1. Open web installer in Chrome/Edge
-2. Select **esp32feather-ble** firmware (not esp32dev-ble)
-3. Connect ESP32 via USB, click Install
-4. Wait 2-3 min for flash
-5. Connect to "OpenMQTTGateway" WiFi
-6. Open 192.168.4.1, configure WiFi + MQTT broker
-7. Verify: `iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#"`
+### Integration Method
+- Added as **git submodule** at `services/set-schedule/`
+- Keeps Sean's repo separate (easy to pull updates)
+- Runs as Docker service in compose stack
+- Managed with `iot` commands like other services
 
-### Fallback: Theengs Gateway (Windows)
-**Testing/fallback option** for Windows environments.
-
-- Installed via pip on Windows with VS 2022 Build Tools C++
-- Run manually: `python -m TheengsGateway -H <server-ip> -P 1883`
-- Not a service yet, run manually in PowerShell
-- H5051 NOT supported by Theengs decoder natively
-- Raw manufacturerdata published to MQTT: `home/TheengsGateway/BTtoMQTT/{MAC}`
-- Same ble_decoder.py handles both ESP32 and Theengs topics
-
----
-
-## PHASE 3 COMPLETED WORK
-
-### Documentation Created
-- **README.md**: Quick start guide, commands, troubleshooting
-- **ARCHITECTURE.md**: Data flows, MQTT topics, decode formats, technical details
-- **ROADMAP.md**: Phase tracking, timeline, success metrics
-- **CHANGELOG.md**: Version history
-- **docs/GRAFANA_SETUP.md**: Manual Grafana datasource and dashboard setup
-
-### File Organization
-- Moved scripts to `scripts/` directory
-- Created `docs/` directory for documentation
-- Updated all path references in scripts and wrapper
-- Fixed `iot` command wrapper (not symlink)
-- Updated cron job paths
-
-### Git & GitHub
-- Initialized git repository
-- Created comprehensive .gitignore
-- Committed all work with detailed messages
-- Pushed to public GitHub: https://github.com/dubpixel/dpx_showsite_ops
-- Repository naming: underscores (dpx_showsite_ops) to match existing 80+ repos
-
-### Testing & Validation
-- All `iot` commands tested and working
-- Device mapping updates working (hourly cron)
-- Paths resolved correctly after reorganization
-- Stack survives restart
-- Backup process verified
-
----
-
-## PHASE 4 - BLE GATEWAY INTEGRATION (IN PROGRESS)
-
-### Goals
-- Real-time sensor data (<5 second latency)
-- Dual-source data (cloud + BLE)
-- No dependency on Govee cloud uptime
-- Better debugging (see raw sensor broadcasts)
-
-### Completed
-- ✅ ESP32 hardware gateway deployed (Gateway 1)
-- ✅ OpenMQTTGateway firmware flashed (esp32feather-ble)
-- ✅ WiFi + MQTT configuration complete
-- ✅ Publishing raw BLE to `home/OpenMQTTGateway/BTtoMQTT/#`
-
-### Tasks
-
-#### 4.1: Deploy ble_decoder.py as systemd service
-**File already exists** at: `~/dpx_govee_stack/scripts/ble_decoder.py` (needs verification/update)
-
-Create systemd service:
-```bash
-sudo tee /etc/systemd/system/ble-decoder.service << 'EOF'
-[Unit]
-Description=Govee BLE Decoder
-After=network.target mosquitto.service
-
-[Service]
-Type=simple
-User=dubpixel
-WorkingDirectory=/home/dubpixel/dpx_govee_stack/scripts
-ExecStart=/usr/bin/python3 /home/dubpixel/dpx_govee_stack/scripts/ble_decoder.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable ble-decoder
-sudo systemctl start ble-decoder
-```
-
-#### 4.2: Update Telegraf Config
-Add BLE input alongside cloud input:
-
-```toml
-# BLE source input (add this)
-[[inputs.mqtt_consumer]]
-  servers = ["tcp://mosquitto:1883"]
-  topics = [
-    "govee/ble/+/temperature",
-    "govee/ble/+/humidity",
-    "govee/ble/+/battery"
-  ]
-  data_format = "value"
-  data_type = "float"
-  topic_tag = "topic"
-  [inputs.mqtt_consumer.tags]
-    source = "ble"
-
-# Cloud source (existing - add source tag)
-[[inputs.mqtt_consumer]]
-  servers = ["tcp://mosquitto:1883"]
-  topics = [
-    "gv2mqtt/sensor/+/state"
-  ]
-  data_format = "value"
-  data_type = "float"
-  topic_tag = "topic"
-  [inputs.mqtt_consumer.tags]
-    source = "cloud"
-```
-
-**Note**: This requires updating `scripts/update-device-map.sh` to generate unified config with both inputs.
-
-#### 4.3: Update Grafana Dashboards
-- Add source filter to queries
-- Show both cloud and BLE data on same graphs
-- Add latency comparison panel
-- Add source selector variable
-
-#### 4.4: Testing
-```bash
-# Verify ESP32 gateway is publishing (primary)
-iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10
-
-# Or verify Theengs (fallback)
-iot mqtt "home/TheengsGateway/BTtoMQTT/#" 10
-
-# Verify decoder is running
-sudo systemctl status ble-decoder
-journalctl -u ble-decoder -f
-
-# Verify decoded topics
-iot mqtt "govee/ble/#" 10
-
-# Check data in InfluxDB
-iot query 5m 20 | grep source
-
-# Verify both sources in Grafana
-```
-
----
-
-## PHASE 5 - NETWORK DEVICE BACKUPS (AFTER PHASE 4)
-
-### Goals
-- Automated daily backups of M4300 switch configs
-- TFTP server for switch config uploads
-- Version controlled config history
-- Monitoring and alerting
-
-### Tasks
-
-#### 5.1: TFTP Server Setup
-Add to docker-compose.yml:
+### Docker Service Config
+Added to `docker-compose.yml`:
 ```yaml
-  tftp:
-    image: pghalliday/tftp
-    container_name: tftp
-    restart: unless-stopped
-    ports:
-      - "69:69/udp"
-    volumes:
-      - ./tftp-data:/var/tftpboot
-    environment:
-      - TFTP_OPTIONS=--secure --create
+set-schedule:
+  build:
+    context: ./services/set-schedule
+    dockerfile: Dockerfile.showsite
+  container_name: set-schedule
+  restart: unless-stopped
+  ports:
+    - "8000:8000"
+  environment:
+    # Add any required env vars
+  volumes:
+    - ./services/set-schedule/data:/app/data
 ```
 
-#### 5.2: M4300 Backup Scripts
-- Pull existing m4300-scripts repository
-- Integrate with stack
-- Schedule via cron
-- Git commit configs after each backup
+### Usage
+- **Clone with submodules**: `git clone --recurse-submodules <repo-url>`
+- **View-only mode**: http://<server-ip>:8000
+- **Operator mode**: http://<server-ip>:8000/edit
+- **Update Sean's code**: `git submodule update --remote services/set-schedule`
+- **Logs**: `iot ls` (set-schedule logs)
+- **Restart**: `iot restart set-schedule`
 
-#### 5.3: Monitoring
-- Track backup success/failure in InfluxDB
-- Grafana dashboard for backup status
-- Optional: Slack/email alerts on failures
+### Development Workflow
+**For local development, contributing PRs to Sean's repo, and testing**:  
+See [set-schedule-development.md](set-schedule-development.md)
+
+### Optional Enhancement
+Could log actual vs scheduled times to InfluxDB for historical slip analysis and Grafana dashboards showing per-stage timeliness trends.
+
+---
+
+## TROUBLESHOOTING
+
+### Mosquitto Permissions
+
+If Mosquitto fails to start:
+```bash
+sudo chown -R 1883:1883 ~/dpx_govee_stack/mosquitto/data/
+sudo chmod -R 755 ~/dpx_govee_stack/mosquitto/data/
+iot restart mosquitto
+```
 
 ---
 
@@ -776,235 +532,30 @@ Add to docker-compose.yml:
 4. Save & Test
 
 ### Create Dashboard
-Query to see room names:
+See [GRAFANA_SETUP.md](../GRAFANA_SETUP.md) for detailed dashboard configuration.
+
+---
+
+## INFLUXDB QUERY EXAMPLES
+
+**View cloud data:**
 ```flux
 from(bucket: "govee")
   |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "mqtt_consumer")
-  |> keep(columns: ["room"])
-  |> distinct(column: "room")
+  |> filter(fn: (r) => r["_measurement"] == "sensor")
+  |> filter(fn: (r) => r["source"] == "cloud")
+  |> filter(fn: (r) => r["room"] == "studown")
 ```
 
-Temperature panel:
+**Compare sources (cloud vs BLE):**
 ```flux
 from(bucket: "govee")
-  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-  |> filter(fn: (r) => r.sensor_type == "temperature")
-  |> filter(fn: (r) => r.room == "studown")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r["_measurement"] == "sensor")
+  |> filter(fn: (r) => r["room"] == "studown")
+  |> filter(fn: (r) => r["sensor_type"] == "temperature")
+  |> pivot(rowKey: ["_time"], columnKey: ["source"], valueColumn: "_value")
 ```
-
-Humidity panel:
-```flux
-from(bucket: "govee")
-  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-  |> filter(fn: (r) => r.sensor_type == "humidity")
-  |> filter(fn: (r) => r.room == "studown")
-```
-
-Full guide: `docs/GRAFANA_SETUP.md`
-
----
-
-## QUICK REFERENCE
-
-### Start/Stop Stack
-```bash
-iot up                          # Start everything
-iot down                        # Stop everything
-iot restart [service]           # Restart service(s)
-iot status                      # Show status
-```
-
-### Monitor Data Flow
-```bash
-iot mqtt "gv2mqtt/#" 10         # Watch cloud topics
-iot mqtt "govee/ble/#" 10       # Watch BLE topics (Phase 4)
-iot query 1h 10                 # Query recent data
-iot lt                          # Check telegraf logs
-```
-
-### Maintenance
-```bash
-iot backup                      # Backup volumes
-iot update                      # Update device mappings
-iot cron-on                     # Enable hourly updates
-git add -A && git commit -m "..." && git push  # Push changes
-```
-
-### Troubleshooting
-```bash
-iot lg                          # govee2mqtt logs
-iot validate                    # Check configuration
-docker ps                       # Verify containers running
-iot web                         # Show service URLs
-```
-
----
-
-## PHASE 6 - SET SCHEDULE INTEGRATION (NEW)
-
-### Goal
-Integrate Sean's `coachella_set_schedule` app for real-time show schedule tracking.
-
-**Sean's Repo**: https://github.com/macswg/coachella_set_schedule
-
-### What It Is
-- FastAPI/Uvicorn web app
-- Real-time schedule tracking for festival stages
-- Records actual vs scheduled times
-- Tracks "slip" (accumulated lateness)
-- WebSocket sync across clients
-- View-only and operator modes
-- Google Sheets integration
-
-### Integration Approach: Git Submodule + Docker Service
-
-**Why**:
-- Keeps Sean's repo separate (easy to pull his updates)
-- No code duplication
-- Automated deployment
-- Runs as Docker service
-- Managed with `iot` commands
-
-### Implementation Steps
-
-#### 6.1: Add as Git Submodule
-
-```bash
-cd ~/dpx_govee_stack
-git submodule add https://github.com/macswg/coachella_set_schedule.git services/set-schedule
-git add .gitmodules services/set-schedule
-git commit -m "Add set-schedule as submodule (Phase 6)"
-git push
-```
-
-#### 6.2: Create Dockerfile
-
-Create `services/set-schedule/Dockerfile.showsite`:
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-#### 6.3: Update docker-compose.yml
-
-Add set-schedule service (see docker-compose section above)
-
-#### 6.4: Update setup.sh
-
-Add after directory creation:
-```bash
-if [ -f .gitmodules ]; then
-    echo "Initializing submodules..."
-    git submodule init
-    git submodule update
-    echo -e "${GREEN}✓${NC} Submodules initialized"
-fi
-```
-
-#### 6.5: Update manage.sh
-
-Add to log commands:
-```bash
-  ls)       docker logs set-schedule 2>&1 | tail -${2:-30} ;;
-```
-
-Update `la` to include set-schedule:
-```bash
-  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana set-schedule; do ...
-```
-
-Update `web` command:
-```bash
-  web)
-    # ... existing URLs ...
-    echo "Set Schedule: http://$IP:8000"
-    ;;
-```
-
-#### 6.6: User Workflow
-
-**Initial setup**:
-```bash
-git clone --recurse-submodules https://github.com/dubpixel/dpx_showsite_ops.git
-cd dpx_showsite_ops
-./setup.sh
-iot up
-```
-
-**Access**:
-- View-only: http://<server-ip>:8000
-- Operator: http://<server-ip>:8000/edit
-
-**Update Sean's code**:
-```bash
-git submodule update --remote services/set-schedule
-git add services/set-schedule
-git commit -m "Update set-schedule"
-git push
-iot restart set-schedule
-```
-
-### Optional: InfluxDB Integration
-
-Could log actual vs scheduled times to InfluxDB for historical slip tracking and Grafana dashboards.
-
----
-
-## FILES TO CHECK/UPDATE FOR PHASES 4-6
-
-**Phase 4**:
-1. **scripts/ble_decoder.py** - Verify exists and is correct
-2. **scripts/update-device-map.sh** - Update to generate unified telegraf config with BLE input
-3. **telegraf/telegraf.conf** - Will be regenerated with both inputs
-4. **Create**: `/etc/systemd/system/ble-decoder.service`
-5. **Update**: Grafana dashboards to show source tag
-
-**Phase 5**:
-1. Add TFTP service to docker-compose.yml
-2. Pull/integrate m4300-scripts repo
-3. Create backup scheduling
-4. Add monitoring to InfluxDB/Grafana
-
-**Phase 6**:
-1. Add git submodule for set-schedule
-2. Create Dockerfile.showsite
-3. Update docker-compose.yml
-4. Update setup.sh for submodule init
-5. Update manage.sh for set-schedule logs
-6. Update docs/ROADMAP.md
-
----
-
-## NEXT STEPS
-
-### Immediate (Phase 4):
-1. Verify ble_decoder.py script exists and is correct
-2. Create systemd service for ble_decoder.py
-3. Test Theengs → ble_decoder → MQTT flow
-4. Update update-device-map.sh to generate unified Telegraf config
-5. Restart Telegraf with new config
-6. Verify data flowing with source tags
-7. Update Grafana dashboards
-8. Test and document
-
-### Soon (Phase 5):
-1. Add TFTP server to docker-compose.yml
-2. Integrate M4300 backup scripts
-3. Schedule backups via cron
-4. Add monitoring integration
-
-### Optional (Phase 6):
-1. Add set-schedule as submodule
-2. Create integration files
-3. Update docker-compose.yml
-4. Test deployment
-5. Optional: InfluxDB integration for slip tracking
 
 ---
 
@@ -1013,16 +564,11 @@ Could log actual vs scheduled times to InfluxDB for historical slip tracking and
 - **Server**: dubpixel@dpx-showsite-ops (<server-ip>)
 - **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
 - **Git User**: i@dubpixel.tv / dubpixel
-- **Govee**: dont fucking publish the credentials AI you dingus / (see .env)
-- **Sean's Schedule Repo**: https://github.com/macswg/coachella_set_schedule
+- **Govee**: (see .env)
 - **All service passwords**: See .env file (not tracked in git)
 
 ---
 
-**END OF PHASE 3 CONTEXT**
-**READY FOR PHASES 4, 5, 6**
+**For tasks and roadmap, see**: [docs/ROADMAP.md](../ROADMAP.md)
 
-Timeline:
-- Phase 4: Starting immediately (BLE decoder)
-- Phase 5: After Phase 4 (TFTP + M4300)
-- Phase 6: Can be done anytime (independent of 4/5)
+**REMEMBER**: This VM is production infrastructure for DPX shows. Test changes thoroughly before deploying. Keep backups current with `iot backup`!

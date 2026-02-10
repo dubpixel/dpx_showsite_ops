@@ -3,7 +3,7 @@
 
 ## Summary
 
-Three fixes to productionize the BLE decoder: (1) add a process-guard to the `iot ble-decode` CLI command so it kills stale instances before starting, (2) fix the H507x temperature bug causing ~360°F readings (likely double C-to-F conversion), and (3) containerize `ble_decoder.py` as a proper Docker service in the compose stack — eliminating the need for bare-metal Python, systemd, or manual `iot ble-decode` invocations. This brings the decoder in line with every other service in the stack.
+Two fixes to productionize the BLE decoder: (1) add a process-guard to the `iot ble-decode` CLI command so it kills stale instances before starting, and (2) containerize `ble_decoder.py` as a proper Docker service in the compose stack — eliminating the need for bare-metal Python, systemd, or manual `iot ble-decode` invocations. This brings the decoder in line with every other service in the stack.
 
 ---
 
@@ -27,28 +27,10 @@ with logic that:
 
 This keeps `iot ble-decode` usable as a manual/debug tool even after containerization.
 
----
-
-### Step 2 — Fix H507x temperature decode bug (values showing ~360°F)
-
-**File**: `scripts/ble_decoder.py`
-
-**Diagnose**: Check if double C-to-F conversion is happening:
-- The decoder has `(temp_raw / 100.0) * 9.0 / 5.0 + 32.0` (outputs F)
-- Telegraf might also have a C-to-F processor
-- This would convert 20°C → 68°F → 154°F (if applied twice)
-- Or if raw data is misread, could hit ~360°F
-
-**Fix options**:
-- **Option A**: Remove C-to-F from decoder (output Celsius), let Telegraf handle it consistently for all sources
-- **Option B**: Remove Telegraf C-to-F processor, keep decoder outputting F
-- **Option C**: Fix byte-order or signed/unsigned handling in `decode_h507x()` if the issue is raw data parsing
-
-**Action**: Investigate which H507x sensor is affected (H5074/H5075/H5072), check raw manufacturerdata bytes, and apply the correct fix. Most likely solution: standardize on decoder outputting Celsius, single Telegraf processor converts to F for both cloud and BLE sources.
 
 ---
 
-### Step 3 — Make `ble_decoder.py` connection settings configurable via env vars
+### Step 2 — Make `ble_decoder.py` connection settings configurable via env vars
 
 **File**: `scripts/ble_decoder.py`
 
@@ -165,7 +147,7 @@ So future deployments know to set it.
    - Mark Phase 4 subsections as complete
    - Add Phase 4j wrap-up section
 
-3. **`docs/context_public/CONTEXT-PHASE4.md`**: 
+3. **`docs/context_public/CONTEXT.md`**: 
    - Update status to complete
    - Mark pending items complete
    - Note containerized architecture
