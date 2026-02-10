@@ -48,6 +48,40 @@ case "$1" in
       -m '{"pubadvdata":true,"extDecoderEnable":true}'
     echo "✓ ESP32 configured: pubadvdata=true, extDecoderEnable=true"
     ;;
+  
+  esp32-verbose)
+    echo "Configuring ESP32 for maximum verbosity..."
+    mosquitto_pub -h localhost \
+      -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":true,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    echo "✓ ESP32 configured: faster scanning, more frequent advertising"
+    echo "  - BLE scan interval: 1000ms (more frequent scans)"
+    echo "  - Connection interval: 5000ms"
+    echo "  - Scan before connect: enabled"
+    ;;
+  
+  clear-retained)
+    TOPIC="${2:-#}"
+    echo "Clearing retained messages from topic: $TOPIC"
+    echo "This will remove all retained messages matching the pattern..."
+    
+    # Get list of topics with retained messages
+    TOPICS=$(docker exec mosquitto timeout 5 mosquitto_sub -t "$TOPIC" -v -F "%t" 2>/dev/null | sort -u)
+    
+    if [ -z "$TOPICS" ]; then
+      echo "No retained messages found for topic pattern: $TOPIC"
+    else
+      COUNT=0
+      while IFS= read -r topic; do
+        [ -z "$topic" ] && continue
+        docker exec mosquitto mosquitto_pub -t "$topic" -r -n
+        echo "  ✓ Cleared: $topic"
+        ((COUNT++))
+      done <<< "$TOPICS"
+      echo ""
+      echo "Cleared $COUNT retained message(s)"
+    fi
+    ;;
 
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
@@ -97,6 +131,12 @@ case "$1" in
     echo ""
     echo "  MAINTENANCE"
     echo "    backup                 Backup Grafana + InfluxDB volumes to ~/backups/"
+    echo "    clear-retained [topic] Clear retained MQTT messages (default: all topics)"
+    echo "                           examples: iot clear-retained / iot clear-retained 'gv2mqtt/#'"
+    echo ""
+    echo "  ESP32 CONFIG"
+    echo "    esp32-enable           Enable ESP32 BLE gateway external decoder mode"
+    echo "    esp32-verbose          Configure ESP32 for maximum scan frequency"
     echo ""
     echo "  CREDENTIALS"
     echo "    Grafana:   admin / grafanapass123"

@@ -174,15 +174,15 @@ def on_message(client, userdata, msg):
         base_topic = f"{SHOWSITE}/{DECODER_NODE}/{source_node}/{room}/{device_name}/{mac}"
         
         # Publish each metric
-        client.publish(f"{base_topic}/temperature", decoded["temp_f"], retain=True)
-        client.publish(f"{base_topic}/humidity", decoded["humidity"], retain=True)
+        client.publish(f"{base_topic}/temperature", decoded["temp_f"], retain=False)
+        client.publish(f"{base_topic}/humidity", decoded["humidity"], retain=False)
         if "battery" in decoded:
-            client.publish(f"{base_topic}/battery", decoded["battery"], retain=True)
+            client.publish(f"{base_topic}/battery", decoded["battery"], retain=False)
         
         # Optional: Publish RSSI if available
         rssi = data.get("rssi")
         if rssi:
-            client.publish(f"{base_topic}/rssi", rssi, retain=True)
+            client.publish(f"{base_topic}/rssi", rssi, retain=False)
         
         print(
             f"{datetime.now().strftime('%H:%M:%S')} [{source_node}] {room}/{device_name}: "
