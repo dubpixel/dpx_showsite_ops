@@ -154,13 +154,22 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 ### Outstanding Items
 
 #### Critical
-1. **Ghost data at hourly restart** - Retained MQTT messages with old topic paths need clearing
-2. **BLE Decoder restart on name changes** - Decoder loads device map once at startup; needs API polling or cron restart
+1. **MQTT Retained Message Ghost Data** - ble_decoder.py publishes with `retain=True` to topics containing device names. When devices are renamed (e.g., `studio_5051_down` → `5051_studio_down`), old retained messages persist on old topic paths. Every Telegraf restart (hourly cron) causes resubscription, replaying both old and new retained messages, creating duplicate time series in InfluxDB with frozen ghost data.
+   - **Trigger**: update-device-map.sh unconditionally restarts Telegraf hourly (no diff check)
+   - **Impact**: Stale data appears in Grafana dashboards alongside current data
+   - **Workaround**: Manually clear old retained messages with `mosquitto_pub -r -n`
+   - **Fix plan**: See [plan-mqtt-cleanup.md](context_public/plan-mqtt-cleanup.md)
+
+2. **update-device-map.sh Lacks Diff Check** - Script unconditionally restarts Telegraf every hour even when device mappings haven't changed, causing unnecessary service interruptions and replaying retained messages.
+   - **Current**: Always runs `docker compose restart telegraf`
+   - **Needed**: Compare new config to existing, only restart if different
+   - **Benefit**: Reduces hourly disruptions, minimizes ghost data exposure
+
+3. **BLE Decoder restart on name changes** - Decoder loads device map once at startup; needs API polling or cron restart
 
 #### High Priority
-3. **Dockerize ble_decoder.py** - Create Dockerfile, add to docker-compose.yml, auto-start with stack
-4. **ESP32 pubadvdata persistence** - Setting resets on reboot; need auto-enable script or systemd timer
-5. **Hourly cron impact** - update-device-map.sh restarts Telegraf causing data gaps; change to reload
+4. **Dockerize ble_decoder.py** - Create Dockerfile, add to docker-compose.yml, auto-start with stack
+5. **ESP32 pubadvdata persistence** - Setting resets on reboot; need auto-enable script or systemd timer
 
 #### Medium Priority
 6. **Telegraf "Available" error suppression** - govee2mqtt status messages trigger parse errors (low impact)

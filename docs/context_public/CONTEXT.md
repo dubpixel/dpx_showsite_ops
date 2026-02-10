@@ -691,6 +691,38 @@ cat ~/dpx_govee_stack/scripts/update-device-map.log | tail -5
 
 Fix: `sudo systemctl restart docker`
 
+### MQTT Retained Message Ghost Data (ACTIVE ISSUE)
+
+**Problem**: After renaming a device (e.g., `studio_5051_down` → `5051_studio_down`), old data continues to appear in InfluxDB/Grafana.
+
+**Root cause**: ble_decoder.py publishes with `retain=True` to topics containing device names:
+```
+demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/{mac}/{metric}
+```
+
+When a device is renamed, the decoder creates NEW retained messages on new topics, but old retained messages persist on old topics. Every time Telegraf restarts (hourly cron), it resubscribes and receives BOTH sets of retained messages:
+- Old ghost: `demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/temperature`
+- New current: `demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/5051_studio_down/4381ECA1010A/temperature`
+
+Telegraf regex processors extract `device_name` from topic path, creating two separate time series in InfluxDB—one frozen at old values, one updating.
+
+**Why hourly**: `update-device-map.sh` cron job **unconditionally** restarts Telegraf every hour (no diff check), forcing resubscription and replay of all retained messages.
+
+**Immediate workaround**: Manually clear old retained messages:
+```bash
+mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/temperature" -r -n
+mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/humidity" -r -n
+mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/battery" -r -n
+```
+
+**Long-term fixes needed**:
+1. Add diff check to update-device-map.sh (only restart if config actually changed)
+2. Create cleanup script to detect and clear stale retained messages
+3. Consider using MAC-based topics instead of device_name to avoid renames creating new topics
+4. Add `iot mqtt-cleanup` command to manage.sh
+
+See [ROADMAP.md](../ROADMAP.md) Phase 4 Outstanding Items and [plan-mqtt-cleanup.md](plan-mqtt-cleanup.md) for fix details.
+
 ### Key Learnings & Gotchas
 
 - govee2mqtt publishes to `gv2mqtt/#` NOT `govee2mqtt/#`
@@ -703,7 +735,8 @@ Fix: `sudo systemctl restart docker`
 - H5051 is BLE only, no LAN/IoT API
 - **InfluxDB timestamps are UTC** — adjust for local timezone
 - **Docker logs lost on recreate** — use `iot restart` not `down/up`
-- **Hourly cron restarts Telegraf** if config changed
+- **update-device-map.sh cron unconditionally restarts Telegraf hourly** — lacks diff check
+- **MQTT retained messages persist across device renames** — creates ghost data
 - **iot command needs wrapper script** not direct symlink
 - **Underscores in hostnames are invalid** (RFC) — use dashes
 - **Directory rename breaks Docker volumes** — backup first
