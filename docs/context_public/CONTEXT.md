@@ -4,7 +4,10 @@
 # **For tasks/roadmap**: See [ROADMAP.md](../ROADMAP.md)
 # **For set-schedule app development**: See [set-schedule-development.md](set-schedule-development.md)
 ---
-## ENVIRONMENT
+
+## SYSTEM OVERVIEW
+
+### Environment
 
 - **VM**: Ubuntu Server 24.04 on Hyper-V (NUC Windows host)
 - **Hostname**: dpx-showsite-ops
@@ -15,9 +18,7 @@
 - **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
 - **Backups**: ~/backups/
 
----
-
-## NETWORK MAP (192.168.1.x)
+### Network Map (192.168.1.x)
 
 - **.1**: Router
 - **.16**: Philips Hue bridge
@@ -27,30 +28,49 @@
 - **.213**: ESP32 BLE Gateway (OMG_ESP32_FTH_BLE)
 - **.220**: User's Mac
 
+### Installed Services
+
+| Service | Status | Purpose |
+|---------|--------|---------|
+| SSH | enabled | Remote access |
+| avahi-daemon | enabled | mDNS (*.local hostnames) |
+| cloudflared | installed | Cloudflare tunnels (manual start) |
+| tailscale | enabled | Mesh VPN |
+| Docker | enabled | Container runtime |
+
 ---
 
-## CREDENTIALS
+## ACCESS & CREDENTIALS
+
+### Service URLs & Credentials
 
 - **Grafana**: (see .env) @ http://<server-ip>:3000
 - **InfluxDB**: (see .env) @ http://<server-ip>:8086
 - **MQTT**: anonymous @ <server-ip>:1883
 - **Govee**: (see .env — do NOT commit)
 - **govee2mqtt web API**: http://localhost:8056/api/devices
-- **Git**: i@dubpixel.tv / dubpixel
 
----
+### Remote Access
 
-## REMOTE ACCESS
-
+- **SSH**: dubpixel@dpx-showsite-ops (192.168.1.100)
 - **Tailscale**: Installed on VM + user's Mac, mesh VPN for SSH from anywhere
 - **Cloudflare Tunnel**: `iot tunnel` for temporary public dashboard sharing
 - **Public dashboard**: Requires Cloudflare Tunnel or port forwarding to work
 
+### Git Credentials
+
+- **Git User**: i@dubpixel.tv / dubpixel
+- **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
+
+**IMPORTANT**: All service passwords are in .env file (not tracked in git)
+
 ---
 
-## BLE GATEWAYS
+## HARDWARE
 
-### ESP32 Gateway (Primary)
+### BLE Gateways
+
+#### ESP32 Gateway (Primary)
 - **IP**: 192.168.1.213
 - **Hostname**: OMG_ESP32_FTH_BLE
 - **Firmware**: OpenMQTTGateway v1.8.1 (esp32feather-ble)
@@ -70,7 +90,7 @@ mosquitto_pub -h localhost \
 iot mqtt "dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT" 5
 ```
 
-### Theengs Gateway (Fallback)
+#### Theengs Gateway (Fallback)
 - **Host**: Windows NUC (192.168.1.68)
 - **MQTT Topics**: `home/TheengsGateway/BTtoMQTT/#`
 - **Status**: ✅ Running
@@ -83,11 +103,19 @@ iot mqtt "dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT" 5  # ESP32
 iot mqtt "home/TheengsGateway/BTtoMQTT" 5                 # Theengs
 ```
 
----
+### Govee Sensors
 
-## GOVEE SENSORS
+#### Current Device Naming & Mappings
 
-### H5051 Sensors (BLE-only, RECOMMENDED)
+Updated device names in Govee app/API. Current mappings from update-device-map.sh:
+- **33FA4381ECA1010A**: 5051_studio_down (studiodown)
+- **19544381ECB1405D**: 5051_studio_up (studioup)
+- **17A8D003C1061976**: floor_lamp_upper (studiodown)
+- **D278A4C138504E6F**: h5074_4e6f (studiodown)
+
+Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
+
+#### H5051 Sensors (BLE-only, RECOMMENDED)
 
 **Sensor 1 - Studio 5051 Down**
 - **Cloud ID**: 33FA4381ECA1010A
@@ -112,23 +140,21 @@ iot mqtt "home/TheengsGateway/BTtoMQTT" 5                 # Theengs
 - Stable packet structure
 - Good for real-time monitoring
 
-### H5074 Sensor (PROBLEMATIC - RETIRE)
+#### H5074 Sensor (PROBLEMATIC - RETIRE)
 - **BLE MAC**: A4C138504E6F
 - **Issue**: Mostly broadcasts iBeacon ads (length 56) with no data
 - **Data Packets**: Rarely sends actual sensor data (length 40)
 - **Frequency**: Minutes between useful broadcasts
 - **Recommendation**: Replace with H5075 or keep using H5051
 
-### H6076 Floor Lamp (BLE + LAN)
+#### H6076 Floor Lamp (BLE + LAN)
 - **Cloud ID**: 17A8D003C1061976
 - **BLE MAC**: D003C1061976
 - **LAN IP**: 192.168.1.28
 - **Type**: WiFi connected, supports LAN API
 - **BLE Broadcast**: Manufacturer data format: 4388ec...
 
----
-
-## SENSOR COMPARISON
+### Sensor Comparison
 
 | Model | BLE Reliability | Theengs Support | Recommendation |
 |-------|----------------|-----------------|----------------|
@@ -138,48 +164,10 @@ iot mqtt "home/TheengsGateway/BTtoMQTT" 5                 # Theengs
 | H5101/H5102 | ✅ Good | ✅ Yes | Good alternative |
 
 ---
-## H5051 MANUFACTURER DATA DECODING
 
-### Packet Format
-**Example**: `88ec00TTTTHHBB`
+## DOCKER STACK
 
-| Bytes | Field | Format | Example | Decoded |
-|-------|-------|--------|---------|---------|
-| 0-1 | Header | - | 88ec | Govee identifier |
-| 2 | Packet Type | - | 00 | Standard data |
-| 3-4 | Temperature | int16 LE ÷ 100 | 0fa4 | 0x0fa4 = 4004 = 40.04°C |
-| 5-6 | Humidity | int16 LE ÷ 100 | 1388 | 0x1388 = 5000 = 50.00% |
-| 7 | Battery | uint8 | 64 | 100% |
-
-### Python Decoder Template
-```python
-def decode_h5051_manufacturer_data(hex_string):
-    """
-    Decode H5051 manufacturer data from hex string
-    Returns: dict with temp_c, humidity, battery
-    """
-    # Convert hex string to bytes
-    data = bytes.fromhex(hex_string)
-    
-    # Validate header
-    if len(data) < 8 or data[0:2] != b'\x88\xec':
-        return None
-    
-    # Extract fields (little-endian)
-    temp_raw = int.from_bytes(data[3:5], 'little', signed=True)
-    humidity_raw = int.from_bytes(data[5:7], 'little')
-    battery = data[7]
-    
-    return {
-        'temperature': temp_raw / 100.0,  # °C
-        'humidity': humidity_raw / 100.0,  # %
-        'battery': battery  # %
-    }
-```
-
----
-
-## FILE STRUCTURE
+### File Structure
 
 ```
 ~/dpx_govee_stack/              (local directory)
@@ -228,42 +216,216 @@ def decode_h5051_manufacturer_data(hex_string):
 - hostname
 - *.backup files
 
+### Volume Naming & Operations
+
+#### Volume Naming
+
+Docker volumes are prefixed with directory name:
+- `dpx_govee_stack_grafana-data`
+- `dpx_govee_stack_influxdb-data`
+- `dpx_govee_stack_govee2mqtt-data`
+
+**CRITICAL**: Renaming directory creates NEW volumes = data loss. Use `iot backup` first.
+
+#### Docker Operations
+
+- `/etc/docker/daemon.json`: `{"ipv6": false, "fixed-cidr-v6": ""}`
+- Docker bridge sometimes goes DOWN after network changes, fix: `sudo systemctl restart docker`
+- Full recreate needed for .env changes: `docker compose down && docker compose up -d`
+- Restart sufficient for telegraf.conf changes: `docker compose restart telegraf`
+- **Logs are lost on container recreate** (down/up cycle) - use `iot restart` when possible
+
 ---
 
-## KNOWN ISSUES & FIXES
+## SERVICES CONFIGURATION
 
-### IPv6 causing govee2mqtt AWS IoT timeouts (SOLVED)
-govee2mqtt kept timing out connecting to AWS IoT (port 8883). Error:
-"timeout connecting to IoT aqm3wd1qlc3dy-ats.iot.us-east-1.amazonaws.com:8883"
+### Telegraf
 
-**Root cause:** AWS IoT endpoint resolves to both IPv4 and IPv6. System prefers IPv6 but Hyper-V network can't route IPv6 to internet. govee2mqtt uses host networking so it inherits the host's IPv6 preference and hangs.
+#### Configuration Structure
 
-**Fix:** Disable IPv6 on eth0 at kernel level:
+Split into modular structure:
+- `telegraf.conf`: Static base config (agent, outputs, inputs, BLE processors)
+- `conf.d/device-mappings.conf`: Dynamic enum mappings (regenerated by update-device-map.sh)
+
+Docker container loads both files via --config-directory flag.
+
+#### Key Configuration Details
+
+- Fixed enum processor deprecation: changed `tag` to `tags` array
+- TZ environment variable loaded from .env
+- BLE regex processor added for demo_showsite topics (extracts source_node, room, device_name, sensor_type)
+
+**View config:**
 ```bash
-sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
-echo "net.ipv6.conf.eth0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+iot conf  # Show telegraf configuration
 ```
 
-**Previous red herrings that didn't fully fix it:**
-- IPv6 disabled in /etc/docker/daemon.json — doesn't help because govee2mqtt uses network_mode: host
-- `sudo tailscale down && iot restart govee2mqtt` — sometimes worked, inconsistent
-- Waiting 10-15 min — intermittent success
+### Mosquitto
 
-### Telegraf "Available" parse errors (HARMLESS)
-Telegraf logs spam: `strconv.ParseFloat: parsing "Available": invalid syntax`
-This is govee2mqtt publishing status messages on same topics. Data still flows. Fix later with topic filtering.
+**Configuration file**: `mosquitto/config/mosquitto.conf`
 
-### Telegraf restarting hourly (NOT A CRASH)
-The update-device-map.sh cron job runs hourly and restarts telegraf if config changed. Check log:
+**Permissions fix** (if Mosquitto fails to start):
 ```bash
-cat ~/dpx_govee_stack/scripts/update-device-map.log | tail -5
+sudo chown -R 1883:1883 ~/dpx_govee_stack/mosquitto/data/
+sudo chmod -R 755 ~/dpx_govee_stack/mosquitto/data/
+iot restart mosquitto
 ```
 
-### Docker logs lost on recreate
-`docker compose down && up` wipes logs (new container ID). No fix currently — just be aware. Use `iot restart` instead when possible.
+**Key notes:**
+- Allows anonymous connections on port 1883
+- MQTT wildcard `+` catches non-numeric topics causing parse errors (harmless)
 
-### iot command requires wrapper script (NOT SYMLINK)
-Direct symlink doesn't work - bash resolves `${BASH_SOURCE[0]}` incorrectly. Must use wrapper script:
+### govee2mqtt
+
+**Configuration:**
+- Uses `network_mode: host` (inherits host networking)
+- Publishes to `gv2mqtt/#` topics (NOT `govee2mqtt/#`)
+- Web API available at `http://localhost:8056/api/devices`
+
+**Environment variables:**
+- `RUST_LOG`: Changes need full `down/up` cycle, not just restart
+- Credentials loaded from .env (do NOT commit)
+
+**Key notes:**
+- Govee API requires devices assigned to rooms to return data
+- Update frequency: polls cloud API every ~10 minutes
+
+### InfluxDB
+
+**Access:**
+- URL: `http://influxdb:8086` (internal) or `http://<server-ip>:8086` (external)
+- Organization: `home`
+- Token: `my-super-secret-token` (from .env)
+- Default Bucket: `govee`
+
+**Key notes:**
+- Timestamps are UTC — adjust for local timezone in queries
+- Volume: `dpx_govee_stack_influxdb-data`
+
+**Emergency data wipe:**
+```bash
+iot nuke  # DELETE all data in govee bucket
+```
+
+### Grafana
+
+#### Access & Credentials
+
+- URL: `http://<server-ip>:3000`
+- Credentials: See .env file
+- Version: OSS 12.3.2 (no Enterprise features)
+
+#### InfluxDB Datasource Setup
+
+1. Configuration → Data sources → Add data source → InfluxDB
+2. Configure:
+   - Query Language: **Flux**
+   - URL: **http://influxdb:8086**
+   - Organization: **home**
+   - Token: **my-super-secret-token**
+   - Default Bucket: **govee**
+3. Save & Test
+
+#### Dashboard Configuration
+
+See [GRAFANA_SETUP.md](../GRAFANA_SETUP.md) for detailed dashboard configuration.
+
+**Dashboard features:**
+- Time series panels, gauges, stat panels
+- Flux queries with custom display names via map()
+
+**Branding note:**
+- OSS version does not support custom logos/branding
+- Enterprise license required (~$299/mo) for branding features
+
+---
+
+## DATA ARCHITECTURE
+
+### Current Data Flow
+
+#### Cloud Path (Working ✅)
+
+```
+Govee Sensors
+  ↓ BLE broadcast (~1min)
+Govee Phone/Gateway
+  ↓ Upload to cloud (~10min)
+Govee Cloud API
+  ↓ govee2mqtt polls (~10min)
+MQTT (gv2mqtt/sensor/+/state)
+  ↓ Telegraf subscribes
+InfluxDB (bucket: govee, source=cloud)
+  ↓ Grafana queries
+Dashboard
+```
+
+**Latency**: 10-20 minutes
+**Sensors Working**: 2/4 (1 with full tags, 1 missing room)
+
+#### BLE Path (Hardware Ready, Software Deployed)
+
+```
+Govee Sensors
+  ↓ BLE broadcast (~1min)
+ESP32/Theengs Gateway
+  ↓ Publish raw manufacturer data
+MQTT (dpx-gateway1/.../BTtoMQTT/# or home/TheengsGateway/...)
+  ↓ ble_decoder.py subscribes
+  ↓ Decode manufacturer data
+  ↓ Map BLE MAC to room
+MQTT (demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/{metric})
+  ↓ Telegraf subscribes
+InfluxDB (bucket: sensors, source=dpx_ops_decoder)
+  ↓ Grafana queries
+Dashboard
+```
+
+**Target Latency**: <5 seconds
+**Status**: Running as manual process (not yet dockerized)
+**Decoder details:**
+- Started via `iot ble-decoder` alias in manage.sh
+- Both dpx_ops_1 (ESP32) and TheengsGateway sources operational
+- Uses `retain=True` on published topics
+
+### MQTT Topics
+
+#### Cloud Topics (Current - Working)
+
+```
+gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state  → float
+gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state     → float
+```
+
+#### BLE Topics (Raw from Gateways)
+
+```
+# ESP32 Gateway
+dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT/4381ECA1010A
+  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
+
+# Theengs Gateway (Fallback)
+home/TheengsGateway/BTtoMQTT/4381ECA1010A
+  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
+```
+
+#### BLE Topics (Decoded - Current Output)
+
+```
+demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/temperature  → 25.48
+demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/humidity     → 51.19
+demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/battery      → 100
+```
+
+---
+
+## MANAGEMENT
+
+### Management CLI (iot command)
+
+Symlinked: /usr/local/bin/iot → wrapper script → ~/dpx_govee_stack/scripts/manage.sh
+
+**Installation** (wrapper script required, NOT direct symlink):
 ```bash
 sudo tee /usr/local/bin/iot > /dev/null << 'WRAPPER'
 #!/bin/bash
@@ -271,11 +433,7 @@ cd /home/dubpixel/dpx_govee_stack
 exec /home/dubpixel/dpx_govee_stack/scripts/manage.sh "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/iot
----
-
-## MANAGEMENT CLI (iot command)
-
-Symlinked: /usr/local/bin/iot → wrapper script → ~/dpx_govee_stack/scripts/manage.sh
+```
 
 **Commands:**
 ```bash
@@ -318,94 +476,9 @@ iot backup                      # Backup Grafana + InfluxDB volumes to ~/backups
 
 # Help
 iot help                        # Show all commands
-
----
-
-## CURRENT DATA FLOW
-
-### Cloud Path (Working ✅)
-```
-Govee Sensors
-  ↓ BLE broadcast (~1min)
-Govee Phone/Gateway
-  ↓ Upload to cloud (~10min)
-Govee Cloud API
-  ↓ govee2mqtt polls (~10min)
-MQTT (gv2mqtt/sensor/+/state)
-  ↓ Telegraf subscribes
-InfluxDB (bucket: govee, source=cloud)
-  ↓ Grafana queries
-Dashboard
 ```
 
-**Latency**: 10-20 minutes
-**Sensors Working**: 2/4 (1 with full tags, 1 missing room)
-
-### BLE Path (Hardware Ready, Software Pending)
-```
-Govee Sensors
-  ↓ BLE broadcast (~1min)
-ESP32/Theengs Gateway
-  ↓ Publish raw manufacturer data
-MQTT (dpx-gateway1/.../BTtoMQTT/# or home/TheengsGateway/...)
-  ↓ ble_decoder.py subscribes (NOT YET DEPLOYED)
-  ↓ Decode manufacturer data
-  ↓ Map BLE MAC to room
-MQTT (govee/ble/{room}/{metric})
-  ↓ Telegraf subscribes (NOT YET CONFIGURED)
-InfluxDB (bucket: govee, source=ble)
-  ↓ Grafana queries
-Dashboard
-```
-
-**Target Latency**: <5 seconds
-**Status**: Hardware deployed, software pending
-
----
-
-## MQTT TOPICS
-
-### Cloud Topics (Current - Working)
-```
-gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensortemperature/state  → float
-gv2mqtt/sensor/sensor-33FA4381ECA1010A-sensorhumidity/state     → float
-```
-
-### BLE Topics (Raw from Gateways)
-```
-# ESP32 Gateway
-dpx-gateway1/dpx_showsite_gateway1/BTtoMQTT/4381ECA1010A
-  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
-
-# Theengs Gateway (Fallback)
-home/TheengsGateway/BTtoMQTT/4381ECA1010A
-  → JSON: {"id":"43:81:EC:A1:01:0A","manufacturerdata":"88ec00..."}
-```
-
-### BLE Topics (Decoded - Target Output)
-```
-govee/ble/studown/temperature  → 25.48
-govee/ble/studown/humidity     → 51.19
-govee/ble/studown/battery      → 100
-```
-### Volume Naming
-Docker volumes are prefixed with directory name:
-- `dpx_govee_stack_grafana-data`
-- `dpx_govee_stack_influxdb-data`
-- `dpx_govee_stack_govee2mqtt-data`
-
-**CRITICAL**: Renaming directory creates NEW volumes = data loss. Use `iot backup` first.
-
-### Operations
-- `/etc/docker/daemon.json`: `{"ipv6": false, "fixed-cidr-v6": ""}`
-- Docker bridge sometimes goes DOWN after network changes, fix: `sudo systemctl restart docker`
-- Full recreate needed for .env changes: `docker compose down && docker compose up -d`
-- Restart sufficient for telegraf.conf changes: `docker compose restart telegraf`
-- **Logs are lost on container recreate** (down/up cycle) - use `iot restart` when possible
-
----
-
-## CRON JOBS
+### Cron Jobs
 
 Device map update runs hourly:
 ```bash
@@ -418,21 +491,25 @@ iot cron-on   # Enable hourly updates
 iot cron-off  # Disable cron job
 ```
 
+**Note**: Hourly cron restarts Telegraf if config changed. Check log:
+```bash
+cat ~/dpx_govee_stack/scripts/update-device-map.log | tail -5
+```
+
+### Backup Procedures
+
+**Manual backup:**
+```bash
+iot backup  # Backup Grafana + InfluxDB volumes to ~/backups/
+```
+
+**Remember**: This VM is production infrastructure for DPX shows. Test changes thoroughly before deploying. Keep backups current!
+
 ---
 
-## INSTALLED SERVICES
+## INTEGRATIONS
 
-| Service | Status | Purpose |
-|---------|--------|---------|
-| SSH | enabled | Remote access |
-| avahi-daemon | enabled | mDNS (*.local hostnames) |
-| cloudflared | installed | Cloudflare tunnels (manual start) |
-| tailscale | enabled | Mesh VPN |
-| Docker | enabled | Container runtime |
-
----
-
-## PHASE 6 - SET SCHEDULE INTEGRATION
+### Phase 6 - Set Schedule Integration
 
 **Sean's Repo**: https://github.com/macswg/coachella_set_schedule
 
@@ -484,59 +561,50 @@ Could log actual vs scheduled times to InfluxDB for historical slip analysis and
 
 ---
 
-## TROUBLESHOOTING
+## DEVELOPMENT REFERENCE
 
-### Mosquitto Permissions
+### H5051 Manufacturer Data Decoding
 
-If Mosquitto fails to start:
-```bash
-sudo chown -R 1883:1883 ~/dpx_govee_stack/mosquitto/data/
-sudo chmod -R 755 ~/dpx_govee_stack/mosquitto/data/
-iot restart mosquitto
+#### Packet Format
+
+**Example**: `88ec00TTTTHHBB`
+
+| Bytes | Field | Format | Example | Decoded |
+|-------|-------|--------|---------|---------|
+| 0-1 | Header | - | 88ec | Govee identifier |
+| 2 | Packet Type | - | 00 | Standard data |
+| 3-4 | Temperature | int16 LE ÷ 100 | 0fa4 | 0x0fa4 = 4004 = 40.04°C |
+| 5-6 | Humidity | int16 LE ÷ 100 | 1388 | 0x1388 = 5000 = 50.00% |
+| 7 | Battery | uint8 | 64 | 100% |
+
+#### Python Decoder Template
+
+```python
+def decode_h5051_manufacturer_data(hex_string):
+    """
+    Decode H5051 manufacturer data from hex string
+    Returns: dict with temp_c, humidity, battery
+    """
+    # Convert hex string to bytes
+    data = bytes.fromhex(hex_string)
+    
+    # Validate header
+    if len(data) < 8 or data[0:2] != b'\x88\xec':
+        return None
+    
+    # Extract fields (little-endian)
+    temp_raw = int.from_bytes(data[3:5], 'little', signed=True)
+    humidity_raw = int.from_bytes(data[5:7], 'little')
+    battery = data[7]
+    
+    return {
+        'temperature': temp_raw / 100.0,  # °C
+        'humidity': humidity_raw / 100.0,  # %
+        'battery': battery  # %
+    }
 ```
 
----
-
-## KEY LEARNINGS / GOTCHAS
-
-- govee2mqtt publishes to `gv2mqtt/#` NOT `govee2mqtt/#`
-- Govee API requires devices assigned to rooms to return data
-- `RUST_LOG` env changes need full `down/up` cycle, not just restart
-- **IPv6 on host causes govee2mqtt timeouts** — disable with sysctl
-- Docker daemon.json IPv6 disable doesn't help govee2mqtt (uses `network_mode: host`)
-- MQTT wildcard `+` catches non-numeric topics causing parse errors (harmless)
-- govee2mqtt web API at port 8056 returns device JSON
-- H5051 is BLE only, no LAN/IoT API
-- **InfluxDB timestamps are UTC** — adjust for local timezone
-- **Docker logs lost on recreate** — use `iot restart` not `down/up`
-- **Hourly cron restarts Telegraf** if config changed
-- **iot command needs wrapper script** not direct symlink
-- **Underscores in hostnames are invalid** (RFC) — use dashes
-- **Directory rename breaks Docker volumes** — backup first
-- Sensor broadcast: BLE every ~1min, cloud upload every ~10min
-- GitHub repo naming: use underscores to match existing projects
-
----
-
-## GRAFANA SETUP (Manual Steps)
-
-### Connect InfluxDB Datasource
-1. Open Grafana: http://<server-ip>:3000 (credentials in .env)
-2. Configuration → Data sources → Add data source → InfluxDB
-3. Configure:
-   - Query Language: **Flux**
-   - URL: **http://influxdb:8086**
-   - Organization: **home**
-   - Token: **my-super-secret-token**
-   - Default Bucket: **govee**
-4. Save & Test
-
-### Create Dashboard
-See [GRAFANA_SETUP.md](../GRAFANA_SETUP.md) for detailed dashboard configuration.
-
----
-
-## INFLUXDB QUERY EXAMPLES
+### InfluxDB Query Examples
 
 **View cloud data:**
 ```flux
@@ -557,18 +625,94 @@ from(bucket: "govee")
   |> pivot(rowKey: ["_time"], columnKey: ["source"], valueColumn: "_value")
 ```
 
+**Multi-source with custom display names:**
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "gv_cloud" or r.source == "dpx_ops_decoder")
+  |> filter(fn: (r) => r.sensor_type == "temperature")
+  |> filter(fn: (r) => r.device_name != "studio_5051_down")
+  |> map(fn: (r) => ({r with _field: 
+      r.source + 
+      (if exists r.source_node then " -- |" + r.source_node + "| - " else " - ") + 
+      r.room + " - " + r.device_name
+  }))
+```
+
 ---
 
-## CONTACT & CREDENTIALS SUMMARY
+## TROUBLESHOOTING
 
-- **Server**: dubpixel@dpx-showsite-ops (<server-ip>)
-- **GitHub**: https://github.com/dubpixel/dpx_showsite_ops
-- **Git User**: i@dubpixel.tv / dubpixel
-- **Govee**: (see .env)
-- **All service passwords**: See .env file (not tracked in git)
+### IPv6 Causing govee2mqtt AWS IoT Timeouts (SOLVED)
+
+govee2mqtt kept timing out connecting to AWS IoT (port 8883). Error:
+"timeout connecting to IoT aqm3wd1qlc3dy-ats.iot.us-east-1.amazonaws.com:8883"
+
+**Root cause:** AWS IoT endpoint resolves to both IPv4 and IPv6. System prefers IPv6 but Hyper-V network can't route IPv6 to internet. govee2mqtt uses host networking so it inherits the host's IPv6 preference and hangs.
+
+**Fix:** Disable IPv6 on eth0 at kernel level:
+```bash
+sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
+echo "net.ipv6.conf.eth0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+```
+
+**Previous red herrings that didn't fully fix it:**
+- IPv6 disabled in /etc/docker/daemon.json — doesn't help because govee2mqtt uses network_mode: host
+- `sudo tailscale down && iot restart govee2mqtt` — sometimes worked, inconsistent
+- Waiting 10-15 min — intermittent success
+
+### Mosquitto Permissions Issues
+
+If Mosquitto fails to start:
+```bash
+sudo chown -R 1883:1883 ~/dpx_govee_stack/mosquitto/data/
+sudo chmod -R 755 ~/dpx_govee_stack/mosquitto/data/
+iot restart mosquitto
+```
+
+### Telegraf "Available" Parse Errors (HARMLESS)
+
+Telegraf logs spam: `strconv.ParseFloat: parsing "Available": invalid syntax`
+
+This is govee2mqtt publishing status messages on same topics. Data still flows. Fix later with topic filtering.
+
+### Telegraf Restarting Hourly (NOT A CRASH)
+
+The update-device-map.sh cron job runs hourly and restarts telegraf if config changed. Check log:
+```bash
+cat ~/dpx_govee_stack/scripts/update-device-map.log | tail -5
+```
+
+### Docker Logs Lost on Recreate
+
+`docker compose down && up` wipes logs (new container ID). No fix currently — just be aware. Use `iot restart` instead when possible.
+
+### Docker Bridge Goes Down After Network Changes
+
+Fix: `sudo systemctl restart docker`
+
+### Key Learnings & Gotchas
+
+- govee2mqtt publishes to `gv2mqtt/#` NOT `govee2mqtt/#`
+- Govee API requires devices assigned to rooms to return data
+- `RUST_LOG` env changes need full `down/up` cycle, not just restart
+- **IPv6 on host causes govee2mqtt timeouts** — disable with sysctl
+- Docker daemon.json IPv6 disable doesn't help govee2mqtt (uses `network_mode: host`)
+- MQTT wildcard `+` catches non-numeric topics causing parse errors (harmless)
+- govee2mqtt web API at port 8056 returns device JSON
+- H5051 is BLE only, no LAN/IoT API
+- **InfluxDB timestamps are UTC** — adjust for local timezone
+- **Docker logs lost on recreate** — use `iot restart` not `down/up`
+- **Hourly cron restarts Telegraf** if config changed
+- **iot command needs wrapper script** not direct symlink
+- **Underscores in hostnames are invalid** (RFC) — use dashes
+- **Directory rename breaks Docker volumes** — backup first
+- Sensor broadcast: BLE every ~1min, cloud upload every ~10min
+- GitHub repo naming: use underscores to match existing projects
 
 ---
 
 **For tasks and roadmap, see**: [docs/ROADMAP.md](../ROADMAP.md)
 
 **REMEMBER**: This VM is production infrastructure for DPX shows. Test changes thoroughly before deploying. Keep backups current with `iot backup`!
+
