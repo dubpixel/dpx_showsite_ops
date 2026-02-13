@@ -252,31 +252,143 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-## 🔮 Future Phases (Ideas)
+## � Phase 7: Metrics-Driven Device Control (Planned)
 
-### Phase 7: Additional Sensor Types
-- Motion sensors (PIR)
-- Light sensors
-- Door/window sensors
-- Energy monitoring (smart plugs)
+**Goal**: Control lighting and other devices based on sensor metrics and conditions
 
-### Phase 8: Automation & Control
-- Home Assistant integration
-- Scene triggers based on sensor data
-- HVAC control based on temperature readings
-- Lighting automation
+**What we'll build:**
 
-### Phase 9: Alert System
+### Phase 7.1: Control API Integration
+- Govee API integration for controllable lights (H6159, smart plugs)
+- Philips Hue bridge integration
+- MQTT command topics for ESP32-controlled devices
+- Unified control interface abstraction
+
+### Phase 7.2: Rule Engine
+- Define threshold-based triggers (temp > X → lights on)
+- Schedule-based automation (set-schedule integration)
+- Multi-condition rules (temp + time + occupancy)
+- Override capabilities for manual control
+
+### Phase 7.3: Control Dashboard
+- Grafana panel for manual device control
+- Visual feedback of device states
+- Automation rule status display
+- Quick disable/enable for automation rules
+
+**Use Cases:**
+- Turn on Govee/Hue lights when temperature drops below threshold
+- Activate warning lights when show schedule slips beyond tolerance
+- Control venue lighting based on set schedule state (pre-show, live, break)
+- Automated climate control based on sensor readings
+
+**Status**: 📋 Planned - depends on Phase 4 BLE data and Phase 6 schedule integration
+
+---
+
+## 📦 Phase 8: Consumables Tracking (Planned)
+
+**Goal**: Monitor and track consumable item usage by person, type, and over time
+
+**What we'll build:**
+
+### Phase 8.1: HID Input Integration
+- USB barcode scanner / HID keyboard support
+- Alphanumeric ID entry interface
+- Quantity input forms
+- Person/item/timestamp association
+
+### Phase 8.2: Consumables Database
+- InfluxDB schema for consumption events
+- Person ID tracking (badge scan, manual entry)
+- Item type taxonomy (food, beverage, supplies, etc.)
+- Quantity and timestamp logging
+
+### Phase 8.3: Reporting & Analytics
+- Grafana dashboards for consumption trends
+- Per-person usage tracking
+- Item type breakdowns over time
+- Inventory depletion projections
+- Peak consumption period analysis
+
+### Phase 8.4: Input Interfaces
+- Web form for manual entry
+- Dedicated HID keyboard station for fast entry
+- Mobile-friendly interface for field use
+- Batch entry support for bulk logging
+
+**Use Cases:**
+- Track catering consumption per person per meal
+- Monitor supplies depletion rates
+- Identify high-use items for restocking
+- Generate per-event expense reports
+- Analyze consumption patterns across multiple events
+
+**Status**: 📋 Planned - independent of other phases, can start anytime
+
+---
+
+## 🌡️ Phase 9: Wireless Temperature Probes (Planned)
+
+**Goal**: Integrate Govee wireless temperature/humidity probes into monitoring stack
+
+**What we'll explore:**
+
+### Phase 9.1: Device Compatibility Research
+- Identify compatible Govee temperature probe models (H5179, H5075, etc.)
+- Protocol analysis (BLE advertisement format)
+- Range and battery life testing
+- Multi-probe deployment feasibility
+
+### Phase 9.2: BLE Integration
+- Extend ble_decoder.py with temperature probe support
+- Add probe-specific MQTT topics and parsing
+- Handle multiple probes simultaneously
+- Source tagging and device mapping
+
+### Phase 9.3: Specialized Monitoring
+- Probe-specific Grafana dashboards
+- Temperature gradient visualization (multiple locations)
+- Alert thresholds for critical temperatures
+- Historical trend analysis for venue climate patterns
+
+### Phase 9.4: Use Case Applications
+- Food storage temperature compliance
+- Equipment room thermal monitoring
+- Outdoor vs indoor temperature differentials
+- HVAC performance validation
+- Cold chain monitoring for perishables
+
+**Feasibility Questions:**
+- Can existing ESP32/Theengs gateways decode probe formats?
+- What's the practical range with existing BLE infrastructure?
+- Battery life under continuous monitoring?
+- Cost-effectiveness vs wired sensors?
+
+**Status**: 📋 Planned - feasibility exploration before full implementation
+
+---
+
+## 🔮 Future Phases (Additional Ideas)
+
+### Phase 10: Alert System
 - Slack/Discord/email notifications
 - Temperature threshold alerts
 - Device offline detection
 - API health monitoring
+- Schedule slip notifications
 
-### Phase 10: Multi-Site Support
+### Phase 11: Multi-Site Support
 - Replicate stack to additional show sites
 - Centralized monitoring dashboard
 - Site comparison views
 - Federated data queries
+
+### Phase 12: Additional Sensor Types
+- Motion sensors (PIR)
+- Light sensors
+- Door/window sensors
+- Energy monitoring (smart plugs)
 
 ---
 
@@ -305,6 +417,24 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] Manual set time tracking working end-to-end
 - [ ] Optional: Slip data flowing to InfluxDB
 
+**Phase 7:**
+- [ ] Control at least 2 device types (Govee + Hue or similar)
+- [ ] Rule engine responds to threshold triggers within 5 seconds
+- [ ] Manual override capability working
+- [ ] Dashboard shows device states and automation status
+
+**Phase 8:**
+- [ ] HID keyboard input working for ID + quantity entry
+- [ ] Data flowing to InfluxDB with person/item/timestamp
+- [ ] Grafana dashboards show consumption trends
+- [ ] Sub-30 second entry time for typical transaction
+
+**Phase 9:**
+- [ ] Feasibility assessment complete (range, battery, cost)
+- [ ] At least 1 Govee temperature probe model decoded
+- [ ] Multi-probe tracking working simultaneously
+- [ ] Specialized dashboard showing temperature gradients
+
 ---
 
 ## Timeline
@@ -313,6 +443,9 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 **Phase 4**: Ready to start (2026-02-05) - use Theengs Gateway on Windows NUC  
 **Phase 5**: After Phase 4 completes - hardware available at studio  
 **Phase 6**: Can start anytime (independent of 4/5) - Sean's repo ready  
+**Phase 7**: After Phase 4 + Phase 6 - requires BLE data and schedule integration  
+**Phase 8**: Independent - can start anytime, separate from other phases  
+**Phase 9**: After Phase 4 - requires BLE infrastructure and decoder framework  
 
 **Custom ESP32 hardware**: Optional future enhancement, not blocking current phases
 
@@ -326,4 +459,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Custom ESP32 BLE gateway is a nice-to-have for later, not required
 - Phase 5 depends on stabilizing M4300 scripts in separate repo
 - Phase 6 is independent and can run in parallel with 4/5
+- Phase 7 depends on Phase 4 (BLE metrics) and Phase 6 (schedule integration) for full functionality
+- Phase 8 (consumables tracking) is completely independent and can start anytime
+- Phase 9 (temperature probes) extends Phase 4's BLE infrastructure with additional device types
 - Naming convention (dpx-showsite-ops) enables multi-site deployments
