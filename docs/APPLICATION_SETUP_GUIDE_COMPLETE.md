@@ -535,7 +535,7 @@ It will ask you to change the password. You can click "Skip" or set a new one.
 - Scroll down to **InfluxDB Details**:
   - **Organization**: `home`
   - **Token**: `my-super-secret-token`
-  - **Default Bucket**: `govee`
+  - **Default Bucket**: `sensors`
 
 **Test it**:
 - Scroll to bottom
@@ -592,7 +592,7 @@ In the query editor at the bottom:
 3. Paste this (replace `your_room_name` with your actual room):
 
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r.sensor_type == "temperature")
   |> filter(fn: (r) => r.room == "studown")
@@ -617,7 +617,7 @@ You should see a graph appear!
 3. Paste this query (replace room name):
 
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r.sensor_type == "humidity")
   |> filter(fn: (r) => r.room == "studown")
@@ -1176,7 +1176,7 @@ Manual configuration steps and common operations after running `iot up`.
    - **Auth**: Toggle OFF all options
    - **Organization**: `home`
    - **Token**: `my-super-secret-token`
-   - **Default Bucket**: `govee`
+   - **Default Bucket**: `sensors`
 
 5. Click: **Save & Test** (should show green checkmark)
 
@@ -1186,7 +1186,7 @@ Manual configuration steps and common operations after running `iot up`.
 
 Query to see available rooms:
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "mqtt_consumer")
   |> keep(columns: ["room"])
@@ -1204,7 +1204,7 @@ iot query 1h 100 | grep room
 
 #### Temperature Query
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r.sensor_type == "temperature")
   |> filter(fn: (r) => r.room == "your_room_name")
@@ -1212,7 +1212,7 @@ from(bucket: "govee")
 
 #### Humidity Query
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r.sensor_type == "humidity")
   |> filter(fn: (r) => r.room == "your_room_name")
