@@ -18,6 +18,28 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [1.1.0] - 2026-02-16
+
+### Added
+- **setup.sh**: Automated first-time deployment script
+  - Checks Docker and Docker Compose prerequisites
+  - Creates .env from .env.example template
+  - Prompts to edit .env with user's preferred editor (nano/vi)
+  - Initializes git submodule for services/set-schedule
+  - Installs iot wrapper with auto-detected installation path (fixes dir name mismatch)
+  - Optional cron job installation for hourly device-map updates
+  - Shows next steps with actual IP address
+- **VERSION file**: Centralized version number (1.1.0)
+- **AGENTS.md**: GitHub agent workflow guidelines in .github/ directory
+
+### Changed
+- **CONTEXT.md**: Updated iot wrapper installation instructions to reference setup.sh
+  - Added collapsible manual installation section for reference
+  - Note about auto-detected path
+- **APPLICATION_SETUP_GUIDE_COMPLETE.md**: Added Part 11 ESP32 BLE Gateway Setup section
+
+---
+
 ## [1.0.1] - 2025-02-05
 
 ### Phase 3 - Final Touches
