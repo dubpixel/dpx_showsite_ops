@@ -226,7 +226,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.source == \"gv_cloud\" or r.source == \"dpx_ops_decoder\")\n  |> filter(fn: (r) => r.sensor_type == \"temperature\")\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> map(fn: (r) => ({r with _field: \n  r.source + \n  (if exists r.source_node then \" -- |\" + r.source_node + \"| - \" else \" - \") + \n  r.room + \" - \" + r.device_name\n}))\n  \n\n"
         }
       ],
@@ -322,7 +325,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.source == \"gv_cloud\")\n  |> filter(fn: (r) => r.sensor_type == \"temperature\")\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> filter(fn: (r) => r.device_name != \"studio_5051_down\")\n  |> map(fn: (r) => ({r with _field: r.room +\" - \" + r.device_name}))\n"
         }
       ],
@@ -450,7 +456,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.source == \"dpx_ops_decoder\")\n  |> filter(fn: (r) => r.sensor_type == \"temperature\")\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> map(fn: (r) => ({r with _field: \"|\"+ r.source_node + \"| - \" + r.room +\" - \" + r.device_name}))\n\n  \n\n"
         }
       ],
@@ -528,7 +537,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> filter(fn: (r) => r.source_node == \"dpx_ops_1\")\n  |> filter(fn: (r) => r.sensor_type == \"battery\")\n  |> map(fn: (r) => ({r with _field: \"|\" + r.device_name + \"|\"}))\n  |> last()"
         }
       ],
@@ -606,7 +618,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> filter(fn: (r) => r.source_node == \"dpx_ops_1\")\n  |> filter(fn: (r) => r.sensor_type == \"rssi\")\n  |> map(fn: (r) => ({r with _field: \"|\" + r.device_name + \"|\"}))\n  |> last()"
         }
       ],
@@ -684,7 +699,10 @@
         {
           "refId": "A",
           "hide": false,
-          "datasource": {},
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-default"
+          },
           "query": "from(bucket: \"sensors\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.device_name != \"h5074_4e6f\")\n  |> filter(fn: (r) => r.source_node == \"TheengsGateway\")\n  |> filter(fn: (r) => r.sensor_type == \"rssi\")\n  |> map(fn: (r) => ({r with _field: \"|\" + r.device_name + \"|\"}))\n  |> last()"
         }
       ],
