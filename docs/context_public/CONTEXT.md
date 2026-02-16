@@ -296,7 +296,7 @@ iot restart mosquitto
 - URL: `http://influxdb:8086` (internal) or `http://<server-ip>:8086` (external)
 - Organization: `home`
 - Token: `my-super-secret-token` (from .env)
-- Default Bucket: `govee`
+- Default Bucket: `sensors`
 
 **Key notes:**
 - Timestamps are UTC — adjust for local timezone in queries
@@ -304,7 +304,7 @@ iot restart mosquitto
 
 **Emergency data wipe:**
 ```bash
-iot nuke  # DELETE all data in govee bucket
+iot nuke  # DELETE all data in sensors bucket
 ```
 
 ### Grafana
@@ -323,7 +323,7 @@ iot nuke  # DELETE all data in govee bucket
    - URL: **http://influxdb:8086**
    - Organization: **home**
    - Token: **my-super-secret-token**
-   - Default Bucket: **govee**
+   - Default Bucket: **sensors**
 3. Save & Test
 
 #### Dashboard Configuration
@@ -355,7 +355,7 @@ Govee Cloud API
   ↓ govee2mqtt polls (~10min)
 MQTT (gv2mqtt/sensor/+/state)
   ↓ Telegraf subscribes
-InfluxDB (bucket: govee, source=cloud)
+InfluxDB (bucket: sensors, source=gv_cloud)
   ↓ Grafana queries
 Dashboard
 ```
@@ -464,7 +464,7 @@ iot la [n]                      # all logs (default 10 each)
 # Data
 iot query [range] [rows]        # Query InfluxDB (default: 30m, 5 rows)
 iot mqtt [topic] [count]        # Subscribe to MQTT topics
-iot nuke                        # DELETE all data in govee bucket
+iot nuke                        # DELETE all data in sensors bucket
 
 # Config
 iot env                         # Show .env file
@@ -616,16 +616,16 @@ def decode_h5051_manufacturer_data(hex_string):
 
 **View cloud data:**
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: -1h)
   |> filter(fn: (r) => r["_measurement"] == "sensor")
-  |> filter(fn: (r) => r["source"] == "cloud")
+  |> filter(fn: (r) => r["source"] == "gv_cloud")
   |> filter(fn: (r) => r["room"] == "studown")
 ```
 
 **Compare sources (cloud vs BLE):**
 ```flux
-from(bucket: "govee")
+from(bucket: "sensors")
   |> range(start: -1h)
   |> filter(fn: (r) => r["_measurement"] == "sensor")
   |> filter(fn: (r) => r["room"] == "studown")
