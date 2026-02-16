@@ -108,13 +108,13 @@ echo ""
 read -p "Open .env for editing now? [Y/n] " -n 1 -r
 echo ""
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    # Detect available editor
-    if command -v nano &> /dev/null; then
-        nano "$SCRIPT_DIR/.env"
+    # Detect available editor (prefer vim)
+    if command -v vim &> /dev/null; then
+        vim "$SCRIPT_DIR/.env"
     elif command -v vi &> /dev/null; then
         vi "$SCRIPT_DIR/.env"
     else
-        echo -e "${YELLOW}WARNING${NC}: No editor found (nano/vi)"
+        echo -e "${YELLOW}WARNING${NC}: No editor found (vim/vi)"
         echo "Edit .env manually before running 'iot up'"
     fi
 fi
