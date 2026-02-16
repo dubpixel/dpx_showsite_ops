@@ -1,9 +1,15 @@
 #!/bin/bash
+
+# Determine stack directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 API="http://localhost:8056/api/devices"
-CONF="$HOME/dpx_govee_stack/telegraf/conf.d/device-mappings.conf"
-LOG="$HOME/dpx_govee_stack/scripts/update-device-map.log"
+CONF="$REPO_ROOT/telegraf/conf.d/device-mappings.conf"
+LOG="$REPO_ROOT/scripts/update-device-map.log"
 
 mkdir -p "$(dirname "$CONF")"
+mkdir -p "$(dirname "$LOG")"
 
 DEVICES=$(curl -s --max-time 10 "$API")
 if [ -z "$DEVICES" ] || [ "$DEVICES" = "[]" ]; then
@@ -42,7 +48,7 @@ ${NAME_MAPPINGS}
 ${ROOM_MAPPINGS}
 EOF
 
-docker compose -f "$HOME/dpx_govee_stack/docker-compose.yml" restart telegraf
+docker compose -f "$REPO_ROOT/docker-compose.yml" restart telegraf
 echo "$(date) - Device mappings updated:" >> "$LOG"
 echo "$DEVICES" | python3 -c "
 import json, sys
