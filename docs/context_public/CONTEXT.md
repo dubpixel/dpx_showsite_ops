@@ -425,7 +425,12 @@ demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/battery      �
 
 Symlinked: /usr/local/bin/iot → wrapper script → ~/dpx_govee_stack/scripts/manage.sh
 
-**Installation** (wrapper script required, NOT direct symlink):
+**Installation**: Automatically installed by [setup.sh](../../setup.sh) with auto-detected path.
+
+<details>
+<summary>Manual installation (if needed)</summary>
+
+Wrapper script required, NOT direct symlink:
 ```bash
 sudo tee /usr/local/bin/iot > /dev/null << 'WRAPPER'
 #!/bin/bash
@@ -434,6 +439,9 @@ exec /home/dubpixel/dpx_govee_stack/scripts/manage.sh "$@"
 WRAPPER
 sudo chmod +x /usr/local/bin/iot
 ```
+
+**Note**: Replace `/home/dubpixel/dpx_govee_stack` with your actual installation directory path.
+</details>
 
 **Commands:**
 ```bash
