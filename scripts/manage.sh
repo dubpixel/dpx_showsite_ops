@@ -3,6 +3,7 @@
 
 # Determine stack directory dynamically
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
 
@@ -35,12 +36,12 @@ case "$1" in
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-influxdb)   cloudflared tunnel --url http://localhost:8086 ;;
   tunnel-schedule)   cloudflared tunnel --url http://localhost:8000 ;;
-  update)   ~/dpx_govee_stack/scripts/update-device-map.sh ;;
-  cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $HOME/dpx_govee_stack/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
+  update)   "$REPO_ROOT/scripts/update-device-map.sh" ;;
+  cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $REPO_ROOT/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
-  env)      cat ~/dpx_govee_stack/.env ;;
-  conf)     cat ~/dpx_govee_stack/telegraf/telegraf.conf ;;
-  edit)     vim ~/dpx_govee_stack/${2:-.env} ;;
+  env)      cat "$REPO_ROOT/.env" ;;
+  conf)     cat "$REPO_ROOT/telegraf/telegraf.conf" ;;
+  edit)     vim "$REPO_ROOT/${2:-.env}" ;;
   esp32-enable)
     echo "Enabling ESP32 external decoder mode..."
     mosquitto_pub -h localhost \
@@ -102,10 +103,10 @@ case "$1" in
     ;;
   
   schedule-build)
-    SCHEDULE_DIR="$HOME/coachella_set_schedule"
+    SCHEDULE_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
     if [ ! -d "$SCHEDULE_DIR" ]; then
       echo "⚠ Directory not found: $SCHEDULE_DIR"
-      echo "Clone the repo first: git clone https://github.com/dubpixel/coachella_set_schedule.git ~/coachella_set_schedule"
+      echo "The COACHELLA_SET_SCHEDULE repo should be a sibling directory to DPX_SHOWSITE_OPS"
       exit 1
     fi
     
@@ -142,7 +143,7 @@ case "$1" in
     ;;
   
   schedule-update)
-    SCHEDULE_DIR="$HOME/coachella_set_schedule"
+    SCHEDULE_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
     if [ ! -d "$SCHEDULE_DIR" ]; then
       echo "⚠ Directory not found: $SCHEDULE_DIR"
       exit 1
@@ -207,7 +208,7 @@ case "$1" in
     echo "    schedule-status        Show set-schedule container status"
     echo "    schedule-logs [n]      View logs (default: 30 lines)"
     echo "    schedule-follow        Follow logs in real-time"
-    echo "    schedule-build         Build and deploy from ~/coachella_set_schedule"
+    echo "    schedule-build         Build and deploy from ../COACHELLA_SET_SCHEDULE"
     echo "    schedule-rebuild       Rebuild and redeploy (alias for schedule-build)"
     echo "    schedule-update        Update from Sean's upstream repo"
     echo "    schedule-shell         Open shell in container"
