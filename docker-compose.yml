@@ -38,7 +38,7 @@ services:
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_PASSWORD=influxpass123
       - DOCKER_INFLUXDB_INIT_ORG=home
-      - DOCKER_INFLUXDB_INIT_BUCKET=govee
+      - DOCKER_INFLUXDB_INIT_BUCKET=sensors
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-token
     networks:
       - iot
@@ -55,10 +55,10 @@ services:
       # Map to both standard and build locations to cover all bases
       - ./images/login_logo.svg:/usr/share/grafana/public/img/grafana_icon.svg:ro
       - ./images/login_logo.svg:/usr/share/grafana/public/build/img/grafana_icon.1e0deb6b.svg:ro
-      
       - ./images/menu_logo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg:ro
       - ./images/menu_logo.svg:/usr/share/grafana/public/build/img/grafana_typelogo.svg:ro
-
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      
       # Favicon (which you said is working, keep this)
       - ./images/fav_icon.png:/usr/share/grafana/public/img/fav32.png:ro
     environment:
