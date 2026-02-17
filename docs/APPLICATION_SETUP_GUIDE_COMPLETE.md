@@ -5,7 +5,7 @@
 **Time Required**: 2-3 hours for initial setup  
 **Skill Level**: Beginner (we assume nothing)
 
-**THIS DOCUMENT CURRENTLY UNTESTED OR EDITED AS OF 2.5.26**
+**testing a/o 2.16.26**
 
 ---
 
@@ -20,9 +20,9 @@
 7. [Part 5: Deploy the Stack](#part-5-deploy-the-stack)
 8. [Part 6: Connect Grafana to InfluxDB](#part-6-connect-grafana-to-influxdb)
 9. [Part 7: Create Your First Dashboard](#part-7-create-your-first-dashboard)
-10. [Part 8: Remote Access (Optional)](#part-8-remote-access-optional)
-11. [Part 9: Public Dashboards (Optional)](#part-9-public-dashboards-optional)
-12. [Part 10: Theengs Gateway for BLE (Optional)](#part-10-theengs-gateway-for-ble-optional)
+10. [Part 8: Public Dashboards (Optional)](#part-8-public-dashboards-optional)
+11. [Part 9: Theengs Gateway for BLE (Optional)](#part-9-theengs-gateway-for-ble-optional)
+12. [Part 10: ESP32 BLE Gateway Setup (Recommended)](#part-10-esp32-ble-gateway-setup-recommended)
 13. [Troubleshooting](#troubleshooting)
 14. [Daily Operations](#daily-operations)
 
@@ -60,6 +60,24 @@ Govee Sensor → Govee Cloud → Your VM → Database → Pretty Graphs
 ---
 
 ## Part 1: Windows NUC Setup
+
+**Time Required**: 30-45 minutes
+
+### Pre-Flight Checklist
+
+Before you begin, make sure you have:
+
+**Downloads**:
+- [ ] Ubuntu Server 24.04 LTS ISO (~2.5 GB)
+  - URL: https://ubuntu.com/download/server
+  - File: `ubuntu-24.04.X-live-server-amd64.iso`
+  - Architecture: **amd64** (correct for Intel/AMD 64-bit CPUs)
+
+**Hyper-V Setup**:
+- [ ] Hyper-V Manager installed and accessible
+- [ ] Virtual Switch will be created in Step 1.2
+
+---
 
 ### 1.1: Enable Hyper-V
 
@@ -115,40 +133,26 @@ This lets your VM talk to your home network.
 2. Right-click your computer name → **New** → **Virtual Machine**
 3. Click **Next** on the wizard welcome screen
 
-**Specify Name and Location**:
-- Name: `dpx-showsite-ops`
-- Click **Next**
+**Quick Reference Table** for VM wizard:
 
-**Specify Generation**:
-- Select **Generation 2**
-- Click **Next**
+| Step | Setting | Value |
+|------|---------|-------|
+| **Name and Location** | Name | `dpx-showsite-ops` |
+| | Store in different location | ☐ Optional (check if using secondary SSD) |
+| | Location | `D:\VMs\dpx-showsite-ops` (if using second drive) |
+| **Generation** | Type | **Generation 2** ✓ |
+| **Memory** | Startup memory | `4096 MB` (4 GB) |
+| | Use Dynamic Memory | ☑ Check |
+| **Networking** | Connection | **External Network** |
+| **Hard Disk** | Action | ⦿ Create a virtual hard disk |
+| | Size | `64 GB` (or **50 GB minimum**) |
+| | Location | Same as VM or secondary SSD |
+| **Installation** | Options | ⦿ Install from bootable image |
+| | ISO | Browse to Ubuntu Server ISO |
 
-**Assign Memory**:
-- Startup memory: `4096` MB (4GB)
-- ☑ Check **Use Dynamic Memory**
-- Click **Next**
+**Note**: If you have a secondary SSD, you can store the VM files there for better performance. In "Name and Location" step, check "Store the virtual machine in a different location" and browse to your secondary drive (e.g., `D:\VMs\`).
 
-**Configure Networking**:
-- Connection: Select **External Network** (the one you created)
-- Click **Next**
-
-**Connect Virtual Hard Disk**:
-- ⦿ Create a virtual hard disk
-- Name: `dpx-showsite-ops.vhdx`
-- Location: (leave default)
-- Size: `50` GB
-- Click **Next**
-
-**Installation Options**:
-- ⦿ Install an operating system from a bootable image file
-- Click **Browse**
-- Navigate to your Downloads folder
-- Select the Ubuntu Server .iso file you downloaded
-- Click **Next**
-
-**Summary**:
-- Review everything
-- Click **Finish**
+Click **Finish** when done.
 
 ### 2.2: Adjust VM Settings
 
@@ -158,9 +162,12 @@ Before we start it, let's tweak a few things:
 1. In Hyper-V Manager, right-click **dpx-showsite-ops** → **Settings**
 2. Go to **Security** on the left
 3. **UNCHECK** "Enable Secure Boot" (important!)
+   - **Alternative**: If you prefer to keep Secure Boot enabled, change template to "Microsoft UEFI Certificate Authority"
 4. Go to **Processor** on the left
 5. Set **Number of virtual processors** to `2`
 6. Click **OK**
+
+**Note**: The disk size must be at least 50 GB. If you specified less, you may run into space issues during setup or when deploying the stack.
 
 ### 2.3: Start the VM
 
@@ -348,6 +355,135 @@ sudo apt install -y git curl wget vim avahi-daemon
 ```bash
 sudo systemctl enable --now avahi-daemon
 ```
+
+### 3.6: Set Up Tailscale
+
+**Why now?** Tailscale enables remote SSH access immediately. After this step, you can close the Hyper-V console and do all remaining work via SSH from your comfortable main computer!
+
+**Install Tailscale on VM**:
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+```bash
+sudo tailscale up
+```
+
+It will give you a URL like: `https://login.tailscale.com/a/abc123xyz`
+
+**Copy that URL** and paste it in your browser. Log in with:
+- Google account
+- Microsoft account
+- Or create a Tailscale account
+
+After you authorize it, go back to the terminal. It should say "Success."
+
+**Install Tailscale on your main computer**:
+1. Go to https://tailscale.com/download
+2. Download for your OS (Windows/Mac/Linux)
+3. Install and log in with the same account
+
+**Test remote access**:
+
+From your main computer, open a terminal and try:
+```bash
+ssh dubpixel@dpx-showsite-ops
+```
+
+If it connects, **you're done with the Hyper-V console!** You can minimize it and work from your main computer for all remaining steps.
+
+### 3.7: Set Up GitHub SSH Access
+
+If you need to work with private GitHub repositories or push code changes, set up SSH keys now.
+
+**Generate SSH key on VM**:
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+Press Enter 3 times (default location, no passphrase).
+
+**Display your public key**:
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+**Copy the entire output** (starts with `ssh-ed25519 ...`).
+
+**Add to GitHub**:
+1. Go to https://github.com/settings/keys
+2. Click **New SSH key**
+3. Title: `dpx-showsite-ops VM`
+4. Paste your public key
+5. Click **Add SSH key**
+
+**Test it**:
+```bash
+ssh -T git@github.com
+```
+
+Should see: `Hi username! You've successfully authenticated...`
+
+**Note**: If you don't need private repos, you can skip this step and use HTTPS git URLs instead.
+
+### 3.8: Optional - Disable IPv6
+
+**Only if you'll use govee2mqtt** (the Govee cloud integration in this stack). This fixes AWS IoT timeout issues on Hyper-V VMs.
+
+```bash
+sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
+echo "net.ipv6.conf.eth0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+```
+
+**Verify**:
+```bash
+ip addr show eth0 | grep inet6
+```
+
+Should show nothing (IPv6 disabled).
+
+**If you're not using govee2mqtt**, you can skip this step.
+
+### 3.9: VM Ready Checklist
+
+Before proceeding to Docker deployment, verify everything is working:
+
+- [ ] VM boots successfully
+- [ ] Can log in locally (Hyper-V console)
+- [ ] Can SSH remotely: `ssh dubpixel@192.168.1.X` (where X is your static IP)
+- [ ] Can SSH via Tailscale: `ssh dubpixel@dpx-showsite-ops`
+- [ ] Static IP is set and pingable: `ping 192.168.1.X`
+- [ ] Internet working: `ping google.com`
+- [ ] Base tools installed: `git --version`, `docker --version` (docker comes in Part 4)
+- [ ] mDNS working: `ping dpx-showsite-ops.local` (from another computer)
+- [ ] (Optional) IPv6 disabled if using govee2mqtt
+- [ ] (Optional) GitHub SSH access working
+
+**If all checks pass, your VM is ready!**
+
+### 3.10: Quick Reference
+
+Keep this handy for future access:
+
+**VM Access**:
+- **Local IP**: `192.168.1.X` (your static IP)
+- **Hostname**: `dpx-showsite-ops.local`
+- **Tailscale**: `dpx-showsite-ops` (from any device on your Tailscale network)
+- **User**: `dubpixel` (or whatever you chose)
+- **Password**: [your password]
+
+**VM Resources**:
+- **RAM**: 4 GB (dynamic)
+- **Disk**: 50-64 GB
+- **CPUs**: 2 cores
+
+**Network**:
+- **Switch**: External Network (connected to your LAN)
+- **IP Assignment**: Static (192.168.1.X/24)
+- **Gateway**: 192.168.1.1
+- **DNS**: 8.8.8.8, 8.8.4.4
+
+**Next Steps**: Proceed to Part 4 to install Docker!
 
 ---
 
@@ -639,58 +775,7 @@ Click **Apply**
 
 ---
 
-## Part 8: Remote Access (Optional)
-
-Want to check your sensors from your phone or while away from home? Install Tailscale.
-
-### 8.1: Install Tailscale on VM
-
-**In your VM terminal**:
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-```
-
-```bash
-sudo tailscale up
-```
-
-It will give you a URL like: `https://login.tailscale.com/a/abc123xyz`
-
-**Copy that URL** and paste it in your browser. Log in with:
-- Google account
-- Microsoft account
-- Or create a Tailscale account
-
-After you authorize it, go back to the terminal. It should say "Success."
-
-### 8.2: Install Tailscale on Your Phone/Computer
-
-**On your phone**:
-1. Download **Tailscale** from App Store or Google Play
-2. Open it and log in with the same account
-3. Turn it ON
-
-**On your laptop**:
-1. Go to https://tailscale.com/download
-2. Download for your OS
-3. Install and log in
-
-### 8.3: Access Grafana Remotely
-
-With Tailscale running on your phone:
-
-Open your browser and go to:
-```
-http://dpx-showsite-ops:3000
-```
-
-Or use the Tailscale IP (check in Tailscale app under your VM's name).
-
-**You can now access your dashboard from anywhere!**
-
----
-
-## Part 9: Public Dashboards (Optional)
+## Part 8: Public Dashboards (Optional)
 
 Want to share your dashboard with someone who doesn't have Tailscale? Use Cloudflare Tunnel.
 
@@ -722,11 +807,11 @@ https://random-words-example.trycloudflare.com
 
 ---
 
-## Part 10: Theengs Gateway for BLE (Optional)
+## Part 9: Theengs Gateway for BLE (Optional)
 
 Want faster updates? Instead of waiting 10 minutes for cloud sync, read sensors directly via Bluetooth.
 
-### 10.1: Install Python on Windows
+### 9.1: Install Python on Windows
 
 **On your Windows NUC**:
 
@@ -736,7 +821,7 @@ Want faster updates? Instead of waiting 10 minutes for cloud sync, read sensors 
 4. ☑ **CHECK** "Add Python to PATH"
 5. Click **Install Now**
 
-### 10.2: Install Visual Studio Build Tools
+### 9.2: Install Visual Studio Build Tools
 
 Theengs needs C++ compiler tools.
 
@@ -745,17 +830,17 @@ Theengs needs C++ compiler tools.
 3. Download **Build Tools for Visual Studio 2022**
 4. Run the installer
 5. Select **Desktop development with C++**
-6. Click **Install** (takes 10-15 minutes)
+6. C8.1: Install Cloudflare Tunnel
 
-### 10.3: Install Theengs Gateway
-
-Open **PowerShell** (right-click Start → Windows PowerShell):
-
-```powershell
-pip install TheengsGateway
+**In your VM terminal**:
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+sudo dpkg -i cloudflared.deb
 ```
 
-### 10.4: Run Theengs Gateway
+### 8
+
+### 9.4: Run Theengs Gateway
 
 ```powershell
 python -m TheengsGateway -H 192.168.1.X -P 1883
@@ -771,7 +856,7 @@ You should see output about discovering devices. Leave this running.
 
 ---
 
-## Part 11: ESP32 BLE Gateway Setup (Recommended)
+## Part 10: ESP32 BLE Gateway Setup (Recommended)
 
 **For real-time BLE data (<5 sec latency)**, deploy ESP32 hardware gateways instead of or alongside Theengs on Windows.
 
@@ -781,14 +866,14 @@ You should see output about discovering devices. Leave this running.
 - **Faster setup**: 5-10 min per gateway
 - **Production proven**: OpenMQTTGateway firmware used worldwide
 
-### 11.1: Hardware Requirements
+### 10.1: Hardware Requirements
 
 - **Board**: ESP32-based hardware with WiFi (custom DPX boards or ESP32 DevKit)
 - **USB Cable**: For initial firmware flash
 - **Browser**: Chrome or Edge (for web installer)
 - **Network**: WiFi credentials + MQTT broker IP
 
-### 11.2: Flash Firmware
+### 10.2: Flash Firmware
 
 1. **Open web installer**: https://docs.openmqttgateway.com/upload/web-install.html
 
@@ -808,7 +893,7 @@ You should see output about discovering devices. Leave this running.
 
 6. **Flash complete**: Click "Next" when done
 
-### 11.3: Configure Gateway
+### 10.3: Configure Gateway
 
 1. **Connect to ESP32 WiFi**:
    - Look for WiFi network: **"OpenMQTTGateway"**
@@ -834,7 +919,7 @@ You should see output about discovering devices. Leave this running.
    - Click "Save"
    - ESP32 reboots and connects to your WiFi
 
-### 11.4: Verify Gateway
+### 10.4: Verify Gateway
 
 **On your VM**, check that ESP32 is publishing:
 
@@ -855,7 +940,7 @@ You should see JSON messages with BLE device data:
 - Check MQTT broker IP is correct
 - Try power cycling the ESP32
 
-### 11.5: Multi-Gateway Deployment (Optional)
+### 10.5: Multi-Gateway Deployment (Optional)
 
 For larger venues or multiple rooms:
 
@@ -908,7 +993,7 @@ For larger venues or multiple rooms:
 - Reflash with correct build: **esp32feather-ble** for DPX boards
 - Use "Erase Flash" option in web installer first
 
-### 11.7: Next Steps
+### 10.7: Next Steps
 
 With ESP32 gateway(s) deployed:
 

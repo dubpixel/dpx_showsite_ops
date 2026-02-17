@@ -371,20 +371,37 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ## 🔮 Future Phases (Additional Ideas)
 
-### Phase 10: Alert System
+### Phase 10: LTC Monitoring Real-Time Dashboard
+- Real-time LTC (Linear Timecode) signal monitoring
+- rs-ltc-qc integration for timecode quality analysis
+- Visual alerts for timecode drift or signal loss
+- Grafana dashboards showing timecode sync health
+- Historical timecode data storage in InfluxDB
+- Integration with show infrastructure for A/V sync monitoring
+- Sub-100ms latency timecode display
+
+**Success Metrics**:
+- [ ] LTC signal monitoring with <100ms latency
+- [ ] Visual alerts trigger on timecode drift (>2 frames)
+- [ ] Historical timecode data flowing to InfluxDB
+- [ ] Grafana dashboard showing real-time sync status
+- [ ] rs-ltc-qc reports integrated into monitoring stack
+
+### Phase 11: Alert System
 - Slack/Discord/email notifications
 - Temperature threshold alerts
 - Device offline detection
 - API health monitoring
 - Schedule slip notifications
+- LTC sync loss alerts
 
-### Phase 11: Multi-Site Support
+### Phase 12: Multi-Site Support
 - Replicate stack to additional show sites
 - Centralized monitoring dashboard
 - Site comparison views
 - Federated data queries
 
-### Phase 12: Additional Sensor Types
+### Phase 13: Additional Sensor Types
 - Motion sensors (PIR)
 - Light sensors
 - Door/window sensors
@@ -425,9 +442,11 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **Phase 8:**
 - [ ] HID keyboard input working for ID + quantity entry
+- [ ] NFC card checkout system operational for resource deployment logging
 - [ ] Data flowing to InfluxDB with person/item/timestamp
-- [ ] Grafana dashboards show consumption trends
+- [ ] Grafana dashboards show consumption trends per person and item type
 - [ ] Sub-30 second entry time for typical transaction
+- [ ] Both HID keyboard and NFC card input methods supported
 
 **Phase 9:**
 - [ ] Feasibility assessment complete (range, battery, cost)
@@ -440,12 +459,13 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 ## Timeline
 
 **Phase 3**: ✅ Complete (2026-02-05)  
-**Phase 4**: Ready to start (2026-02-05) - use Theengs Gateway on Windows NUC  
+**Phase 4**: ✅ Complete (2026-02-16) - BLE decoder dockerized and operational  
 **Phase 5**: After Phase 4 completes - hardware available at studio  
-**Phase 6**: Can start anytime (independent of 4/5) - Sean's repo ready  
+**Phase 6**: 🔄 In Progress - set-schedule integration underway  
 **Phase 7**: After Phase 4 + Phase 6 - requires BLE data and schedule integration  
-**Phase 8**: Independent - can start anytime, separate from other phases  
+**Phase 8**: Independent - can start anytime, NFC + HID keyboard tracking  
 **Phase 9**: After Phase 4 - requires BLE infrastructure and decoder framework  
+**Phase 10**: Planning - LTC monitoring integration with rs-ltc-qc  
 
 **Custom ESP32 hardware**: Optional future enhancement, not blocking current phases
 
