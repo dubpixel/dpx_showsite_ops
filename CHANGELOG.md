@@ -33,6 +33,10 @@ All notable changes to dpx-showsite-ops.
   - `iot ble-follow` - Real-time log streaming
   - `iot ble-decode` - Manual foreground mode (for debugging)
 - **Configuration**: Added SHOWSITE_NAME to .env.example for site identification
+- **setup.sh**: Added Python3/pip3 checks and paho-mqtt installation
+  - Checks for Python3 and pip3 availability
+  - Automatically installs paho-mqtt for manual decoder mode
+  - Gracefully handles missing dependencies (Docker mode unaffected)
 
 ### Changed
 - Updated manage.sh to include ble-decoder in `iot la` (all logs)
