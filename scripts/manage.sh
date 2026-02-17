@@ -69,103 +69,140 @@ case "$1" in
     echo "  - Scan before connect: enabled"
     ;;
   
+  # Production Set-Schedule Commands (uses docker-compose service)
   schedule-up)
-    echo "Starting set-schedule service..."
-    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-test$"; then
-      docker start set-schedule-test
-      echo "✓ set-schedule-test container started"
-    else
-      echo "⚠ Container doesn't exist. Build it first with: iot schedule-build"
-      exit 1
-    fi
-    echo "Access at: http://localhost:8000"
+    echo "Starting set-schedule production service..."
+    docker compose up -d set-schedule
+    echo "✓ Production set-schedule service started"
+    echo "Access at: http://localhost:${SCHEDULE_PORT:-8000}"
     ;;
   
   schedule-down)
-    echo "Stopping set-schedule service..."
-    docker stop set-schedule-test
-    echo "✓ set-schedule-test container stopped"
+    echo "Stopping set-schedule production service..."
+    docker compose stop set-schedule
+    echo "✓ Production set-schedule service stopped"
     ;;
   
   schedule-restart)
-    echo "Restarting set-schedule service..."
-    docker restart set-schedule-test
-    echo "✓ set-schedule-test container restarted"
+    echo "Restarting set-schedule production service..."
+    docker compose restart set-schedule
+    echo "✓ Production set-schedule service restarted"
     ;;
   
   schedule-status)
-    echo "Set-Schedule Service Status:"
-    echo "================================"
-    docker ps -a --filter "name=set-schedule-test" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    echo "Set-Schedule Production Service Status:"
+    echo "========================================"
+    docker compose ps set-schedule
     ;;
   
   schedule-logs)
-    echo "Set-Schedule Logs (last ${2:-30} lines):"
-    echo "================================"
-    docker logs set-schedule-test 2>&1 | tail -${2:-30}
+    echo "Set-Schedule Production Logs (last ${2:-30} lines):"
+    echo "===================================================="
+    docker compose logs set-schedule --tail ${2:-30}
     ;;
   
   schedule-follow)
-    echo "Following set-schedule logs (Ctrl+C to exit)..."
-    docker logs -f set-schedule-test
+    echo "Following set-schedule production logs (Ctrl+C to exit)..."
+    docker compose logs -f set-schedule
     ;;
   
-  schedule-build)
-    SCHEDULE_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
-    if [ ! -d "$SCHEDULE_DIR" ]; then
-      echo "⚠ Directory not found: $SCHEDULE_DIR"
+  schedule-rebuild)
+    echo "Rebuilding and redeploying set-schedule production service..."
+    docker compose up -d --build set-schedule
+    echo "✓ Production set-schedule service rebuilt and redeployed"
+    echo "Access at: http://localhost:${SCHEDULE_PORT:-8000}"
+    ;;
+  
+  schedule-shell)
+    echo "Opening shell in set-schedule production container..."
+    docker compose exec set-schedule /bin/sh
+    ;;
+  
+  # Development Set-Schedule Commands (uses standalone folder)
+  schedule-dev-build)
+    DEV_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
+    if [ ! -d "$DEV_DIR" ]; then
+      echo "⚠ Development directory not found: $DEV_DIR"
       echo "The COACHELLA_SET_SCHEDULE repo should be a sibling directory to DPX_SHOWSITE_OPS"
       exit 1
     fi
     
-    cd "$SCHEDULE_DIR"
-    echo "Building set-schedule image..."
-    docker build -t set-schedule:test .
-    
-    # Stop and remove old container if exists
-    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-test$"; then
-      echo "Stopping and removing old container..."
-      docker stop set-schedule-test 2>/dev/null
-      docker rm set-schedule-test
-    fi
-    
-    echo "Creating new container..."
-    docker run -d \
-      --name set-schedule-test \
-      -p 8000:8000 \
-      --env-file .env \
-      set-schedule:test
-    
-    echo "✓ set-schedule built and running"
-    echo "Access at: http://localhost:8000"
+    cd "$DEV_DIR"
+    echo "Building set-schedule dev image from: $DEV_DIR"
+    docker build -t set-schedule:dev .
+    echo "✓ Dev image built"
     ;;
   
-  schedule-rebuild)
-    echo "This will rebuild and redeploy the set-schedule service"
-    $0 schedule-build
-    ;;
-  
-  schedule-shell)
-    echo "Opening shell in set-schedule container..."
-    docker exec -it set-schedule-test /bin/sh
-    ;;
-  
-  schedule-update)
-    SCHEDULE_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
-    if [ ! -d "$SCHEDULE_DIR" ]; then
-      echo "⚠ Directory not found: $SCHEDULE_DIR"
+  schedule-dev-up)
+    DEV_DIR="$REPO_ROOT/../COACHELLA_SET_SCHEDULE"
+    if [ ! -d "$DEV_DIR" ]; then
+      echo "⚠ Development directory not found: $DEV_DIR"
       exit 1
     fi
     
-    cd "$SCHEDULE_DIR"
-    echo "Updating from Sean's upstream repo..."
-    git fetch upstream
-    git checkout main
-    git pull upstream main
-    git push origin main
-    echo "✓ Updated to latest from upstream"
-    echo ""
-    echo "Rebuild container to apply changes: iot schedule-rebuild"
+    # Check if dev .env exists
+    if [ ! -f "$DEV_DIR/.env" ]; then
+      echo "⚠ No .env file found in $DEV_DIR"
+      echo "Copy .env.example to .env and configure PORT=8001"
+      exit 1
+    fi
+    
+    # Stop and remove old dev container if exists
+    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-dev$"; then
+      echo "Stopping and removing old dev container..."
+      docker stop set-schedule-dev 2>/dev/null
+      docker rm set-schedule-dev
+    fi
+    
+    echo "Starting dev container on port 8001..."
+    docker run -d \
+      --name set-schedule-dev \
+      -p 8001:8001 \
+      --env-file "$DEV_DIR/.env" \
+      -v "$REPO_ROOT/secret:/app/secret:ro" \
+      set-schedule:dev
+    
+    echo "✓ Dev set-schedule running"
+    echo "Access at: http://localhost:8001"
+    ;;
+  
+  schedule-dev-down)
+    echo "Stopping dev set-schedule container..."
+    if docker ps -a --format '{{.Names}}' | grep -q "^set-schedule-dev$"; then
+      docker stop set-schedule-dev
+      docker rm set-schedule-dev
+      echo "✓ Dev container stopped and removed"
+    else
+      echo "⚠ Dev container not found"
+    fi
+    ;;
+  
+  schedule-dev-restart)
+    echo "Restarting dev set-schedule container..."
+    docker restart set-schedule-dev
+    echo "✓ Dev container restarted"
+    ;;
+  
+  schedule-dev-logs)
+    echo "Set-Schedule Dev Logs (last ${2:-30} lines):"
+    echo "============================================="
+    docker logs set-schedule-dev 2>&1 | tail -${2:-30}
+    ;;
+  
+  schedule-dev-follow)
+    echo "Following dev set-schedule logs (Ctrl+C to exit)..."
+    docker logs -f set-schedule-dev
+    ;;
+  
+  schedule-dev-rebuild)
+    echo "Rebuilding and redeploying dev set-schedule..."
+    $0 schedule-dev-build
+    $0 schedule-dev-up
+    ;;
+  
+  schedule-dev-shell)
+    echo "Opening shell in dev set-schedule container..."
+    docker exec -it set-schedule-dev /bin/sh
     ;;
   
   clear-retained)
@@ -209,17 +246,25 @@ case "$1" in
     echo "                           services: govee2mqtt telegraf mosquitto influxdb grafana ble-decoder"
     echo "    status                 Show running containers"
     echo ""
-    echo "  SET-SCHEDULE SERVICE (Sean's coachella_set_schedule app)"
-    echo "    schedule-up            Start set-schedule service"
-    echo "    schedule-down          Stop set-schedule service"
-    echo "    schedule-restart       Restart set-schedule service"
-    echo "    schedule-status        Show set-schedule container status"
-    echo "    schedule-logs [n]      View logs (default: 30 lines)"
-    echo "    schedule-follow        Follow logs in real-time"
-    echo "    schedule-build         Build and deploy from ../COACHELLA_SET_SCHEDULE"
-    echo "    schedule-rebuild       Rebuild and redeploy (alias for schedule-build)"
-    echo "    schedule-update        Update from Sean's upstream repo"
-    echo "    schedule-shell         Open shell in container"
+    echo "  SET-SCHEDULE SERVICE (Production - uses docker-compose)"
+    echo "    schedule-up            Start production service on port 8000"
+    echo "    schedule-down          Stop production service"
+    echo "    schedule-restart       Restart production service"
+    echo "    schedule-status        Show production container status"
+    echo "    schedule-logs [n]      View production logs (default: 30 lines)"
+    echo "    schedule-follow        Follow production logs in real-time"
+    echo "    schedule-rebuild       Rebuild and redeploy production service"
+    echo "    schedule-shell         Open shell in production container"
+    echo ""
+    echo "  SET-SCHEDULE DEV (Dev/Test - uses standalone folder)"
+    echo "    schedule-dev-build     Build dev image from ../COACHELLA_SET_SCHEDULE"
+    echo "    schedule-dev-up        Start dev service on port 8001"
+    echo "    schedule-dev-down      Stop dev service"
+    echo "    schedule-dev-restart   Restart dev service"
+    echo "    schedule-dev-logs [n]  View dev logs (default: 30 lines)"
+    echo "    schedule-dev-follow    Follow dev logs in real-time"
+    echo "    schedule-dev-rebuild   Build and start dev service"
+    echo "    schedule-dev-shell     Open shell in dev container"
     echo ""
     echo "  BLE DECODER SERVICE (Python decoder for Govee BLE broadcasts)"
     echo "    ble-decode             Run decoder manually (foreground, for debugging)"
