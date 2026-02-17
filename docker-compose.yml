@@ -98,6 +98,34 @@ services:
       - mosquitto
       - govee2mqtt
 
+  set-schedule:
+    build:
+      context: ./services/set-schedule
+      dockerfile: Dockerfile
+    container_name: set-schedule
+    restart: unless-stopped
+    ports:
+      - "${SCHEDULE_PORT:-8000}:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - USE_GOOGLE_SHEETS=${USE_GOOGLE_SHEETS:-false}
+      - STAGE_NAME=${STAGE_NAME:-Main Stage}
+      - TIMEZONE=${TIMEZONE:-America/Los_Angeles}
+      - GOOGLE_SHEETS_ID=${GOOGLE_SHEETS_ID}
+      - GOOGLE_SHEET_TAB=${GOOGLE_SHEET_TAB:-Schedule}
+      - GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-/app/secret/set-schedule-service-account.json}
+      - ARTNET_ENABLED=${ARTNET_ENABLED:-false}
+      - ARTNET_LISTEN_IP=${ARTNET_LISTEN_IP:-0.0.0.0}
+      - ARTNET_PORT=${ARTNET_PORT:-6454}
+      - ARTNET_UNIVERSE=${ARTNET_UNIVERSE:-0}
+      - ARTNET_CHANNEL_START=${ARTNET_CHANNEL_START:-1}
+      - ARTNET_CHANNEL_COUNT=${ARTNET_CHANNEL_COUNT:-3}
+    volumes:
+      - ./secret:/app/secret:ro
+    networks:
+      - iot
+
 networks:
   iot:
     driver: bridge

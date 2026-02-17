@@ -1,10 +1,12 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": ".",
+			"name": "🏠 DPX Stack (Production)"
 		},
 		{
-			"path": "../COACHELLA_SET_SCHEDULE"
+			"path": "../COACHELLA_SET_SCHEDULE",
+			"name": "🔧 Set-Schedule (Dev)"
 		}
 	],
 	"settings": {}
