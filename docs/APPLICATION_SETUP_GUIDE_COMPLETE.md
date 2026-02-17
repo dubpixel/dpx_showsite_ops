@@ -767,7 +767,7 @@ You should see output about discovering devices. Leave this running.
 
 **To stop it**: Press `Ctrl + C`
 
-**Note**: This is Phase 4 of the project. Full integration requires additional setup (ble_decoder.py service). See the main documentation for details.
+**Note**: The BLE decoder service (ble-decoder) is automatically deployed via docker-compose and starts with `iot up`. No additional setup needed!
 
 ---
 
@@ -912,10 +912,11 @@ For larger venues or multiple rooms:
 
 With ESP32 gateway(s) deployed:
 
-1. **Deploy ble_decoder.py** (see Phase 4 in main docs)
-2. **Update Telegraf** to collect both cloud + BLE data
-3. **Update Grafana** dashboards to show both sources
-4. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
+1. **BLE decoder already running**: Automatically started with `iot up`
+2. **Check decoder logs**: `iot lb` or `iot ble-status`
+3. **Telegraf**: Already configured to collect both cloud + BLE data
+4. **Grafana**: Dashboards show both sources with source tags
+5. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
 
 **Windows Theengs Gateway**: Available as fallback option (see Part 10)
 
@@ -1114,9 +1115,11 @@ You now have a working IoT monitoring system! Here are some ideas for what to do
 - Buy more Govee sensors for different rooms
 - They automatically get discovered
 
-**Phase 4 - BLE Gateway**:
-- Set up local Bluetooth reading for faster updates (<5 seconds instead of 10 minutes)
-- See the main repository documentation
+**Phase 4 - BLE Gateway** ✅ Complete:
+- Local BLE reading deployed and operational (<5 second latency)
+- ble-decoder service runs automatically with the stack
+- Manage with: `iot ble-status`, `iot lb`, `iot ble-restart`
+- See ROADMAP.md for details
 
 **Phase 5 - Network Backups**:
 - Automate backups of your network switches and routers

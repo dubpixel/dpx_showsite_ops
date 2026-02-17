@@ -118,6 +118,48 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         echo "Edit .env manually before running 'iot up'"
     fi
 fi
+# Install Python dependencies for BLE decoder (manual mode)
+
+echo ""
+echo -n "Checking Python3... "
+if ! command -v python3 &> /dev/null; then
+    echo -e "${YELLOW}NOT FOUND${NC}"
+    echo "Python3 not installed. Manual 'iot ble-decode' won't work."
+    echo "Install with: sudo apt install python3 python3-paho-mqtt"
+    echo "(Docker service 'iot ble-up' will still work fine)"
+else
+    echo -e "${GREEN}OK${NC}"
+    
+    echo -n "Installing paho-mqtt... "
+    # Try apt first (handles PEP 668 externally-managed environments)
+    if command -v apt &> /dev/null; then
+        if dpkg -l python3-paho-mqtt 2>/dev/null | grep -q ^ii; then
+            echo -e "${GREEN}ALREADY INSTALLED${NC}"
+        else
+            if sudo apt install -y python3-paho-mqtt &>/dev/null; then
+                echo -e "${GREEN}INSTALLED${NC}"
+            else
+                echo -e "${YELLOW}FAILED${NC}"
+                echo "Try manually: sudo apt install python3-paho-mqtt"
+            fi
+        fi
+    else
+        # Non-Debian system, try pip3
+        if command -v pip3 &> /dev/null; then
+            if pip3 install -q 'paho-mqtt>=1.6.1,<2.0.0' 2>/dev/null; then
+                echo -e "${GREEN}INSTALLED${NC}"
+            else
+                echo -e "${YELLOW}FAILED${NC}"
+                echo "Try manually: pip3 install --break-system-packages 'paho-mqtt>=1.6.1,<2.0.0'"
+            fi
+        else
+            echo -e "${YELLOW}SKIPPED${NC}"
+            echo "No package manager found. Install manually:"
+            echo "  sudo apt install python3-paho-mqtt  (Debian/Ubuntu)"
+            echo "  pip3 install --break-system-packages 'paho-mqtt>=1.6.1,<2.0.0'  (other)"
+        fi
+    fi
+fi
 
 # Initialize git submodule if needed
 echo ""

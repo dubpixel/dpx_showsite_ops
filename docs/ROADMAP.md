@@ -122,13 +122,14 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - ✅ Both publish to standardized MQTT topics
 - Both gateways operational with redundancy
 
-### Phase 4.2: BLE Decoder Service ⏳
+### Phase 4.2: BLE Decoder Service ✅
 - ✅ ble_decoder.py script created and functional
 - ✅ Subscribes to both ESP32 and Theengs MQTT topics
 - ✅ Decodes H5051/H507x manufacturerdata
 - ✅ Publishes to demo_showsite topics with source tagging
 - ✅ Loads device mappings from govee2mqtt API
-- ⏳ **Pending**: Dockerization (currently runs manually)
+- ✅ Dockerized as ble-decoder service in docker-compose.yml
+- ✅ Full management via iot commands (ble-up/down/restart/logs)
 
 ### Phase 4.3: Unified Telegraf Config ✅
 - ✅ Modular telegraf.conf structure (base config + device-mappings.conf)
@@ -168,15 +169,14 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 3. **BLE Decoder restart on name changes** - Decoder loads device map once at startup; needs API polling or cron restart
 
 #### High Priority
-4. **Dockerize ble_decoder.py** - Create Dockerfile, add to docker-compose.yml, auto-start with stack
-5. **ESP32 pubadvdata persistence** - Setting resets on reboot; need auto-enable script or systemd timer
+4. **ESP32 pubadvdata persistence** - Setting resets on reboot; need auto-enable script or systemd timer
 
 #### Medium Priority
-6. **Telegraf "Available" error suppression** - govee2mqtt status messages trigger parse errors (low impact)
-7. **MAC-based device filtering** - Use z_device_id instead of device_name for stability across renames
-8. **Theengs Gateway auto-start** - Windows scheduled task or NSSM service needed
+5. **Telegraf "Available" error suppression** - govee2mqtt status messages trigger parse errors (low impact)
+6. **MAC-based device filtering** - Use z_device_id instead of device_name for stability across renames
+7. **Theengs Gateway auto-start** - Windows scheduled task or NSSM service needed
 
-**Status**: 🔄 In Progress - core functionality working, containerization and cleanup pending
+**Status**: ✅ Complete - BLE decoder dockerized and operational, cleanup tasks remain
 
 ---
 

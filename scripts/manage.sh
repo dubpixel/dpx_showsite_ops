@@ -13,13 +13,21 @@ case "$1" in
   restart)  docker compose restart ${2:-} ;;
   status)   docker compose ps ;;
   fixnet)   sudo systemctl restart network-route-fix.service ;;
-  ble-decode) source ../.env && python3 ble_decoder.py ;;
+  ble-decode) cd "$SCRIPT_DIR" && source "$REPO_ROOT/.env" && python3 ble_decoder.py ;;
+  ble-up)   docker compose up -d ble-decoder ;;
+  ble-down) docker compose stop ble-decoder ;;
+  ble-restart) docker compose restart ble-decoder ;;
+  ble-rebuild) docker compose up -d --build ble-decoder ;;
+  ble-status) docker compose ps ble-decoder ;;
+  ble-logs) docker logs ble-decoder 2>&1 | tail -${2:-30} ;;
+  ble-follow) docker logs -f ble-decoder ;;
   lg)       docker logs govee2mqtt 2>&1 | tail -${2:-30} ;;
   lt)       docker logs telegraf 2>&1 | tail -${2:-30} ;;
   lm)       docker logs mosquitto 2>&1 | tail -${2:-30} ;;
   li)       docker logs influxdb 2>&1 | tail -${2:-30} ;;
   lf)       docker logs grafana 2>&1 | tail -${2:-30} ;;
-  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
+  lb)       docker logs ble-decoder 2>&1 | tail -${2:-30} ;;
+  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana ble-decoder; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
   query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
   query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} | ts '[%H:%M:%S]' ;;
@@ -198,7 +206,7 @@ case "$1" in
     echo "    up                     Start all containers"
     echo "    down                   Stop all containers (keeps data)"
     echo "    restart [service]      Restart all, or just one service"
-    echo "                           services: govee2mqtt telegraf mosquitto influxdb grafana"
+    echo "                           services: govee2mqtt telegraf mosquitto influxdb grafana ble-decoder"
     echo "    status                 Show running containers"
     echo ""
     echo "  SET-SCHEDULE SERVICE (Sean's coachella_set_schedule app)"
@@ -213,12 +221,23 @@ case "$1" in
     echo "    schedule-update        Update from Sean's upstream repo"
     echo "    schedule-shell         Open shell in container"
     echo ""
+    echo "  BLE DECODER SERVICE (Python decoder for Govee BLE broadcasts)"
+    echo "    ble-decode             Run decoder manually (foreground, for debugging)"
+    echo "    ble-up                 Start BLE decoder service"
+    echo "    ble-down               Stop BLE decoder service"
+    echo "    ble-restart            Restart BLE decoder service"
+    echo "    ble-rebuild            Rebuild and restart BLE decoder"
+    echo "    ble-status             Show BLE decoder container status"
+    echo "    ble-logs [n]           View logs (default: 30 lines)"
+    echo "    ble-follow             Follow logs in real-time"
+    echo ""
     echo "  LOGS                     All take optional line count (default 30)"
     echo "    lg [n]                 govee2mqtt logs"
     echo "    lt [n]                 telegraf logs"
     echo "    lm [n]                 mosquitto (MQTT broker) logs"
     echo "    li [n]                 influxdb logs"
     echo "    lf [n]                 grafana logs"
+    echo "    lb [n]                 ble-decoder logs"
     echo "    la [n]                 ALL containers (default 10 each)"
     echo ""
     echo "  DATA"
