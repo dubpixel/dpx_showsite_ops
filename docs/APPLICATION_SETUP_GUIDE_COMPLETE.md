@@ -1024,19 +1024,46 @@ This installs Build Tools with the C++ workload. Takes 5-10 minutes.
 
 **Note**: If you already have Chocolatey: `choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`
 
-### 9.3: Install Theengs Gateway
+### 9.3: Verify pip (Python Package Manager)
+
+Python 3.11+ includes pip by default, but let's verify it's available.
 
 **In PowerShell**:
 
 ```powershell
-pip install TheengsGateway
+python -m pip --version
 ```
 
-If you get an error about pip not being found, try:
+**If you see a version number** (e.g., `pip 23.x.x`): ✅ Skip to 9.4
+
+**If you get "No module named pip"**, install it:
+
+```powershell
+python -m ensurepip --upgrade
+```
+
+Or download the pip installer:
+
+```powershell
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python get-pip.py
+```
+
+**Verify pip works**:
+
+```powershell
+python -m pip --version
+```
+
+### 9.4: Install Theengs Gateway
+
+**In PowerShell**:
 
 ```powershell
 python -m pip install TheengsGateway
 ```
+
+Wait for installation to complete (takes 1-2 minutes).
 
 **Verify installation**:
 
@@ -1046,7 +1073,7 @@ python -m TheengsGateway --version
 
 Should show the Theengs Gateway version number.
 
-### 9.4: Run Theengs Gateway
+### 9.5: Run Theengs Gateway
 
 ```powershell
 python -m TheengsGateway -H 192.168.1.X -P 1883
