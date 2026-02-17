@@ -78,6 +78,26 @@ services:
       - TZ=${TZ} 
     networks:
       - iot
+
+  ble-decoder:
+    build:
+      context: .
+      dockerfile: Dockerfile.ble-decoder
+    container_name: ble-decoder
+    restart: unless-stopped
+    environment:
+      - BROKER=mosquitto
+      - GOVEE_API_URL=http://host.docker.internal:8056/api/devices
+      - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
+      - TZ=${TZ}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
+      - govee2mqtt
+
 networks:
   iot:
     driver: bridge

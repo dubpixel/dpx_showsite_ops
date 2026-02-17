@@ -7,7 +7,6 @@ All notable changes to dpx-showsite-ops.
 ## [Unreleased]
 
 ### Phase 4 - BLE Gateway (Planned)
-- BLE decoder service for real-time sensor data
 - ESP32 or Windows Theengs Gateway integration
 - Unified Telegraf config with source tagging
 
@@ -15,6 +14,29 @@ All notable changes to dpx-showsite-ops.
 - TFTP server deployment
 - M4300 automated backup scripts
 - Monitoring integration
+
+---
+
+## [1.2.0] - 2026-02-16
+
+### Added
+- **BLE Decoder Service**: Dockerized Python BLE decoder for Govee sensors
+  - Created Dockerfile.ble-decoder with Python 3.11 slim image
+  - Added requirements-ble-decoder.txt (paho-mqtt dependency)
+  - Integrated ble-decoder service into docker-compose.yml
+  - Auto-connects to mosquitto and govee2mqtt API
+  - Decodes H5051, H5074, H5075 manufacturer data to standardized MQTT topics
+- **Management Commands**: New iot commands for BLE decoder
+  - `iot ble-up/down/restart/rebuild` - Service control
+  - `iot ble-status` - Container status
+  - `iot ble-logs [n]` / `iot lb [n]` - View logs (default 30 lines)
+  - `iot ble-follow` - Real-time log streaming
+  - `iot ble-decode` - Manual foreground mode (for debugging)
+- **Configuration**: Added SHOWSITE_NAME to .env.example for site identification
+
+### Changed
+- Updated manage.sh to include ble-decoder in `iot la` (all logs)
+- Updated help text with BLE Decoder service section
 
 ---
 

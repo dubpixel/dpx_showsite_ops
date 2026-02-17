@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements-ble-decoder.txt .
+RUN pip install --no-cache-dir -r requirements-ble-decoder.txt
+
+# Copy the decoder script
+COPY scripts/ble_decoder.py .
+
+# Set environment defaults
+ENV BROKER=mosquitto
+ENV GOVEE_API_URL=http://host.docker.internal:8056/api/devices
+ENV SHOWSITE_NAME=demo_showsite
+
+# Replace hardcoded localhost with env vars
+RUN sed -i 's|BROKER = "localhost"|BROKER = os.getenv("BROKER", "mosquitto")|' ble_decoder.py && \
+    sed -i 's|API = "http://localhost:8056/api/devices"|API = os.getenv("GOVEE_API_URL", "http://host.docker.internal:8056/api/devices")|' ble_decoder.py
+
+CMD ["python", "-u", "ble_decoder.py"]
