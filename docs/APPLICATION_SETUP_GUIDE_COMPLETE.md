@@ -1057,11 +1057,15 @@ python -m pip --version
 
 ### 9.4: Install Theengs Gateway
 
-**In PowerShell**:
+**In PowerShell as Administrator**:
 
 ```powershell
 python -m pip install TheengsGateway
 ```
+
+**If you see "Defaulting to user installation"**: This means PowerShell isn't running as Administrator. Either:
+- Close PowerShell and reopen **as Administrator** (right-click → Run as Administrator), OR
+- Continue anyway - the warning is harmless, TheengsGateway will install to your user directory
 
 Wait for installation to complete (takes 1-2 minutes).
 
@@ -1075,13 +1079,31 @@ Should show the Theengs Gateway version number.
 
 ### 9.5: Run Theengs Gateway
 
+**Start Theengs Gateway**:
 ```powershell
-python -m TheengsGateway -H 192.168.1.X -P 1883
+python -m TheengsGateway -H dpx-showsite-ops.local -P 1883 -ll DEBUG
 ```
 
-(Replace 192.168.1.X with your VM's IP)
+**If mDNS isn't working**, use the VM's IP address instead:
+```powershell
+python -m TheengsGateway -H 192.168.1.X -P 1883 -ll DEBUG
+```
 
-You should see output about discovering devices. Leave this running.
+**Key options**:
+- `-ll DEBUG`: Show decoded sensor data in console (recommended for setup/testing)
+- `-ll INFO`: Quieter - just connection status and message counts
+- `-a hci0`: Specify Bluetooth adapter (auto-detected by default)
+
+You should see output about discovering devices:
+```
+DEBUG: Discovered device: A4:C1:38:XX:XX:XX
+DEBUG: Temperature: 72.5°F, Humidity: 45%
+INFO: Published to home/TheengsGateway/BTtoMQTT/A4C138XXXXXX
+```
+
+**Note**: If you want to integrate Theengs with the dpx-showsite-ops ble_decoder.py (similar to ESP32 gateways), you may need to add the `--publish-advdata` flag. This publishes raw advertising data for custom decoding. Test without it first to see decoded data.
+
+Leave this running.
 
 **To stop it**: Press `Ctrl + C`
 
