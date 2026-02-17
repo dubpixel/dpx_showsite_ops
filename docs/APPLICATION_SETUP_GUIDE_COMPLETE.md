@@ -33,14 +33,21 @@
 By the end of this guide, you'll have:
 
 - A Linux VM running on your Windows NUC
-- Temperature and humidity data from sensors flowing into a database every 10 minutes
+- Temperature and humidity data from sensors flowing into a database
 - Beautiful Grafana dashboards showing your sensor data
 - The ability to view dashboards from anywhere (phone, laptop, etc.)
 - Automatic device discovery and mapping
 
-**The data flow**:
+**The data flow** (two parallel paths):
+
+**Cloud Path** (10-20 min latency):
 ```
-Govee Sensor → Govee Cloud → Your VM → Database → Pretty Graphs
+Govee Sensor → Govee Cloud → govee2mqtt → MQTT → Telegraf → InfluxDB → Grafana
+```
+
+**BLE Path** (<5 sec latency):
+```
+Govee Sensor → ESP32/Theengs Gateway → MQTT → BLE Decoder → InfluxDB → Grafana
 ```
 
 ---
@@ -49,7 +56,11 @@ Govee Sensor → Govee Cloud → Your VM → Database → Pretty Graphs
 
 ### Required
 - **Windows NUC** (or any Windows PC with 8GB+ RAM)
-- **Govee Sensors** (H5051 or similar Bluetooth temperature/humidity sensors)
+- **Govee Sensors**: 
+  - **H5075** (RECOMMENDED): BLE-only, Theengs decoder support, excellent reliability
+  - **H5051**: Cloud + BLE capable, requires custom decoder, good option
+  - ❌ **NOT H5074**: Poor BLE reliability (avoid this model)
+  - See [sensor comparison table](context_public/CONTEXT.md#sensor-comparison) for details
 - **Internet connection** (wired recommended)
 - **Router** with ability to set static IP (most routers can do this)
 
@@ -351,6 +362,15 @@ You should see responses. Press `Ctrl + C` if it keeps going.
 sudo apt install -y git curl wget vim avahi-daemon
 ```
 
+**Install GitHub CLI** (makes git authentication and PRs easier):
+```bash
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update
+sudo apt install -y gh
+```
+
 **Enable mDNS** (lets you use dpx-showsite-ops.local instead of IP):
 ```bash
 sudo systemctl enable --now avahi-daemon
@@ -426,9 +446,36 @@ Should see: `Hi username! You've successfully authenticated...`
 
 **Note**: If you don't need private repos, you can skip this step and use HTTPS git URLs instead.
 
-### 3.8: Optional - Disable IPv6
+#### Alternative: GitHub CLI (Easier)
 
-**Only if you'll use govee2mqtt** (the Govee cloud integration in this stack). This fixes AWS IoT timeout issues on Hyper-V VMs.
+If you installed GitHub CLI in Part 3.5, you can use it instead of SSH keys:
+
+**Authenticate**:
+```bash
+gh auth login
+```
+
+Follow the interactive prompts:
+1. Select "GitHub.com"
+2. Select "HTTPS"
+3. Authenticate via web browser
+
+**Test it**:
+```bash
+gh repo view dubpixel/dpx_showsite_ops
+```
+
+**Benefits**:
+- No SSH key management required
+- Works with HTTPS git URLs
+- Can create pull requests from CLI: `gh pr create`
+- Recommended for beginners
+
+**Note**: SSH keys are still required for git submodules with private repos, but `gh` handles regular git operations via HTTPS.
+
+### 3.8: Disable IPv6 (Required for Cloud Integration)
+
+**Required if using govee2mqtt** (cloud Govee data path). This fixes AWS IoT timeout issues on Hyper-V VMs.
 
 ```bash
 sudo sysctl -w net.ipv6.conf.eth0.disable_ipv6=1
@@ -456,7 +503,7 @@ Before proceeding to Docker deployment, verify everything is working:
 - [ ] Internet working: `ping google.com`
 - [ ] Base tools installed: `git --version`, `docker --version` (docker comes in Part 4)
 - [ ] mDNS working: `ping dpx-showsite-ops.local` (from another computer)
-- [ ] (Optional) IPv6 disabled if using govee2mqtt
+- [ ] (Required for cloud) IPv6 disabled: `ip addr show eth0 | grep inet6` shows nothing
 - [ ] (Optional) GitHub SSH access working
 
 **If all checks pass, your VM is ready!**
@@ -488,6 +535,8 @@ Keep this handy for future access:
 ---
 
 ## Part 4: Install Docker
+
+**Note**: Docker installation is manual (not part of setup.sh). Complete this section before proceeding to Part 5.
 
 Docker runs all our services in containers (like tiny virtual machines).
 
@@ -632,9 +681,11 @@ You should see logs about connecting to AWS IoT. If you see "timeout" errors, se
 
 ---
 
-## Part 6: Connect Grafana to InfluxDB
+## Part 6: Grafana InfluxDB Connection (Auto-Configured)
 
-Grafana shows graphs. InfluxDB stores data. Let's connect them.
+The InfluxDB datasource should auto-provision when Grafana starts via the configuration in `grafana/provisioning/datasources/influxdb.yaml`.
+
+**Verify auto-provisioning worked:**
 
 ### 6.1: Access Grafana
 
@@ -654,7 +705,41 @@ You should see the Grafana login page.
 
 It will ask you to change the password. You can click "Skip" or set a new one.
 
-### 6.2: Add InfluxDB Data Source
+### 6.2: Verify InfluxDB Datasource
+
+**Check if auto-provisioning worked**:
+1. On the left sidebar, click the **⚙️ gear icon** (Configuration)
+2. Click **Data sources**
+3. You should see **InfluxDB** listed with a green checkmark
+
+If you see the InfluxDB datasource, you're done! Skip to Part 7.
+
+If the datasource is missing or shows errors, continue with manual setup below.
+
+### 6.3: Understanding Provisioning (Optional)
+
+The datasource is configured in `grafana/provisioning/datasources/influxdb.yaml`:
+
+```yaml
+apiVersion: 1
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: home
+      defaultBucket: sensors
+    secureJsonData:
+      token: my-super-secret-token
+```
+
+**Note**: The token must match your `.env` file's `INFLUXDB_TOKEN`. If you change the token, update both files and restart Grafana: `iot restart grafana`
+
+### 6.4: Manual Configuration (Fallback Only)
+
+**Only follow these steps if auto-provisioning failed.**
 
 **Steps**:
 1. On the left sidebar, click the **⚙️ gear icon** (Configuration)
@@ -663,7 +748,7 @@ It will ask you to change the password. You can click "Skip" or set a new one.
 4. Scroll down and click **InfluxDB**
 
 **Configure it**:
-- **Name**: `InfluxDB` (already filled)
+- **Name**: `InfluxDB`
 - **Query Language**: Select **Flux** from dropdown
 - **URL**: `http://influxdb:8086`
 - **Access**: Leave as "Server (default)"
@@ -678,11 +763,13 @@ It will ask you to change the password. You can click "Skip" or set a new one.
 - Click **Save & Test**
 - You should see a green checkmark: "datasource is working. 1 buckets found"
 
-If you see red errors, double-check your entries.
+If you see red errors, double-check your entries match the provisioning YAML.
 
 ---
 
 ## Part 7: Create Your First Dashboard
+
+**Note**: A default temperature monitoring dashboard auto-loads from `grafana/provisioning/dashboards/dashboard-temperature-sensors.json` showing both cloud and BLE data paths. This section teaches you to create custom dashboards or modify the default.
 
 ### 7.1: Find Your Room Names
 
@@ -725,20 +812,55 @@ In the query editor at the bottom:
 
 1. Make sure "Query Language" shows **Flux**
 2. Delete any existing query text
-3. Paste this (replace `your_room_name` with your actual room):
+3. Choose one of these queries based on your data source:
 
+**Temperature - Cloud Data Only** (10-20 min latency):
 ```flux
 from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "gv_cloud")
   |> filter(fn: (r) => r.sensor_type == "temperature")
-  |> filter(fn: (r) => r.room == "studown")
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> filter(fn: (r) => r.device_name != "studio_5051_down")
+  |> map(fn: (r) => ({r with _field: r.room + " - " + r.device_name}))
 ```
+
+**Temperature - BLE Data Only** (<5 sec latency):
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "dpx_ops_decoder")
+  |> filter(fn: (r) => r.sensor_type == "temperature")
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> map(fn: (r) => ({r with _field: "|" + r.source_node + "| - " + r.room + " - " + r.device_name}))
+```
+
+**Temperature - Both Cloud & BLE** (compare latency):
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "gv_cloud" or r.source == "dpx_ops_decoder")
+  |> filter(fn: (r) => r.sensor_type == "temperature")
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> map(fn: (r) => ({r with _field: 
+    r.source + 
+    (if exists r.source_node then " -- |" + r.source_node + "| - " else " - ") + 
+    r.room + " - " + r.device_name
+  }))
+```
+
+**About these queries**:
+- `device_name != "h5074_4e6f"` filters out H5074 sensors (unreliable BLE)
+- `device_name != "studio_5051_down"` excludes a specific duplicate device (adjust for your setup)
+- The `map()` function creates custom series names combining source, room, and device
+- `${__field.name}` in panel settings references this custom name for legends/titles
 
 **Customize the panel**:
 1. On the right side, under "Panel options":
    - **Title**: Change to "Temperature"
 2. Under "Standard options":
    - **Unit**: Select "Temperature" → "Fahrenheit (°F)" (or Celsius if you prefer)
+   - **Display name**: Use `${__field.name}` to show the custom field names from the map() function
 3. Click **Run query** button (top right) or wait a few seconds
 
 You should see a graph appear!
@@ -746,24 +868,62 @@ You should see a graph appear!
 **Save the panel**:
 - Click **Apply** button (top right)
 
-### 7.4: Add a Humidity Panel
+### 7.4: Add More Panels
 
+**Add Humidity Panel**:
 1. Click **Add** dropdown (top right) → **Visualization**
 2. Select **InfluxDB**
-3. Paste this query (replace room name):
+3. Paste this query (adjust filters as needed):
 
 ```flux
 from(bucket: "sensors")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "gv_cloud" or r.source == "dpx_ops_decoder")
   |> filter(fn: (r) => r.sensor_type == "humidity")
-  |> filter(fn: (r) => r.room == "studown")
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> map(fn: (r) => ({r with _field: r.room + " - " + r.device_name}))
 ```
 
 **Customize**:
 - **Title**: "Humidity"
 - **Unit**: "Misc" → "Percent (0-100)"
+- **Display name**: `${__field.name}`
 
 Click **Apply**
+
+**Add Battery Level Panel** (BLE sensors only):
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> filter(fn: (r) => r.source_node == "dpx_ops_1")
+  |> filter(fn: (r) => r.sensor_type == "battery")
+  |> map(fn: (r) => ({r with _field: "|" + r.device_name + "|"}))
+  |> last()
+```
+
+**Customize**:
+- **Title**: "Battery Levels"
+- **Unit**: "Percent (0-100)"
+- **Visualization**: Try "Gauge" or "Stat" panel type
+- Note: `last()` shows only the most recent value
+
+**Add Signal Strength (RSSI) Panel** (BLE sensors only):
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.device_name != "h5074_4e6f")
+  |> filter(fn: (r) => r.source_node == "dpx_ops_1")
+  |> filter(fn: (r) => r.sensor_type == "rssi")
+  |> map(fn: (r) => ({r with _field: "|" + r.device_name + "|"}))
+  |> last()
+```
+
+**Customize**:
+- **Title**: "Signal Strength"
+- **Unit**: "Signal strength (dBm)"
+- **Visualization**: "Gauge" or "Stat"
+- Note: RSSI values are negative; closer to 0 is better (e.g., -50 is better than -80)
 
 ### 7.5: Save the Dashboard
 
@@ -779,7 +939,7 @@ Click **Apply**
 
 Want to share your dashboard with someone who doesn't have Tailscale? Use Cloudflare Tunnel.
 
-### 9.1: Install Cloudflare Tunnel
+### 8.1: Install Cloudflare Tunnel
 
 **In your VM terminal**:
 ```bash
@@ -787,7 +947,7 @@ curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloud
 sudo dpkg -i cloudflared.deb
 ```
 
-### 9.2: Start a Temporary Tunnel
+### 8.2: Start a Temporary Tunnel
 
 ```bash
 iot tunnel
@@ -815,30 +975,76 @@ Want faster updates? Instead of waiting 10 minutes for cloud sync, read sensors 
 
 **On your Windows NUC**:
 
+**Option A: GUI Installer** (recommended for first-timers)
+
 1. Go to: https://www.python.org/downloads/
 2. Download Python 3.11 or newer
 3. Run the installer
 4. ☑ **CHECK** "Add Python to PATH"
 5. Click **Install Now**
 
+**Option B: Command Line** (using winget)
+
+Open **PowerShell** as Administrator and run:
+
+```powershell
+winget install Python.Python.3.11
+```
+
+This automatically adds Python to PATH. Verify installation:
+
+```powershell
+python --version
+```
+
+**Note**: If you already have Chocolatey installed, you can also use: `choco install python311`
+
 ### 9.2: Install Visual Studio Build Tools
 
 Theengs needs C++ compiler tools.
+
+**Option A: GUI Installer** (recommended for first-timers)
 
 1. Go to: https://visualstudio.microsoft.com/downloads/
 2. Scroll to "Tools for Visual Studio"
 3. Download **Build Tools for Visual Studio 2022**
 4. Run the installer
 5. Select **Desktop development with C++**
-6. C8.1: Install Cloudflare Tunnel
+6. Click **Install** and wait for completion (takes 5-10 minutes)
 
-**In your VM terminal**:
-```bash
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
-sudo dpkg -i cloudflared.deb
+**Option B: Command Line** (using winget)
+
+Open **PowerShell** as Administrator and run:
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --silent --override "--wait --quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-### 8
+This installs Build Tools with the C++ workload. Takes 5-10 minutes.
+
+**Note**: If you already have Chocolatey: `choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`
+
+### 9.3: Install Theengs Gateway
+
+**In PowerShell**:
+
+```powershell
+pip install TheengsGateway
+```
+
+If you get an error about pip not being found, try:
+
+```powershell
+python -m pip install TheengsGateway
+```
+
+**Verify installation**:
+
+```powershell
+python -m TheengsGateway --version
+```
+
+Should show the Theengs Gateway version number.
 
 ### 9.4: Run Theengs Gateway
 
@@ -852,7 +1058,7 @@ You should see output about discovering devices. Leave this running.
 
 **To stop it**: Press `Ctrl + C`
 
-**Note**: The BLE decoder service (ble-decoder) is automatically deployed via docker-compose and starts with `iot up`. No additional setup needed!
+**Note**: The BLE decoder is now containerized and auto-starts with `iot up` (see docker-compose.yml). Theengs Gateway on Windows is still useful as a fallback gateway or for multi-location deployments, but is not required if you're using ESP32 gateways.
 
 ---
 
@@ -918,6 +1124,55 @@ You should see output about discovering devices. Leave this running.
 5. **Save & Reboot**:
    - Click "Save"
    - ESP32 reboots and connects to your WiFi
+
+### 10.3a: Showsite Naming Configuration
+
+**IMPORTANT**: Gateway naming affects MQTT topic structure and BLE decoder integration.
+
+**Default OpenMQTT behavior**: Publishes to `home/gateway-name/BTtoMQTT/#`
+
+**For dpx-showsite-ops integration**: Configure gateway name with showsite prefix to match your deployment.
+
+**Configuration in OpenMQTT WiFi portal**:
+1. When configuring gateway at 192.168.4.1
+2. Look for **Gateway Name** or **Device Name** field
+3. Set to format: `{showsite}/{gateway-location}`
+   - Example: `demo_showsite/studio-down`
+   - Or simpler: `demo_showsite-studio-down`
+
+**Topic structure examples**:
+
+**Option 1: Nested path** (cleaner hierarchy):
+- Gateway name: `demo_showsite/studio-down`
+- Publishes to: `demo_showsite/studio-down/BTtoMQTT/4381ECA1010A`
+- BLE decoder subscribes: `demo_showsite/+/BTtoMQTT/#`
+
+**Option 2: Flat naming** (simpler, recommended):
+- Gateway name: `demo_showsite-studio-down`
+- Publishes to: `demo_showsite-studio-down/BTtoMQTT/4381ECA1010A`
+- BLE decoder subscribes: `demo_showsite-+/BTtoMQTT/#`
+
+**Data flow after decoding**:
+```
+demo_showsite-studio-down/BTtoMQTT/4381ECA1010A           (raw BLE from ESP32)
+                ↓
+         BLE Decoder processes
+                ↓
+demo_showsite/dpx_ops_decoder/demo_showsite-studio-down/studiodown/studio_5051_down/temperature
+     ↓              ↓                  ↓                     ↓              ↓              ↓
+  showsite    decoder node        source gateway          room       device name      metric
+```
+
+**Multi-gateway deployments**:
+- Each gateway needs unique location: `demo_showsite-studio-up`, `demo_showsite-stage-left`, etc.
+- All share same showsite prefix: `demo_showsite`
+- Set `SHOWSITE_NAME=demo_showsite` in `.env` file to match
+- BLE decoder automatically extracts location from gateway name
+
+**Why this matters**:
+- Ensures BLE decoder can identify data source
+- Allows filtering by gateway/location in Grafana
+- Enables multi-site deployments with same codebase
 
 ### 10.4: Verify Gateway
 
