@@ -92,7 +92,10 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
 * **Visualization**: Grafana
 * **Message Broker**: Eclipse Mosquitto
 * **Data Pipeline**: Telegraf
-* **Data Source**: govee2mqtt (AWS IoT bridge)
+* **Data Sources**: 
+  * govee2mqtt (AWS IoT bridge for cloud data)
+  * ble-decoder (Python service for real-time BLE data)
+* **Hardware Gateways**: ESP32 with OpenMQTTGateway firmware
 * **Infrastructure**: Docker, systemd, cron
 * **Remote Access**: Tailscale, Cloudflare Tunnel (optional)
 
@@ -166,7 +169,15 @@ iot lt [n]          # telegraf logs
 iot lm [n]          # mosquitto logs
 iot li [n]          # influxdb logs
 iot lf [n]          # grafana logs
+iot lb [n]          # ble-decoder logs
 iot la [n]          # all logs
+
+# BLE Decoder Service
+iot ble-up          # Start BLE decoder
+iot ble-down        # Stop BLE decoder
+iot ble-restart     # Restart BLE decoder
+iot ble-status      # Show status
+iot ble-logs [n]    # View logs (alias: iot lb)
 
 # Data & Monitoring
 iot query [range] [rows]  # Query InfluxDB directly
@@ -239,12 +250,13 @@ docker compose logs [service-name]
 ## Roadmap
 
 ### ✅ Phase 1: Core Data Pipeline (Completed)
-- Docker Compose stack with 5 services
+- Docker Compose stack with 6 services
 - govee2mqtt polling Govee Cloud API every 10 minutes
 - MQTT broker for pub/sub messaging
 - Telegraf for MQTT→InfluxDB routing
 - InfluxDB 2.x for time-series storage
 - Grafana for dashboards
+- ble-decoder for real-time BLE data processing
 
 ### ✅ Phase 2: External Access & Network (Completed)
 - Static IP configuration (<server-ip>)
@@ -265,10 +277,13 @@ docker compose logs [service-name]
 - Volume backup/restore scripts
 - Full deployment testing
 
-### 📋 Phase 4: BLE Gateway (Ready)
-- BLE decoder service for real-time sensor data
-- ESP32 or Windows Theengs Gateway integration (parallel paths)
-- Unified Telegraf config with source tagging
+### ✅ Phase 4: BLE Gateway (Completed)
+- ble-decoder service dockerized and operational
+- ESP32 gateways deployed (OpenMQTTGateway firmware)
+- Theengs Gateway available as fallback
+- Real-time BLE data (<5 sec latency) alongside cloud data
+- Unified Telegraf config with source tagging (gv_cloud, dpx_ops_decoder)
+- Grafana dashboards showing both data sources
 
 ### 📋 Phase 5: Network Backups (Planned)
 - TFTP server deployment

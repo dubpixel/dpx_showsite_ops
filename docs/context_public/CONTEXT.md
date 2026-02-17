@@ -1,5 +1,5 @@
 # dpx-showsite-ops - System Reference
-# Last updated: 2026-02-09
+# Last updated: 2026-02-16
 # Upload this file for system context (network, sensors, configs, stack operations)
 # **For tasks/roadmap**: See [ROADMAP.md](../ROADMAP.md)
 # **For set-schedule app development**: See [set-schedule-development.md](set-schedule-development.md)
@@ -173,7 +173,10 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
 ~/dpx_govee_stack/              (local directory)
 ├── README.md                   ← Quick start guide
 ├── CHANGELOG.md                ← Version history
+├── VERSION                     ← Current version number
 ├── docker-compose.yml          ← Main stack definition
+├── Dockerfile.ble-decoder      ← BLE decoder container build
+├── requirements-ble-decoder.txt ← Python dependencies for BLE decoder
 ├── .env                        ← Secrets (gitignored)
 ├── .env.example                ← Template for users
 ├── .gitignore                  ← Excludes secrets, logs, backups
@@ -186,6 +189,7 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
 │   └── backups/                ← Last 10 config backups
 ├── scripts/
 │   ├── manage.sh               ← Main management CLI
+│   ├── ble_decoder.py          ← BLE decoder Python script
 │   ├── update-device-map.sh    ← Hourly device mapping updates
 │   └── update-device-map.log   ← Update script log
 └── docs/
@@ -382,9 +386,11 @@ Dashboard
 ```
 
 **Target Latency**: <5 seconds
-**Status**: Running as manual process (not yet dockerized)
+**Status**: ✅ Dockerized and running as `ble-decoder` service
 **Decoder details:**
-- Started via `iot ble-decoder` alias in manage.sh
+- Container: ble-decoder (auto-starts with stack)
+- Management: `iot ble-up/down/restart/rebuild/logs` or `iot lb`
+- Manual debug mode: `iot ble-decode` (requires python3-paho-mqtt on host)
 - Both dpx_ops_1 (ESP32) and TheengsGateway sources operational
 - Uses `retain=True` on published topics
 
@@ -458,8 +464,19 @@ iot lt [n]                      # telegraf logs
 iot lm [n]                      # mosquitto logs
 iot li [n]                      # influxdb logs
 iot lf [n]                      # grafana logs
+iot lb [n]                      # ble-decoder logs
 iot ls [n]                      # set-schedule logs (Phase 6)
 iot la [n]                      # all logs (default 10 each)
+
+# BLE Decoder (Python BLE-to-MQTT decoder service)
+iot ble-up                      # Start BLE decoder service
+iot ble-down                    # Stop BLE decoder service
+iot ble-restart                 # Restart BLE decoder
+iot ble-rebuild                 # Rebuild and restart
+iot ble-status                  # Show container status
+iot ble-logs [n]                # View logs (same as iot lb)
+iot ble-follow                  # Follow logs in real-time
+iot ble-decode                  # Run manually (debug mode, requires python3-paho-mqtt)
 
 # Data
 iot query [range] [rows]        # Query InfluxDB (default: 30m, 5 rows)
