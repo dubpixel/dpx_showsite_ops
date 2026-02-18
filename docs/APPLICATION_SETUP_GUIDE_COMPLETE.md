@@ -629,6 +629,10 @@ GOVEE_MQTT_PORT=1883
 # Set your timezone (find yours at: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 TZ=America/New_York
 
+# Showsite name - must match MQTT Base Topic setting on ESP32 gateways
+# This is used by BLE decoder to subscribe to the correct MQTT topics
+SHOWSITE_NAME=my_venue
+
 # Leave these as-is:
 RUST_LOG=govee=info
 GOVEE_TEMPERATURE_SCALE=F
@@ -1170,70 +1174,118 @@ Leave this running.
    - MQTT User: (leave blank for anonymous)
    - MQTT Password: (leave blank for anonymous)
 
+4a. **Configure Gateway Naming** (IMPORTANT):
+   
+   OpenMQTT has **three settings** you should configure:
+   
+   - **MQTT Base Topic**: Set this to your showsite name (e.g., `my_venue`)
+     - Default is `home/` if not set
+     - This must match `SHOWSITE_NAME` in your `.env` file
+   
+   - **Gateway Name**: Set this to a device identifier (e.g., `gateway_1`, `gateway_2`, `esp32_alpha`)
+     - This identifies which physical ESP32 captured the data
+     - Use simple device IDs, NOT location names
+   
+   - **MQTT Discovery Prefix** (optional but recommended): Set to `dpx_showsite_ops`
+     - Default is `homeassistant` (for Home Assistant integration)
+     - Keeps discovery metadata organized if you're not using Home Assistant
+     - Not critical for basic operation
+   
+   **⚠️ Important**: Don't use location names (studio, stage, etc) for gateway names. Physical locations come from the Govee app and are added by the BLE decoder automatically.
+   
+   **Example configuration**:
+   - MQTT Base Topic: `my_venue`
+   - Gateway Name: `gateway_1`
+   - MQTT Discovery Prefix: `dpx_showsite_ops`
+   - Resulting topic: `my_venue/gateway_1/BTtoMQTT/#`
+
 5. **Save & Reboot**:
    - Click "Save"
    - ESP32 reboots and connects to your WiFi
 
-### 10.3a: Showsite Naming Configuration
+### 10.3a: Understanding MQTT Topic Structure
 
-**IMPORTANT**: Gateway naming affects MQTT topic structure and BLE decoder integration.
+**IMPORTANT**: OpenMQTT uses two separate settings to build your MQTT topic path.
 
-**Default OpenMQTT behavior**: Publishes to `home/gateway-name/BTtoMQTT/#`
+**How OpenMQTT topic structure works**:
 
-**For dpx-showsite-ops integration**: Configure gateway name with showsite prefix to match your deployment.
+OpenMQTT publishes to: `{MQTT_Base_Topic}/{Gateway_Name}/BTtoMQTT/{MAC_Address}`
 
-**Configuration in OpenMQTT WiFi portal**:
-1. When configuring gateway at 192.168.4.1
-2. Look for **Gateway Name** or **Device Name** field
-3. Set to format: `{showsite}/{gateway-location}`
-   - Example: `demo_showsite/studio-down`
-   - Or simpler: `demo_showsite-studio-down`
+Example: `my_venue/gateway_1/BTtoMQTT/B4FBE42F59EA`
 
-**Topic structure examples**:
+**The two settings in OpenMQTT config portal (192.168.4.1)**:
 
-**Option 1: Nested path** (cleaner hierarchy):
-- Gateway name: `demo_showsite/studio-down`
-- Publishes to: `demo_showsite/studio-down/BTtoMQTT/4381ECA1010A`
-- BLE decoder subscribes: `demo_showsite/+/BTtoMQTT/#`
+1. **MQTT Base Topic** (defaults to `home/` if not set)
+   - Set this to your showsite/venue name
+   - Examples: `my_venue`, `festival_2026`, `warehouse_show`
+   - Must match `SHOWSITE_NAME` in your `.env` file
 
-**Option 2: Flat naming** (simpler, recommended):
-- Gateway name: `demo_showsite-studio-down`
-- Publishes to: `demo_showsite-studio-down/BTtoMQTT/4381ECA1010A`
-- BLE decoder subscribes: `demo_showsite-+/BTtoMQTT/#`
+2. **Gateway Name** (defaults to `OpenMQTTGateway` if not set)
+   - Set this to a unique device identifier
+   - Examples: `gateway_1`, `gateway_2`, `esp32_alpha`, `omg_01`
+   - Use simple device IDs that identify the hardware
+   - **Don't use location names** (studio, stage, lobby, etc)
 
-**Data flow after decoding**:
+**Why no location names for gateways?**
+
+Physical locations are assigned to **sensors** in the Govee app and added by the BLE decoder. If you name a gateway "studio", you'll have confusing nested locations when the decoder adds the sensor's actual room assignment.
+
+**Topic flow example**:
+
 ```
-demo_showsite-studio-down/BTtoMQTT/4381ECA1010A           (raw BLE from ESP32)
-                ↓
-         BLE Decoder processes
-                ↓
-demo_showsite/dpx_ops_decoder/demo_showsite-studio-down/studiodown/studio_5051_down/temperature
-     ↓              ↓                  ↓                     ↓              ↓              ↓
-  showsite    decoder node        source gateway          room       device name      metric
+Raw BLE from ESP32:
+my_venue/gateway_1/BTtoMQTT/B4FBE42F59EA
+    ↓         ↓          ↓           ↓
+ showsite   device    message   MAC address
+            name       type
+
+                ↓ BLE Decoder processes ↓
+
+Decoded output:
+my_venue/dpx_ops_decoder/gateway_1/living_room/temp_sensor_5051/temperature
+    ↓         ↓            ↓           ↓              ↓              ↓
+ showsite  decoder    source      room (from    device (from    metric
+                     gateway     Govee API)     Govee API)
 ```
+
+**How BLE decoder subscribes**:
+
+The decoder subscribes to: `{SHOWSITE_NAME}/+/BTtoMQTT/#`
+- `SHOWSITE_NAME` comes from your `.env` file
+- `+` matches any gateway name
+- `#` matches any MAC address
 
 **Multi-gateway deployments**:
-- Each gateway needs unique location: `demo_showsite-studio-up`, `demo_showsite-stage-left`, etc.
-- All share same showsite prefix: `demo_showsite`
-- Set `SHOWSITE_NAME=demo_showsite` in `.env` file to match
-- BLE decoder automatically extracts location from gateway name
+- All gateways use same **MQTT Base Topic**: `my_venue`
+- Each gateway has unique **Gateway Name**: `gateway_1`, `gateway_2`, `gateway_3`
+- BLE decoder automatically tracks which gateway saw which sensor
+- You can filter by source gateway in Grafana queries
 
 **Why this matters**:
-- Ensures BLE decoder can identify data source
-- Allows filtering by gateway/location in Grafana
-- Enables multi-site deployments with same codebase
+- Clean separation between hardware (gateways) and physical layout (rooms)
+- Allows you to move/add gateways without changing location mappings
+- Sensor locations stay accurate even if you relocate an ESP32
+- Multi-site deployments just need different `SHOWSITE_NAME` values
 
 ### 10.4: Verify Gateway
 
-**On your VM**, check that ESP32 is publishing:
+**On your VM**, check that ESP32 is publishing.
+
+Replace `my_venue` and `gateway_1` with your actual MQTT Base Topic and Gateway Name:
 
 ```bash
-iot mqtt "home/OpenMQTTGateway/BTtoMQTT/#" 10
+iot mqtt "my_venue/gateway_1/BTtoMQTT/#" 10
+```
+
+Or use wildcard to see all gateways for your showsite:
+
+```bash
+iot mqtt "my_venue/+/BTtoMQTT/#" 10
 ```
 
 You should see JSON messages with BLE device data:
 ```json
-{"id":"4381ECA1010A","mac_type":1,"manufacturerdata":"88ec004e06f00864e00101","rssi":-65}
+{"id":"B4FBE42F59EA","mac_type":1,"manufacturerdata":"88ec004e06f00864e00101","rssi":-65}
 ```
 
 **If you see data**: ✅ Gateway is working!
@@ -1246,27 +1298,39 @@ You should see JSON messages with BLE device data:
 
 ### 10.5: Multi-Gateway Deployment (Optional)
 
-For larger venues or multiple rooms:
+For larger venues or multiple rooms where a single ESP32 can't reach all sensors:
 
-1. **Flash additional ESP32s**: Repeat steps 11.2-11.3 for each gateway
+1. **Flash additional ESP32s**: Repeat steps 10.2-10.3 for each gateway
 
-2. **Name your gateways**: In config portal, set unique names:
-   - Gateway 1: "omg-studio-down"
-   - Gateway 2: "omg-studio-up"
-   - Gateway 3: "omg-lobby"
+2. **Configure each gateway** in the config portal:
+   - **All gateways**: Set MQTT Base Topic to same showsite name (e.g., `my_venue`)
+   - **Each gateway**: Set unique Gateway Name (`gateway_1`, `gateway_2`, `gateway_3`)
 
-3. **Map coverage areas**:
+3. **Example multi-gateway setup**:
 
-| Gateway Name | Location | Covers Sensors | MQTT Topic |
-|--------------|----------|----------------|------------|
-| omg-studio-down | Studio Downstairs | H5051 (4381ECA1010A) | home/omg-studio-down/BTtoMQTT/# |
-| omg-studio-up | Studio Upstairs | (future sensors) | home/omg-studio-up/BTtoMQTT/# |
-| omg-lobby | Lobby | (future sensors) | home/omg-lobby/BTtoMQTT/# |
+| Device ID | MQTT Base Topic | Gateway Name | Resulting MQTT Topic | Notes |
+|-----------|----------------|--------------|----------------------|-------|
+| ESP32 #1 | `my_venue` | `gateway_1` | `my_venue/gateway_1/BTtoMQTT/#` | First floor ESP32 |
+| ESP32 #2 | `my_venue` | `gateway_2` | `my_venue/gateway_2/BTtoMQTT/#` | Second floor ESP32 |
+| ESP32 #3 | `my_venue` | `gateway_3` | `my_venue/gateway_3/BTtoMQTT/#` | Outdoor/remote area |
 
-4. **Update ble_decoder.py** to subscribe to all gateways:
+4. **Verify all gateways are publishing**:
    ```bash
-   iot mqtt "home/+/BTtoMQTT/#"
+   iot mqtt "my_venue/+/BTtoMQTT/#" 30
    ```
+   
+   You should see messages from different gateway names:
+   ```
+   my_venue/gateway_1/BTtoMQTT/B4FBE42F59EA {...}
+   my_venue/gateway_2/BTtoMQTT/A1C3D5E7F9AB {...}
+   my_venue/gateway_3/BTtoMQTT/1234ABCD5678 {...}
+   ```
+
+**Coverage planning tips**:
+- BLE range is typically 30-50 feet through walls
+- Multiple gateways can see the same sensor (decoder handles duplicates)
+- Place gateways where you need coverage, not necessarily near sensors
+- Use Grafana to see which gateway has best RSSI for each sensor
 
 ### 11.6: Troubleshooting
 
@@ -1291,7 +1355,7 @@ For larger venues or multiple rooms:
 - BLE sensors must be within ~30 feet of ESP32
 - Remove sensor batteries for 10 sec, reinsert
 - Check sensor is broadcasting: should show in Govee app
-- Verify ESP32 is publishing *something*: `iot mqtt "home/OpenMQTTGateway/#"`
+- Verify ESP32 is publishing *something*: `iot mqtt "my_venue/+/BTtoMQTT/#"` (replace `my_venue` with your showsite name)
 
 **Wrong firmware flashed**:
 - Reflash with correct build: **esp32feather-ble** for DPX boards
