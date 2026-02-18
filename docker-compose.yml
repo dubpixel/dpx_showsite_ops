@@ -90,7 +90,6 @@ services:
       - GOVEE_API_URL=http://host.docker.internal:8056/api/devices
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
       - TZ=${TZ}
-      - DEBUG_DECODER=0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
