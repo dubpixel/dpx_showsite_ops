@@ -40,7 +40,7 @@ SUB_TOPICS = [
 DECODERS = {
     "H5051": lambda b: decode_h5051(b),
     "H5074": lambda b: decode_h507x(b),
-    "H5075": lambda b: decode_h507x(b),
+    "H5075": lambda b: decode_h5075(b),
     "H5072": lambda b: decode_h507x(b),
 }
 
@@ -82,7 +82,7 @@ def decode_h5051(b):
 
 
 def decode_h507x(b):
-    """Decode Govee H5074/H5075/H5072 manufacturer data."""
+    """Decode Govee H5074/H5072 manufacturer data (little-endian)."""
     if len(b) < 8:
         return None
     # Reject iBeacon packets (start with 4c00) and other non-Govee packets
@@ -98,6 +98,34 @@ def decode_h507x(b):
         "temp_f": (temp_raw / 100.0) * 9.0 / 5.0 + 32.0,  # Fahrenheit
         "humidity": hum_raw / 100.0,
         "battery": b[7] if len(b) > 7 else 100
+    }
+
+
+def decode_h5075(b):
+    """Decode Govee H5075 manufacturer data (big-endian, different encoding)."""
+    if len(b) < 7:
+        return None
+    # Reject iBeacon packets
+    if b[0] == 0x4c:
+        return None
+    # Validate Govee manufacturer header
+    if not (b[0] == 0x88 and b[1] == 0xec):
+        return None
+    
+    # Temperature: bytes 3-4, BIG-endian (different from H5074!)
+    # Empirical formula derived from sample data: tempC = (raw + 16) / 40
+    temp_raw = (b[3] << 8) | b[4]
+    temp_c = (temp_raw + 16) / 40.0
+    temp_f = temp_c * 9.0 / 5.0 + 32.0
+    
+    # Humidity: byte 5
+    # Empirical approximation (refined formula TBD with more varying samples)
+    humidity = (b[5] - 135) / 2.5
+    
+    return {
+        "temp_f": temp_f,
+        "humidity": max(0, min(100, humidity)),  # Clamp to valid 0-100 range
+        "battery": b[6] if len(b) > 6 else 100
     }
 
 
