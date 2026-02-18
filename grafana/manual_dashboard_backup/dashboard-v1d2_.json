@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": null,
   "links": [],
   "panels": [
     {
@@ -935,5 +935,5 @@
   "timezone": "browser",
   "title": "dpx_showsite_ops - Temperature & Sensor Data Comparison - v2d1",
   "uid": "dpx_temp_v2_fixed",
-  "version": 5
+  "version": 0
 }
