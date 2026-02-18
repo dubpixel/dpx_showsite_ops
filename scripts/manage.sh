@@ -55,6 +55,9 @@ case "$1" in
     mosquitto_pub -h localhost \
       -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true}'
+    mosquitto_pub -h localhost \
+      -t "demo_showsite/dpx_showsite_2/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":true}'
     echo "✓ ESP32 configured: pubadvdata=true, extDecoderEnable=true"
     ;;
   
@@ -62,6 +65,9 @@ case "$1" in
     echo "Configuring ESP32 for maximum verbosity..."
     mosquitto_pub -h localhost \
       -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":true,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    mosquitto_pub -h localhost \
+      -t "demo_showsite/dpx_showsite_2/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
     echo "✓ ESP32 configured: faster scanning, more frequent advertising"
     echo "  - BLE scan interval: 1000ms (more frequent scans)"
