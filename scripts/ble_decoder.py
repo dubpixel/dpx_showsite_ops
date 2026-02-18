@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v1.9- MQTT Payload Decoder
+BLE Decoder v2.0 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -147,22 +147,39 @@ def on_message(client, userdata, msg):
 
         if not device:
             return  # Unknown device, skip
-        mfr = data.get("manufacturerdata")
         
-        if not mfr:
-            return  # No manufacturer data
+        # Debug: show device info and available data
+        if os.getenv("DEBUG_DECODER"):
+            print(f"  Device: {device['name']} ({device['sku']}), Room: {device['room']}")
+            if "manufacturerdata" in data:
+                print(f"  Raw hex: {data['manufacturerdata']}")
+            if "tempf" in data:
+                print(f"  Pre-decoded: {data['tempf']}°F, {data['hum']}%, batt: {data.get('batt')}%")
         
-        # Get decoder for this device model
-        decoder = DECODERS.get(device["sku"])
-        if not decoder:
-            return  # No decoder for this model
-        
-        # Decode the manufacturer data
-        b = bytes.fromhex(mfr)
-        decoded = decoder(b)
-        
-        if not decoded:
-            return  # Decoding failed
+        # Prefer pre-decoded values (ESP32/Theengs firmware already decoded)
+        if "tempf" in data and "hum" in data:
+            decoded = {
+                "temp_f": data["tempf"],
+                "humidity": data["hum"],
+                "battery": data.get("batt", 100)
+            }
+        else:
+            # Fallback: manual decode of raw manufacturerdata
+            mfr = data.get("manufacturerdata")
+            if not mfr:
+                return  # No data available
+            
+            # Get decoder for this device model
+            decoder = DECODERS.get(device["sku"])
+            if not decoder:
+                return  # No decoder for this model
+            
+            # Decode the manufacturer data
+            b = bytes.fromhex(mfr)
+            decoded = decoder(b)
+            
+            if not decoded:
+                return  # Decoding failed
         
         # Extract source node from incoming topic
         source_node = extract_source_node(msg.topic)
@@ -220,7 +237,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v1.9")
+    print("DPX BLE Decoder v2.0")
     print("=" * 60)
     print()
     
