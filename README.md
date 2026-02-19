@@ -48,12 +48,13 @@
 
 Operations stack for DPX show sites. Get Govee sensor data flowing into InfluxDB with Grafana dashboards in minutes. Includes MQTT pub/sub messaging, time-series storage, and remote access via Tailscale or Cloudflare Tunnel.
 
-**Current Deployment:** Govee IoT monitoring via cloud API + ESP32 BLE gateways (OpenMQTTGateway)
+**Current Deployment:** Govee IoT monitoring via cloud API + ESP32 BLE gateways (OpenMQTTGateway) + Geist Watchdog SNMP monitoring
 **Future:** Network device backups, additional sensor types, automation workflows
 
 **Key features:**
 - **Govee IoT Stack**: Temperature/humidity monitoring via Govee H5051 sensors
 - **ESP32 BLE Gateways**: Real-time BLE data collection (<5 sec latency)
+- **Geist Watchdog**: SNMP-based environmental monitoring for infrastructure
 - **MQTT Broker**: Eclipse Mosquitto for sensor data pub/sub
 - **Time Series DB**: InfluxDB 2.x for storing sensor readings
 - **Visualization**: Grafana dashboards with public sharing
@@ -95,6 +96,7 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
 * **Data Sources**: 
   * govee2mqtt (AWS IoT bridge for cloud data)
   * ble-decoder (Python service for real-time BLE data)
+  * Geist Watchdog (SNMP environmental monitoring)
 * **Hardware Gateways**: ESP32 with OpenMQTTGateway firmware
 * **Infrastructure**: Docker, systemd, cron
 * **Remote Access**: Tailscale, Cloudflare Tunnel (optional)

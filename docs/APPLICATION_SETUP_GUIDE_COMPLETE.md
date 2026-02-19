@@ -23,8 +23,9 @@
 10. [Part 8: Public Dashboards (Optional)](#part-8-public-dashboards-optional)
 11. [Part 9: Theengs Gateway for BLE (Optional)](#part-9-theengs-gateway-for-ble-optional)
 12. [Part 10: ESP32 BLE Gateway Setup (Recommended)](#part-10-esp32-ble-gateway-setup-recommended)
-13. [Troubleshooting](#troubleshooting)
-14. [Daily Operations](#daily-operations)
+13. [Part 11: Geist Watchdog Environmental Monitor (SNMP)](#part-11-geist-watchdog-environmental-monitor-snmp)
+14. [Troubleshooting](#troubleshooting)
+15. [Daily Operations](#daily-operations)
 
 ---
 
@@ -1372,6 +1373,356 @@ With ESP32 gateway(s) deployed:
 5. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
 
 **Windows Theengs Gateway**: Available as fallback option (see Part 10)
+
+---
+
+## Part 11: Geist Watchdog Environmental Monitor (SNMP)
+
+**For infrastructure monitoring** (server rooms, network closets): Add SNMP-based environmental monitoring with Geist Watchdog 100 devices.
+
+### What is the Geist Watchdog?
+
+The Geist Watchdog 100 is a network-attached environmental monitor designed for data centers and server rooms. It monitors:
+
+- **Temperature**: Built-in and remote sensors
+- **Humidity**: Air moisture levels
+- **Dew Point**: Condensation risk
+- **Remote Sensors**: Supports external temp/humidity probes
+
+**Key Features**:
+- SNMP v1/v2c/v3 for polling
+- SNMP traps for real-time alerts
+- Web interface for configuration
+- Multiple sensor support
+- Network-based (Ethernet)
+
+### 11.1: Pre-Flight Checks
+
+**Before configuring Telegraf**, verify the Geist Watchdog is accessible and discover what sensors are connected.
+
+**Install SNMP tools** (on your Mac/laptop, not the VM):
+
+```bash
+# macOS:
+brew install net-snmp
+
+# Linux:
+sudo apt install snmp snmp-mibs-downloader
+```
+
+**Test basic connectivity**:
+
+```bash
+# Verify device responds (replace with your device IP):
+snmpget -v2c -c public 10.0.10.162 1.3.6.1.2.1.1.5.0
+
+# Should return: SNMPv2-MIB::sysName.0 = STRING: "Watchdog100"
+```
+
+**Discover connected sensors**:
+
+```bash
+# Internal sensors (built into Watchdog):
+snmptable -v2c -c public 10.0.10.162 1.3.6.1.4.1.21239.5.1.2
+
+# Remote temperature-only sensors:
+snmptable -v2c -c public 10.0.10.162 1.3.6.1.4.1.21239.5.1.4
+
+# Remote multi-sensors (temp + humidity):
+snmptable -v2c -c public 10.0.10.162 1.3.6.1.4.1.21239.5.1.5
+
+# Check temperature units (0=Celsius, 1=Fahrenheit):
+snmpget -v2c -c public 10.0.10.162 1.3.6.1.4.1.21239.5.1.1.7.0
+```
+
+**What to look for**:
+- Which sensor tables have data
+- Sensor names (you can configure these in Geist web UI)
+- Temperature values (will be 10x actual, e.g., 725 = 72.5°F)
+- Availability status (1=connected, 0=disconnected)
+
+### 11.2: Geist Configuration Already Complete
+
+The Geist Watchdog integration is pre-configured in this repository:
+
+**File created**: `telegraf/conf.d/geist-watchdog.conf`
+
+**What it does**:
+- Polls device every 30 seconds via SNMP
+- Auto-discovers all connected sensors (internal + remote)
+- Scales temperature from 0.1 degrees to readable values
+- Filters out disconnected sensors automatically
+- Tags data with sensor names from device
+- Pulls location metadata from device configuration
+
+**Review the configuration**:
+
+```bash
+cd ~/dpx_showsite_ops
+cat telegraf/conf.d/geist-watchdog.conf
+```
+
+**Key settings**:
+- **Device IP**: `10.0.10.162` (change if different)
+- **Community string**: `public` (read-only)
+- **Poll interval**: `30s`
+- **Auto-discovery**: Walks all sensor tables
+- **Scaling**: Temperature divided by 10 (725 → 72.5)
+
+### 11.3: Customize Device IP (if needed)
+
+If your Geist Watchdog has a different IP address:
+
+**Edit the config file**:
+
+```bash
+nano telegraf/conf.d/geist-watchdog.conf
+```
+
+**Find this line** (near top):
+
+```toml
+agents = ["10.0.10.162:161"]
+```
+
+**Change to your device IP**:
+
+```toml
+agents = ["192.168.1.100:161"]  # Example
+```
+
+**Also update** the static tag further down:
+
+```toml
+[inputs.snmp.tags]
+  source = "geist_watchdog"
+  device_ip = "192.168.1.100"  # Match your IP
+```
+
+**Save**: `Ctrl+O`, `Enter`, `Ctrl+X`
+
+### 11.4: Deploy and Verify
+
+**Restart Telegraf** to activate the Geist integration:
+
+```bash
+iot restart telegraf
+```
+
+**Watch logs** for SNMP connection:
+
+```bash
+iot logs telegraf -f
+```
+
+Look for messages like:
+```
+gathered 6 metrics from 1 SNMP agents
+```
+
+Press `Ctrl+C` to stop log streaming.
+
+**If you see errors**:
+- `connection refused`: Check device IP and network connectivity
+- `timeout`: Device may be on different subnet or firewall blocking
+- `no such object`: OID doesn't exist (sensor type not connected)
+
+### 11.5: Verify Data in InfluxDB
+
+**Check that Geist data is flowing**:
+
+```bash
+iot query 2m 100 | grep sensor_name
+```
+
+You should see sensor names from your Geist device:
+```
+sensor_name=Internal
+sensor_name=ServerRackIntake
+sensor_name=Ambient
+```
+
+**Verify temperature scaling** (should be readable, NOT 10x):
+
+```bash
+iot query 2m 50 | grep "temperature="
+```
+
+Should show values like `temperature=72.5` not `temperature=725`
+
+**Check humidity values**:
+
+```bash
+iot query 2m 50 | grep "humidity="
+```
+
+Should be 0-100 range (percentage).
+
+### 11.6: Add Geist Metrics to Grafana
+
+**Open Grafana**: `http://192.168.1.X:3000` (use your VM IP)
+
+**Create a new panel** or add to existing dashboard:
+
+1. Click **+ Add** → **Visualization**
+2. Select **InfluxDB** datasource
+3. Select **Flux** query language
+
+**Temperature query** (all Geist sensors):
+
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "geist_watchdog")
+  |> filter(fn: (r) => r._field == "temperature")
+  |> map(fn: (r) => ({r with _field: r.sensor_name}))
+```
+
+**Customize the panel**:
+- **Title**: "Geist Watchdog - Temperature"
+- **Unit**: Temperature → Fahrenheit (°F) or Celsius (°C)
+- **Display name**: `${__field.name}` (shows sensor name)
+- **Legend**: Table or list view
+
+**Humidity query** (where available):
+
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "geist_watchdog")
+  |> filter(fn: (r) => r._field == "humidity")
+  |> filter(fn: (r) => r._value > 0)
+  |> map(fn: (r) => ({r with _field: r.sensor_name + " Humidity"}))
+```
+
+**Customize**:
+- **Title**: "Geist Watchdog - Humidity"
+- **Unit**: Percent (0-100)
+
+**Set alert thresholds** (optional):
+- Temperature > 85°F: Warning
+- Temperature > 95°F: Critical
+- Humidity > 70%: Warning
+
+Click **Apply** to save the panel, then **Save dashboard**.
+
+### 11.7: Configure SNMP Traps (Optional)
+
+For real-time alerts when thresholds are exceeded, configure SNMP traps.
+
+**On Geist web interface** (http://10.0.10.162):
+
+1. Navigate to **Configuration** → **SNMP**
+2. Scroll to **Traps** section
+3. Click **Add** icon
+4. Configure trap destination:
+   - **Host**: Your VM IP address (e.g., `192.168.1.100`)
+   - **Port**: `162`
+   - **Version**: `v2c`
+   - **Community**: `private` (default)
+5. Click **Save**
+
+**Update docker-compose.yml** to expose trap port:
+
+```bash
+cd ~/dpx_showsite_ops
+nano docker-compose.yml
+```
+
+Find the `telegraf:` service section and add port mapping:
+
+```yaml
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    restart: unless-stopped
+    ports:
+      - "162:162/udp"  # Add this line for SNMP traps
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+```
+
+**Save**: `Ctrl+O`, `Enter`, `Ctrl+X`
+
+**Restart stack**:
+
+```bash
+iot restart
+```
+
+**Test trap** (in Geist web UI):
+- Click **Test** icon next to trap destination
+- Check Telegraf logs: `iot logs telegraf | grep trap`
+
+### 11.8: Troubleshooting Geist Integration
+
+**No data in InfluxDB**:
+
+```bash
+# Check Telegraf can reach device:
+snmpget -v2c -c public 10.0.10.162 1.3.6.1.2.1.1.5.0
+
+# Verify Telegraf is polling:
+iot logs telegraf | grep -i snmp
+
+# Check for errors:
+iot logs telegraf | grep -i error
+```
+
+**Temperature values look wrong**:
+
+If you see `temperature=725` instead of `72.5`:
+- Math processor may not be applied
+- Check `telegraf/conf.d/geist-watchdog.conf` has `[[processors.math]]` section
+- Restart Telegraf: `iot restart telegraf`
+
+**Sensor shows as unavailable**:
+
+The Starlark processor filters out sensors with `available=0`. This is normal for disconnected sensors.
+
+To see all sensor states (including unavailable):
+- Comment out the `[[processors.starlark]]` section in config
+- Restart Telegraf
+
+**SNMP timeout errors**:
+
+```bash
+# Check device is on same network:
+ping 10.0.10.162
+
+# Verify SNMP port is open:
+nmap -sU -p 161 10.0.10.162
+
+# Try from VM directly:
+ssh dubpixel@dpx-showsite-ops.local
+snmpget -v2c -c public 10.0.10.162 1.3.6.1.2.1.1.5.0
+```
+
+**Traps not received**:
+
+```bash
+# Verify port mapping:
+docker ps | grep telegraf
+
+# Check firewall:
+sudo ufw status
+
+# Test trap listener:
+iot logs telegraf -f
+# Then click Test in Geist UI
+```
+
+### 11.9: Next Steps
+
+With Geist Watchdog integrated:
+
+1. **Monitor infrastructure temps**: Critical for server room environments
+2. **Set alert thresholds**: Temperature and humidity warnings
+3. **Compare with room sensors**: Geist vs Govee BLE sensors
+4. **Multiple locations**: Add more Geist units with unique IPs
+5. **Historical trends**: Track environmental changes over time
+
+**Data retention**: InfluxDB keeps sensor data based on retention policy (check `iot query` for details)
 
 ---
 
