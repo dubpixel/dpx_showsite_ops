@@ -228,7 +228,10 @@ iot backup-dashboards     # Fetches all dashboards via API
 
 **Convert to provisioning format:**
 ```bash
-# Pick a backup file to convert
+# Interactive picker - shows list of backups to choose from
+iot provision-dashboard
+
+# Or specify file directly
 iot provision-dashboard grafana/manual_dashboard_backup/dashboard-abc123-20260218-120000.json
 
 # Auto-detects format (v2beta1 or legacy JSON)

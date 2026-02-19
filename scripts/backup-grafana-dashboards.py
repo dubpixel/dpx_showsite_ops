@@ -16,6 +16,7 @@ Environment variables (from .env):
 
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -108,8 +109,14 @@ def main():
             print(f"    ✗ Failed to fetch dashboard")
             continue
         
-        # Save to file
-        filename = f"dashboard-{uid}-{timestamp}.json"
+        # Create human-readable filename with title
+        # Sanitize title for filesystem
+        safe_title = re.sub(r'[^\w\s-]', '', title.lower())
+        safe_title = re.sub(r'[-\s]+', '-', safe_title).strip('-')
+        safe_title = safe_title[:50]  # Limit length
+        
+        # Save to file with format: dashboard-{safe-title}-{uid}-{timestamp}.json
+        filename = f"dashboard-{safe_title}-{uid}-{timestamp}.json"
         filepath = BACKUP_DIR / filename
         
         try:

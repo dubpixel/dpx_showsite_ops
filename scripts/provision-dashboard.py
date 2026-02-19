@@ -75,16 +75,59 @@ def validate_dashboard(data):
     return True
 
 
+def list_backups():
+    """List available backup files and let user choose."""
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    backup_dir = repo_root / 'grafana' / 'manual_dashboard_backup'
+    
+    if not backup_dir.exists():
+        print(f"ERROR: Backup directory not found: {backup_dir}")
+        sys.exit(1)
+    
+    # Find all JSON files
+    backup_files = sorted(backup_dir.glob('dashboard-*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+    
+    if not backup_files:
+        print("No dashboard backup files found.")
+        print(f"Run 'iot backup-dashboards' first to create backups.")
+        sys.exit(1)
+    
+    print("Available dashboard backups:")
+    print("=" * 70)
+    for idx, filepath in enumerate(backup_files, 1):
+        # Show file with relative path and timestamp
+        rel_path = filepath.relative_to(repo_root)
+        mtime = filepath.stat().st_mtime
+        from datetime import datetime
+        timestamp = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+        print(f"{idx:2d}. {filepath.name}")
+        print(f"    {timestamp}")
+    
+    print()
+    try:
+        choice = input("Enter number to provision (or 'q' to quit): ").strip()
+        if choice.lower() == 'q':
+            sys.exit(0)
+        
+        idx = int(choice)
+        if 1 <= idx <= len(backup_files):
+            return backup_files[idx - 1]
+        else:
+            print(f"Invalid choice: {choice}")
+            sys.exit(1)
+    except (ValueError, KeyboardInterrupt):
+        print("\nCancelled.")
+        sys.exit(1)
+
+
 def main():
     """Main conversion workflow."""
     if len(sys.argv) < 2:
-        print("Usage: provision-dashboard.py <path-to-exported-dashboard.json>")
-        print()
-        print("Example:")
-        print("  ./scripts/provision-dashboard.py grafana/manual_dashboard_backup/dashboard-abc123.json")
-        sys.exit(1)
-    
-    input_path = Path(sys.argv[1])
+        # No argument provided - show interactive picker
+        input_path = list_backups()
+    else:
+        input_path = Path(sys.argv[1])
     
     if not input_path.exists():
         print(f"ERROR: File not found: {input_path}")

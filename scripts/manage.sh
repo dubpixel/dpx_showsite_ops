@@ -259,13 +259,12 @@ case "$1" in
   
   provision-dashboard)
     if [ -z "$2" ]; then
-      echo "Usage: iot provision-dashboard <path-to-dashboard.json>"
-      echo ""
-      echo "Example:"
-      echo "  iot provision-dashboard grafana/manual_dashboard_backup/dashboard-abc123.json"
-      exit 1
+      # No file provided - run interactive picker
+      python3 "$SCRIPT_DIR/provision-dashboard.py"
+    else
+      # File path provided - convert it
+      python3 "$SCRIPT_DIR/provision-dashboard.py" "$2"
     fi
-    python3 "$SCRIPT_DIR/provision-dashboard.py" "$2"
     ;;
   
   setup-dashboard-cron)
@@ -361,8 +360,8 @@ case "$1" in
     echo ""
     echo "  GRAFANA DASHBOARDS"
     echo "    backup-dashboards      Fetch all dashboards via API and save to manual_dashboard_backup/"
-    echo "    provision-dashboard <file>  Convert exported dashboard to provisioning format"
-    echo "                           Example: iot provision-dashboard grafana/manual_dashboard_backup/dash.json"
+    echo "    provision-dashboard [file]  Convert backup to provisioning format"
+    echo "                           No args = interactive picker | With file = convert that file"
     echo "    setup-dashboard-cron   Install daily cron job for automatic dashboard backups"
     echo "    remove-dashboard-cron  Remove automatic dashboard backup cron job"
     echo ""
