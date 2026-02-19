@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v2.2 - MQTT Payload Decoder
+BLE Decoder v2.3 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -68,7 +68,7 @@ def load_devices():
         print("Continuing with empty device map...")
     
     # Apply local overrides
-    override_file = os.path.join(os.path.dirname(__file__), "..", "telegraf", "conf.d", "device-overrides.json")
+    override_file = os.path.join(os.path.dirname(__file__), "telegraf", "conf.d", "device-overrides.json")
     print(f"DEBUG: Looking for override file at: {override_file}")
     print(f"DEBUG: File exists: {os.path.exists(override_file)}")
     if os.path.exists(override_file):
@@ -309,7 +309,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v2.2")
+    print("DPX BLE Decoder v2.3")
     print("=" * 60)
     print()
     
