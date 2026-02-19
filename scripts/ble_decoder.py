@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v2.0 - MQTT Payload Decoder
+BLE Decoder v2.3 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -49,24 +49,68 @@ DEVICES = {}
 
 
 def load_devices():
-    """Load device info from govee2mqtt API."""
+    """Load device info from govee2mqtt API and apply local overrides."""
     try:
         resp = urllib.request.urlopen(API, timeout=5)
         devices = json.loads(resp.read())
         for d in devices:
-            mac = d["id"].replace(":", "")
+            mac = d["id"].replace(":", "").upper()
             suffix = mac[-12:]
             DEVICES[suffix] = {
                 "name": d["name"].lower().replace(" ", "_"),
                 "room": (d.get("room") or "unassigned").lower().replace(" ", "_"),
                 "sku": d["sku"],
+                "has_override": False  # Track if this device has an override
             }
-        print(f"Loaded {len(DEVICES)} devices from API:")
-        for mac, info in DEVICES.items():
-            print(f"  {mac} -> {info['name']} ({info['sku']}) in {info['room']}")
+        print(f"Loaded {len(DEVICES)} devices from API")
     except Exception as e:
         print(f"Failed to load devices: {e}")
         print("Continuing with empty device map...")
+    
+    # Apply local overrides
+    override_file = os.path.join(os.path.dirname(__file__), "telegraf", "conf.d", "device-overrides.json")
+    print(f"DEBUG: Looking for override file at: {override_file}")
+    print(f"DEBUG: File exists: {os.path.exists(override_file)}")
+    if os.path.exists(override_file):
+        try:
+            with open(override_file) as f:
+                overrides = json.load(f)
+            print(f"DEBUG: Loaded override data: {overrides}")
+            override_count = 0
+            for mac_full, override_data in overrides.items():
+                if mac_full.startswith("_"):  # Skip JSON comments
+                    continue
+                mac_suffix = mac_full[-12:].upper()  # Match by suffix like API devices
+                if mac_suffix in DEVICES:
+                    # Update existing device
+                    if "name" in override_data:
+                        DEVICES[mac_suffix]["name"] = override_data["name"]
+                    if "room" in override_data:
+                        DEVICES[mac_suffix]["room"] = override_data["room"]
+                    if "sku" in override_data:
+                        DEVICES[mac_suffix]["sku"] = override_data["sku"]
+                    DEVICES[mac_suffix]["has_override"] = True
+                    override_count += 1
+                elif "name" in override_data:
+                    # Add override-only device (not in API)
+                    DEVICES[mac_suffix] = {
+                        "name": override_data["name"],
+                        "room": override_data.get("room", "unassigned"),
+                        "sku": override_data.get("sku", "unknown"),
+                        "has_override": True
+                    }
+                    override_count += 1
+            if override_count > 0:
+                print(f"Applied {override_count} device override(s)")
+        except Exception as e:
+            print(f"Warning: Failed to load overrides: {e}")
+    
+    # Print final device list
+    if DEVICES:
+        print("Final device mappings:")
+        for mac, info in DEVICES.items():
+            override_marker = " [OVERRIDE]" if info.get("has_override") else ""
+            print(f"  {mac} -> {info['name']} ({info['sku']}) in {info['room']}{override_marker}")
 
 
 def decode_h5051(b):
@@ -265,7 +309,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v2.0")
+    print("DPX BLE Decoder v2.3")
     print("=" * 60)
     print()
     

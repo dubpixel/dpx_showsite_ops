@@ -1,0 +1,19 @@
+{
+  "_comment": "Local device name/room overrides - survives iot update commands",
+  "_format": "MAC addresses without colons (uppercase) as keys",
+  "_example": {
+    "AABBCCDDEEFF0011": {
+      "name": "my_custom_sensor_name",
+      "room": "my_custom_room",
+      "sku": "H5075"
+    }
+  },
+  "_instructions": [
+    "1. Copy this file to device-overrides.json (same directory)",
+    "2. Add your device MAC addresses (find with 'iot list-devices')",
+    "3. Set custom names (lowercase_with_underscores only)",
+    "4. Run 'iot update' to regenerate configs",
+    "5. Run 'iot ble-restart' and 'docker compose restart telegraf' to apply",
+    "Or use: 'iot rename-device' for interactive renaming"
+  ]
+}

@@ -210,6 +210,56 @@ The stack automatically discovers Govee devices from your account:
 
 **Note**: Devices MUST be assigned to a room in the Govee app, or the API won't return data.
 
+### Device Renaming
+
+The Govee API sometimes returns auto-generated garbage names like `h5075_5a9` (model + MAC suffix). You can override these locally with meaningful names:
+
+```bash
+# View all devices with current names
+iot list-devices
+
+# Interactive rename (prompts for device selection and new name)
+iot rename-device
+
+# Change room assignment
+iot set-room
+
+# Remove local override (revert to API name)
+iot clear-override
+```
+
+**How it works:**
+- Overrides stored in `telegraf/conf.d/device-overrides.json` (local-only, .gitignored)
+- Applied automatically during `iot update` and BLE decoder startup
+- Survives API changes and service restarts
+- Works offline if govee2mqtt API is unavailable
+
+**Naming rules:**
+- Lowercase letters, numbers, and underscores only
+- 3-50 characters
+- No leading/trailing underscores
+
+**Example:**
+```bash
+$ iot rename-device
+Devices:
+================================================================================
+[1] MAC: 33FA4381ECA1... | Name: h5075_5a9 | Room: unassigned | SKU: H5075
+[2] MAC: 19544381ECB1... | Name: studio_main | Room: studio_down | SKU: H5051
+[0] Cancel
+
+Select device number: 1
+Enter new name (or 'cancel' to abort): green_room_sensor
+Also change room? Current: 'unassigned' [y/N]: y
+Enter new room name: green_room
+
+✓ Override saved: h5075_5a9 → green_room_sensor
+✓ Room updated: unassigned → green_room
+
+Restart services to apply changes? [Y/n] y
+✓ Services restarted
+```
+
 ### Dashboard Backup & Provisioning
 
 Automate Grafana dashboard backups and convert them to provisioning format for version control:

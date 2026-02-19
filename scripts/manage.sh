@@ -45,6 +45,46 @@ case "$1" in
   tunnel-influxdb)   cloudflared tunnel --url http://localhost:8086 ;;
   tunnel-schedule)   cloudflared tunnel --url http://localhost:8000 ;;
   update)   "$REPO_ROOT/scripts/update-device-map.sh" ;;
+  list-devices)
+    python3 "$REPO_ROOT/scripts/manage-devices.py" list
+    ;;
+  
+  rename-device)
+    python3 "$REPO_ROOT/scripts/manage-devices.py" rename
+    if [ $? -eq 0 ]; then
+      echo ""
+      read -p "Restart services to apply changes? [Y/n] " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        docker compose restart ble-decoder telegraf
+        echo "✓ Services restarted"
+      fi
+    fi
+    ;;
+  
+  set-room)
+    python3 "$REPO_ROOT/scripts/manage-devices.py" set-room
+    if [ $? -eq 0 ]; then
+      read -p "Restart services to apply changes? [Y/n] " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        docker compose restart ble-decoder telegraf
+        echo "✓ Services restarted"
+      fi
+    fi
+    ;;
+  
+  clear-override)
+    python3 "$REPO_ROOT/scripts/manage-devices.py" clear-override
+    if [ $? -eq 0 ]; then
+      read -p "Restart services to apply changes? [Y/n] " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        docker compose restart ble-decoder telegraf
+        echo "✓ Services restarted"
+      fi
+    fi
+    ;;
   cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $REPO_ROOT/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
   env)      cat "$REPO_ROOT/.env" ;;
@@ -365,6 +405,10 @@ case "$1" in
     echo "    edit [file]            Edit a file (default: .env)"
     echo "                           examples: iot edit / iot edit telegraf/telegraf.conf"
     echo "    update                 Refresh device name mappings from govee2mqtt API"
+    echo "    list-devices           List all devices with current names and overrides"
+    echo "    rename-device          Interactive device rename (prompts for service restart)"
+    echo "    set-room               Interactive room change (prompts for service restart)"
+    echo "    clear-override         Remove local override for a device (reverts to API name)"
     echo ""
     echo "  NETWORK"
     echo "    ip                     Show VM IP address"

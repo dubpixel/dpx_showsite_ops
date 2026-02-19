@@ -17,6 +17,37 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [1.3.0] - 2026-02-18
+
+### Added
+- **Device Name Override System**: Persistent device renaming for BLE sensors
+  - Created `scripts/manage-devices.py` - Interactive CLI tool for device management
+  - New `iot` commands: `list-devices`, `rename-device`, `set-room`, `clear-override`
+  - Override storage in `telegraf/conf.d/device-overrides.json` (local-only, .gitignored)
+  - Interactive device selection with numbered menu
+  - Auto-detection of bad/auto-generated device names
+  - Override file format with device name, room, and SKU overrides
+  - Template file: `device-overrides.json.example`
+- **BLE Decoder Enhancements**: 
+  - Override support in `scripts/ble_decoder.py` 
+  - `load_devices()` applies overrides after API load
+  - Logs show "Applied X override(s)" and [OVERRIDE] markers
+  - MAC address normalization (12-char suffix matching)
+- **Update Command Integration**:
+  - Modified `scripts/update-device-map.sh` to merge API + overrides via manage-devices.py
+  - Renamed log message to "Device mappings updated (with overrides)"
+- **Validation & Safety**:
+  - Device name validation (lowercase_underscore, 3-50 chars, no duplicates)
+  - Auto-restart prompts after rename operations
+  - Atomic JSON file writes with temp file pattern
+
+### Changed
+- Updated `.gitignore` to exclude `device-overrides.json`
+- Enhanced ROADMAP.md with Phase 2.8 (completed) and Phase 11 (future backup/sync)
+- Updated README.md with device renaming documentation and examples
+
+---
+
 ## [1.2.0] - 2026-02-16
 
 ### Added
