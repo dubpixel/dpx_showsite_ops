@@ -54,7 +54,7 @@ def load_devices():
         resp = urllib.request.urlopen(API, timeout=5)
         devices = json.loads(resp.read())
         for d in devices:
-            mac = d["id"].replace(":", "")
+            mac = d["id"].replace(":", "").upper()
             suffix = mac[-12:]
             DEVICES[suffix] = {
                 "name": d["name"].lower().replace(" ", "_"),
@@ -77,7 +77,7 @@ def load_devices():
             for mac_full, override_data in overrides.items():
                 if mac_full.startswith("_"):  # Skip JSON comments
                     continue
-                mac_suffix = mac_full[-12:]  # Match by suffix like API devices
+                mac_suffix = mac_full[-12:].upper()  # Match by suffix like API devices
                 if mac_suffix in DEVICES:
                     # Update existing device
                     if "name" in override_data:
