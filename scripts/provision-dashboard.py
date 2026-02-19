@@ -85,30 +85,49 @@ def list_backups():
         print("Run 'iot backup-dashboards' first to create backups.")
         sys.exit(1)
     
-    # Find all JSON files across all dated folders, sorted by modification time
-    backup_files = []
-    for date_dir in sorted(backup_base.iterdir(), reverse=True):
-        if date_dir.is_dir():
-            backup_files.extend(date_dir.glob('dashboard-*.json'))
+    # Find all backup session folders, sorted newest first
+    session_folders = [d for d in backup_base.iterdir() if d.is_dir()]
+    session_folders = sorted(session_folders, key=lambda d: d.name, reverse=True)
     
-    # Sort by modification time, newest first
-    backup_files = sorted(backup_files, key=lambda p: p.stat().st_mtime, reverse=True)
-    
-    if not backup_files:
-        print("No dashboard backup files found.")
+    if not session_folders:
+        print("No dashboard backup folders found.")
         print(f"Run 'iot backup-dashboards' first to create backups.")
         sys.exit(1)
     
-    print("Available dashboard backups:")
+    # Build a flat list of all dashboards with their session
+    all_dashboards = []
+    for session_dir in session_folders:
+        dashboards = list(session_dir.glob('dashboard-*.json'))
+        if dashboards:
+            all_dashboards.append({
+                'session': session_dir.name,
+                'path': session_dir,
+                'dashboards': sorted(dashboards, key=lambda p: p.name)
+            })
+    
+    if not all_dashboards:
+        print("No dashboard files found in backup folders.")
+        print(f"Run 'iot backup-dashboards' first to create backups.")
+        sys.exit(1)
+    
+    # Display grouped by session
+    print("Available dashboard backups (grouped by backup session):")
     print("=" * 70)
-    for idx, filepath in enumerate(backup_files, 1):
-        # Show file with date folder and timestamp
-        date_folder = filepath.parent.name
-        mtime = filepath.stat().st_mtime
-        from datetime import datetime
-        timestamp = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"{idx:2d}. [{date_folder}] {filepath.name}")
-        print(f"    {timestamp}")
+    
+    idx = 0
+    choice_map = {}
+    for session_info in all_dashboards:
+        session_name = session_info['session']
+        print(f"\n📁 Backup session: {session_name}")
+        print("-" * 70)
+        
+        for filepath in session_info['dashboards']:
+            idx += 1
+            choice_map[idx] = filepath
+            mtime = filepath.stat().st_mtime
+            from datetime import datetime
+            timestamp = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"  {idx:2d}. {filepath.name}")
     
     print()
     try:
@@ -117,8 +136,8 @@ def list_backups():
             sys.exit(0)
         
         idx = int(choice)
-        if 1 <= idx <= len(backup_files):
-            return backup_files[idx - 1]
+        if idx in choice_map:
+            return choice_map[idx]
         else:
             print(f"Invalid choice: {choice}")
             sys.exit(1)

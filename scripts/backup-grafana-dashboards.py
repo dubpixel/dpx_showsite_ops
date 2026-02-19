@@ -42,9 +42,9 @@ SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent
 HOME_DIR = Path.home()
 
-# Backup to ~/backups/grafana/dashboards/YYYY-MM-DD/
-today = datetime.now().strftime('%Y-%m-%d')
-BACKUP_DIR = HOME_DIR / 'backups' / 'grafana' / 'dashboards' / today
+# Backup to ~/backups/grafana/dashboards/YYYY-MM-DD-HHMMSS/
+timestamp = datetime.now().strftime('%Y-%m-%d-%H%M%S')
+BACKUP_DIR = HOME_DIR / 'backups' / 'grafana' / 'dashboards' / timestamp
 
 # Create backup directory if it doesn't exist
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,8 +93,7 @@ def main():
     print(f"Found {len(dashboards)} dashboard(s)")
     print()
 
-    # Backup each dashboard
-    timestamp = datetime.now().strftime('%H%M%S')
+    # Backup each dashboard (no timestamp in filename since folder is timestamped)
     backed_up = 0
     
     for dash in dashboards:
@@ -120,8 +119,8 @@ def main():
         safe_title = safe_title[:50]  # Limit length
         
         # Save to file with format: dashboard-{safe-title}-{uid}-{timestamp}.json
-        filename = f"dashboard-{safe_title}-{uid}-{timestamp}.json"
-        filepath = BACKUP_DIR / filename
+        filename = f"dashboard-{safe_title}-{uid}-{timestamp}.js.json
+        filename = f"dashboard-{safe_title}-{uid
         
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
