@@ -85,6 +85,8 @@ services:
       dockerfile: Dockerfile.ble-decoder
     container_name: ble-decoder
     restart: unless-stopped
+    volumes:
+      - ./telegraf/conf.d:/app/telegraf/conf.d:ro
     environment:
       - BROKER=mosquitto
       - GOVEE_API_URL=http://host.docker.internal:8056/api/devices
