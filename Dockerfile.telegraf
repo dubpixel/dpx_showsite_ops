@@ -12,12 +12,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Enable MIB loading by commenting out "mibs :" restriction BEFORE downloading
+# Enable MIB loading by commenting out "mibs :" restriction
 RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || echo "# MIBs enabled" > /etc/snmp/snmp.conf
 
-# Download standard IETF/IANA MIBs and copy to Telegraf's search path
-RUN download-mibs && \
-    mkdir -p /usr/share/snmp/mibs/ietf /usr/share/snmp/mibs/iana && \
-    cp -r /var/lib/mibs/ietf/* /usr/share/snmp/mibs/ietf/ 2>/dev/null || true && \
-    cp -r /var/lib/mibs/iana/* /usr/share/snmp/mibs/iana/ 2>/dev/null || true && \
-    find /var/lib/mibs/ -name "*.txt" -exec cp {} /usr/share/snmp/mibs/ \; 2>/dev/null || true
+# Download standard IETF/IANA MIBs
+RUN download-mibs
+
+# Set MIBDIRS environment variable to include downloaded MIBs
+ENV MIBDIRS=/var/lib/mibs/ietf:/var/lib/mibs/iana:/usr/share/snmp/mibs
