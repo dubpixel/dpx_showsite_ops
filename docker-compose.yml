@@ -67,7 +67,10 @@ services:
     networks:
       - iot
   telegraf:
-    image: telegraf:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.telegraf
+    image: telegraf-snmp:latest
     container_name: telegraf
     restart: unless-stopped
     volumes:
