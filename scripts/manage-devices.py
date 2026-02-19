@@ -4,9 +4,11 @@ Device Override Management Tool
 Manages local device name/room overrides for govee2mqtt devices.
 """
 
+import csv
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.request
 import tempfile
@@ -24,6 +26,31 @@ API_TIMEOUT = 5
 # ============================================================================
 # Core Functions
 # ============================================================================
+
+def get_env_value(key: str, default: Optional[str] = None) -> str:
+    """Read value from .env file with fallback to default."""
+    env_file = os.path.join(REPO_ROOT, ".env")
+    
+    if not os.path.exists(env_file):
+        return default
+    
+    try:
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('#') or '=' not in line:
+                    continue
+                
+                if line.startswith(f"{key}="):
+                    value = line.split('=', 1)[1]
+                    # Strip quotes if present
+                    value = value.strip('"\'')
+                    return value
+    except Exception as e:
+        print(f"Warning: Error reading .env file: {e}", file=sys.stderr)
+    
+    return default
+
 
 def normalize_mac(mac_str: str) -> str:
     """Strip colons and uppercase MAC address."""
@@ -441,6 +468,237 @@ def interactive_clear_override(device: Dict) -> bool:
         return False
 
 
+def query_device_name_history(mac_suffix: str) -> List[Dict]:
+    """
+    Query InfluxDB for all historical device_name values for a given MAC.
+    Returns list of dicts with device_name, source, count, first_seen, last_seen.
+    """
+    token = get_env_value("INFLUX_TOKEN", "my-super-secret-token")
+    org = get_env_value("INFLUX_ORG", "home")
+    bucket = get_env_value("INFLUX_BUCKET", "sensors")
+    
+    results = []
+    sources = ["gv_cloud", "dpx_ops_decoder"]
+    
+    for source in sources:
+        # Flux query to get device_name values with counts and timestamps
+        flux_query = f'''
+from(bucket: "{bucket}")
+  |> range(start: 1970-01-01T00:00:00Z)
+  |> filter(fn: (r) => r["_measurement"] == "sensor")
+  |> filter(fn: (r) => r.z_device_id =~ /{mac_suffix}$/)
+  |> filter(fn: (r) => r.source == "{source}")
+  |> keep(columns: ["_time", "device_name"])
+  |> group(columns: ["device_name"])
+'''
+        
+        try:
+            cmd = [
+                "docker", "exec", "influxdb", "influx", "query",
+                "--org", org,
+                "--token", token,
+                "--raw", flux_query
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                print(f"Warning: Query failed for source {source}: {result.stderr}", file=sys.stderr)
+                continue
+            
+            # Parse CSV output
+            lines = result.stdout.strip().split('\n')
+            if len(lines) < 2:
+                continue
+            
+            # Group by device_name and count
+            device_data = {}
+            reader = csv.DictReader(lines)
+            
+            for row in reader:
+                if not row or '_time' not in row or 'device_name' not in row:
+                    continue
+                
+                device_name = row['device_name']
+                timestamp = row['_time']
+                
+                if device_name not in device_data:
+                    device_data[device_name] = {
+                        'timestamps': []
+                    }
+                
+                device_data[device_name]['timestamps'].append(timestamp)
+            
+            # Convert to result format
+            for device_name, data in device_data.items():
+                timestamps = sorted(data['timestamps'])
+                results.append({
+                    'device_name': device_name,
+                    'source': source,
+                    'count': len(timestamps),
+                    'first_seen': timestamps[0] if timestamps else 'unknown',
+                    'last_seen': timestamps[-1] if timestamps else 'unknown'
+                })
+        
+        except subprocess.TimeoutExpired:
+            print(f"Warning: Query timeout for source {source}", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Query error for source {source}: {e}", file=sys.stderr)
+    
+    return results
+
+
+def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> bool:
+    """
+    Interactive deletion of historical device data from InfluxDB.
+    Used to clean up old device_name values after renaming.
+    """
+    mac_suffix = get_mac_suffix(device['mac'], 12)
+    
+    print(f"\nQuerying historical data for device:")
+    print(f"  MAC: {device['mac']}")
+    print(f"  Current name: {device['name']}")
+    print(f"  Current room: {device['room']}")
+    print()
+    
+    # Query historical device_name values
+    history = query_device_name_history(mac_suffix)
+    
+    if not history:
+        print("No historical data found in InfluxDB for this device.")
+        return False
+    
+    # Filter out current device_name if it's the only one
+    old_names = [h for h in history if h['device_name'] != device['name']]
+    
+    if not old_names:
+        print(f"No old data to delete. Only current device_name '{device['name']}' found.")
+        return False
+    
+    # Display table of historical data
+    print(f"Found historical data for MAC {mac_suffix}:\n")
+    print(f"{'device_name':<25} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
+    print("─" * 110)
+    
+    for h in history:
+        marker = " [CURRENT]" if h['device_name'] == device['name'] else ""
+        print(f"{h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}{marker}")
+    
+    print()
+    
+    # Prompt for device_name to delete
+    while True:
+        old_name = input("Enter device_name to delete (or 'cancel'): ").strip()
+        
+        if old_name.lower() in ['cancel', 'c', '']:
+            print("Cancelled")
+            return False
+        
+        if old_name == device['name']:
+            print(f"Cannot delete current device_name '{device['name']}'. Choose an old name.")
+            continue
+        
+        # Check if this device_name exists in history
+        if not any(h['device_name'] == old_name for h in history):
+            print(f"device_name '{old_name}' not found in history. Try again.")
+            continue
+        
+        break
+    
+    # Get sources that have this device_name
+    sources_to_delete = [h for h in history if h['device_name'] == old_name]
+    total_count = sum(h['count'] for h in sources_to_delete)
+    
+    # Display dry-run information
+    print(f"\n{'='*80}")
+    print("DRY RUN - Will delete:")
+    print(f"{'='*80}\n")
+    
+    token = get_env_value("INFLUX_TOKEN", "my-super-secret-token")
+    org = get_env_value("INFLUX_ORG", "home")
+    bucket = get_env_value("INFLUX_BUCKET", "sensors")
+    showsite = get_env_value("SHOWSITE_NAME", "demo_showsite")
+    
+    for h in sources_to_delete:
+        predicate = f'device_name="{old_name}" and z_device_id=~/{mac_suffix}$/'
+        print(f"Source: {h['source']}")
+        print(f"Predicate: {predicate}")
+        print(f"Estimated rows: {h['count']}")
+        print()
+    
+    print(f"MQTT cleanup: {showsite}/dpx_ops_decoder/*/*/{old_name}/#")
+    print(f"\nTotal estimated rows: {total_count} across {len(sources_to_delete)} source(s)")
+    print(f"{'='*80}\n")
+    
+    # Confirmation
+    try:
+        confirm = input("Proceed with deletion? [y/N]: ").strip().lower()
+        
+        if confirm not in ['y', 'yes']:
+            print("Cancelled")
+            return False
+        
+        print("\nDeleting data...\n")
+        
+        # Execute deletions
+        deleted_count = 0
+        for h in sources_to_delete:
+            predicate = f'device_name="{old_name}" and z_device_id=~/{mac_suffix}$/'
+            
+            cmd = [
+                "docker", "exec", "influxdb", "influx", "delete",
+                "--org", org,
+                "--token", token,
+                "--bucket", bucket,
+                "--start", "1970-01-01T00:00:00Z",
+                "--stop", "2030-01-01T00:00:00Z",
+                "--predicate", predicate
+            ]
+            
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                
+                if result.returncode == 0:
+                    print(f"  ✓ Deleted from source: {h['source']}")
+                    deleted_count += 1
+                else:
+                    print(f"  ❌ Failed to delete from {h['source']}: {result.stderr}")
+            
+            except subprocess.TimeoutExpired:
+                print(f"  ❌ Timeout deleting from {h['source']}")
+            except Exception as e:
+                print(f"  ❌ Error deleting from {h['source']}: {e}")
+        
+        # Clear MQTT retained messages
+        print(f"\nClearing MQTT retained messages for '{old_name}'...")
+        mqtt_pattern = f"{showsite}/dpx_ops_decoder/*/*/{old_name}/#"
+        
+        try:
+            mqtt_cmd = ["iot", "clear-retained", mqtt_pattern]
+            mqtt_result = subprocess.run(mqtt_cmd, capture_output=True, text=True, timeout=30)
+            
+            if mqtt_result.returncode == 0:
+                print(f"  ✓ MQTT retained messages cleared")
+            else:
+                print(f"  ⚠ MQTT cleanup had issues (may be okay if no retained messages exist)")
+        
+        except Exception as e:
+            print(f"  ⚠ MQTT cleanup error: {e}")
+        
+        print()
+        print(f"✓ Deleted data for device_name='{old_name}' ({total_count} rows across {deleted_count} source(s))")
+        print(f"✓ MQTT retained messages cleared")
+        print()
+        print("Recommendation: Restart Telegraf to verify ghost data doesn't reappear:")
+        print("  iot restart telegraf")
+        
+        return True
+    
+    except KeyboardInterrupt:
+        print("\nCancelled")
+        return False
+
+
 # ============================================================================
 # CLI Commands
 # ============================================================================
@@ -576,17 +834,39 @@ def cmd_merge(args):
     return 0
 
 
+def cmd_delete_device_data(args):
+    """Interactive deletion of historical device data from InfluxDB."""
+    api_data = load_api_devices()
+    overrides = load_overrides()
+    devices = merge_devices(api_data, overrides)
+    
+    if not devices:
+        print("No devices found")
+        return 1
+    
+    if not api_data:
+        print("Warning: API not available, showing override-only devices", file=sys.stderr)
+    
+    device = interactive_select_device(devices)
+    if not device:
+        return 0
+    
+    success = interactive_delete_device_data(device, devices)
+    return 0 if success else 1
+
+
 def main():
     """Main CLI entry point."""
     if len(sys.argv) < 2:
         print("Usage: manage-devices.py <command>")
         print("\nCommands:")
-        print("  list              - List all devices with override indicators")
-        print("  rename            - Interactive device rename")
-        print("  set-room          - Interactive room change")
-        print("  clear-override    - Remove local override for a device")
-        print("  check-bad         - Detect devices with questionable names")
-        print("  merge             - Merge API data with overrides (JSON output)")
+        print("  list                - List all devices with override indicators")
+        print("  rename              - Interactive device rename")
+        print("  set-room            - Interactive room change")
+        print("  clear-override      - Remove local override for a device")
+        print("  check-bad           - Detect devices with questionable names")
+        print("  delete-device-data  - Delete InfluxDB data for renamed devices (interactive)")
+        print("  merge               - Merge API data with overrides (JSON output)")
         return 1
     
     command = sys.argv[1]
@@ -598,6 +878,7 @@ def main():
         'set-room': cmd_set_room,
         'clear-override': cmd_clear_override,
         'check-bad': cmd_check_bad,
+        'delete-device-data': cmd_delete_device_data,
         'merge': cmd_merge,
     }
     

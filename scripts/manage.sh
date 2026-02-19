@@ -85,6 +85,11 @@ case "$1" in
       fi
     fi
     ;;
+  
+  delete-device-data)
+    python3 "$REPO_ROOT/scripts/manage-devices.py" delete-device-data
+    ;;
+  
   cron-on)  (crontab -l 2>/dev/null | grep -v update-device-map; echo "0 * * * * $REPO_ROOT/scripts/update-device-map.sh") | crontab - && echo "Cron enabled (hourly)" ;;
   cron-off) crontab -l 2>/dev/null | grep -v update-device-map | crontab - && echo "Cron disabled" ;;
   env)      cat "$REPO_ROOT/.env" ;;
@@ -409,6 +414,7 @@ case "$1" in
     echo "    rename-device          Interactive device rename (prompts for service restart)"
     echo "    set-room               Interactive room change (prompts for service restart)"
     echo "    clear-override         Remove local override for a device (reverts to API name)"
+    echo "    delete-device-data     Delete InfluxDB data for renamed devices (interactive)"
     echo ""
     echo "  NETWORK"
     echo "    ip                     Show VM IP address"
