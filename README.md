@@ -223,7 +223,7 @@ sudo pip3 install requests
 **Backup dashboards:**
 ```bash
 iot backup-dashboards     # Fetches all dashboards via API
-                          # Saves to grafana/manual_dashboard_backup/ with timestamps
+                          # Saves to ~/backups/grafana/dashboards/YYYY-MM-DD/
 ```
 
 **Convert to provisioning format:**
@@ -232,7 +232,7 @@ iot backup-dashboards     # Fetches all dashboards via API
 iot provision-dashboard
 
 # Or specify file directly
-iot provision-dashboard grafana/manual_dashboard_backup/dashboard-abc123-20260218-120000.json
+iot provision-dashboard ~/backups/grafana/dashboards/2026-02-18/dashboard-abc123.json
 
 # Auto-detects format (v2beta1 or legacy JSON)
 # Removes instance-specific metadata (version, id, timestamps)

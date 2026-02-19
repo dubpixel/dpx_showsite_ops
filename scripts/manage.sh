@@ -362,7 +362,7 @@ case "$1" in
     echo "    tunnel                 Start Cloudflare tunnel to Grafana"
     echo ""
     echo "  GRAFANA DASHBOARDS"
-    echo "    backup-dashboards      Fetch all dashboards via API and save to manual_dashboard_backup/"
+    echo "    backup-dashboards      Fetch all dashboards via API → ~/backups/grafana/dashboards/YYYY-MM-DD/"
     echo "    provision-dashboard [file]  Convert backup to provisioning format"
     echo "                           No args = interactive picker | With file = convert that file"
     echo "    setup-dashboard-cron   Install daily cron job for automatic dashboard backups"

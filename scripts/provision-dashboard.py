@@ -77,16 +77,22 @@ def validate_dashboard(data):
 
 def list_backups():
     """List available backup files and let user choose."""
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
-    backup_dir = repo_root / 'grafana' / 'manual_dashboard_backup'
+    home_dir = Path.home()
+    backup_base = home_dir / 'backups' / 'grafana' / 'dashboards'
     
-    if not backup_dir.exists():
-        print(f"ERROR: Backup directory not found: {backup_dir}")
+    if not backup_base.exists():
+        print(f"ERROR: Backup directory not found: {backup_base}")
+        print("Run 'iot backup-dashboards' first to create backups.")
         sys.exit(1)
     
-    # Find all JSON files
-    backup_files = sorted(backup_dir.glob('dashboard-*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+    # Find all JSON files across all dated folders, sorted by modification time
+    backup_files = []
+    for date_dir in sorted(backup_base.iterdir(), reverse=True):
+        if date_dir.is_dir():
+            backup_files.extend(date_dir.glob('dashboard-*.json'))
+    
+    # Sort by modification time, newest first
+    backup_files = sorted(backup_files, key=lambda p: p.stat().st_mtime, reverse=True)
     
     if not backup_files:
         print("No dashboard backup files found.")
@@ -96,12 +102,12 @@ def list_backups():
     print("Available dashboard backups:")
     print("=" * 70)
     for idx, filepath in enumerate(backup_files, 1):
-        # Show file with relative path and timestamp
-        rel_path = filepath.relative_to(repo_root)
+        # Show file with date folder and timestamp
+        date_folder = filepath.parent.name
         mtime = filepath.stat().st_mtime
         from datetime import datetime
         timestamp = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"{idx:2d}. {filepath.name}")
+        print(f"{idx:2d}. [{date_folder}] {filepath.name}")
         print(f"    {timestamp}")
     
     print()

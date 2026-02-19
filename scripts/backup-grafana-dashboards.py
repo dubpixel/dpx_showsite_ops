@@ -40,7 +40,11 @@ if not GRAFANA_PASSWORD:
 # Determine paths
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent
-BACKUP_DIR = REPO_ROOT / 'grafana' / 'manual_dashboard_backup'
+HOME_DIR = Path.home()
+
+# Backup to ~/backups/grafana/dashboards/YYYY-MM-DD/
+today = datetime.now().strftime('%Y-%m-%d')
+BACKUP_DIR = HOME_DIR / 'backups' / 'grafana' / 'dashboards' / today
 
 # Create backup directory if it doesn't exist
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -90,7 +94,7 @@ def main():
     print()
 
     # Backup each dashboard
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    timestamp = datetime.now().strftime('%H%M%S')
     backed_up = 0
     
     for dash in dashboards:
