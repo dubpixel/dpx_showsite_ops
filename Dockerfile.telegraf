@@ -18,5 +18,5 @@ RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || echo "# MIBs
 # Download standard IETF/IANA MIBs
 RUN download-mibs
 
-# Set MIBDIRS environment variable to include downloaded MIBs
-ENV MIBDIRS=/var/lib/mibs/ietf:/var/lib/mibs/iana:/usr/share/snmp/mibs
+# Set MIBDIRS environment variable to include downloaded MIBs and Geist MIBs
+ENV MIBDIRS=/var/lib/mibs/ietf:/var/lib/mibs/iana:/usr/share/snmp/mibs:/usr/share/snmp/mibs/geist
