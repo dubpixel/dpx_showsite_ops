@@ -15,6 +15,9 @@ import tempfile
 from typing import Dict, List, Optional, Tuple
 
 
+# Version
+VERSION = "1.1.0"  # Added delete-device-data command
+
 # Configuration
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -485,7 +488,7 @@ def query_device_name_history(mac_suffix: str) -> List[Dict]:
     flux_query = f'''
 from(bucket: "{bucket}")
   |> range(start: 1970-01-01T00:00:00Z)
-  |> filter(fn: (r) => r["_measurement"] == "sensor")
+  |> filter(fn: (r) => r["_measurement"] == "mqtt_consumer")
   |> filter(fn: (r) => r["z_device_id"] =~ /{mac_suffix}$/)
   |> filter(fn: (r) => exists r.device_name)
   |> keep(columns: ["_time", "device_name", "source", "z_device_id"])
@@ -898,6 +901,8 @@ def cmd_merge(args):
 
 def cmd_delete_device_data(args):
     """Interactive deletion of historical device data from InfluxDB."""
+    print(f"Device Data Deletion Tool v{VERSION}\n")
+    
     api_data = load_api_devices()
     overrides = load_overrides()
     devices = merge_devices(api_data, overrides)
