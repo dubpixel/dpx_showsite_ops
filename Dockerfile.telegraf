@@ -1,8 +1,8 @@
 # Custom Telegraf image with SNMP tools for MIB support
 FROM telegraf:latest
 
-# Enable non-free repository for snmp-mibs-downloader
-RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/non-free.list
+# Enable non-free repository for snmp-mibs-downloader by modifying existing sources
+RUN sed -i 's/main$/main contrib non-free non-free-firmware/g' /etc/apt/sources.list
 
 # Install SNMP utilities and standard MIBs
 RUN apt-get update && \
