@@ -12,5 +12,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Download standard IETF/IANA MIBs
+RUN download-mibs
+
 # Enable MIB loading by commenting out "mibs :" restriction
 RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || echo "# MIBs enabled" > /etc/snmp/snmp.conf
