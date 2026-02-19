@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v2.1 - MQTT Payload Decoder
+BLE Decoder v2.2 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -306,7 +306,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v2.1")
+    print("DPX BLE Decoder v2.2")
     print("=" * 60)
     print()
     
