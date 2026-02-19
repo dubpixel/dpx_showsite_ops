@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v2.0 - MQTT Payload Decoder
+BLE Decoder v2.1 - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -60,10 +60,9 @@ def load_devices():
                 "name": d["name"].lower().replace(" ", "_"),
                 "room": (d.get("room") or "unassigned").lower().replace(" ", "_"),
                 "sku": d["sku"],
+                "has_override": False  # Track if this device has an override
             }
-        print(f"Loaded {len(DEVICES)} devices from API:")
-        for mac, info in DEVICES.items():
-            print(f"  {mac} -> {info['name']} ({info['sku']}) in {info['room']}")
+        print(f"Loaded {len(DEVICES)} devices from API")
     except Exception as e:
         print(f"Failed to load devices: {e}")
         print("Continuing with empty device map...")
@@ -87,19 +86,28 @@ def load_devices():
                         DEVICES[mac_suffix]["room"] = override_data["room"]
                     if "sku" in override_data:
                         DEVICES[mac_suffix]["sku"] = override_data["sku"]
+                    DEVICES[mac_suffix]["has_override"] = True
                     override_count += 1
                 elif "name" in override_data:
                     # Add override-only device (not in API)
                     DEVICES[mac_suffix] = {
                         "name": override_data["name"],
                         "room": override_data.get("room", "unassigned"),
-                        "sku": override_data.get("sku", "unknown")
+                        "sku": override_data.get("sku", "unknown"),
+                        "has_override": True
                     }
                     override_count += 1
             if override_count > 0:
                 print(f"Applied {override_count} device override(s)")
         except Exception as e:
             print(f"Warning: Failed to load overrides: {e}")
+    
+    # Print final device list
+    if DEVICES:
+        print("Final device mappings:")
+        for mac, info in DEVICES.items():
+            override_marker = " [OVERRIDE]" if info.get("has_override") else ""
+            print(f"  {mac} -> {info['name']} ({info['sku']}) in {info['room']}{override_marker}")
 
 
 def decode_h5051(b):
@@ -298,7 +306,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v2.0")
+    print("DPX BLE Decoder v2.1")
     print("=" * 60)
     print()
     
