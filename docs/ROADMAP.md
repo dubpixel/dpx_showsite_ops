@@ -106,6 +106,23 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [x] Push to GitHub as `dpx-showsite-ops`
 - [x] Set up comprehensive documentation links
 
+### Phase 3.4: Dashboard Backup & Provisioning Utility
+- [x] `backup-grafana-dashboards.py` - Fetch all dashboards via Grafana API
+- [x] `provision-dashboard.py` - Convert exported dashboards to provisioning format
+- [x] Format auto-detection (v2beta1 vs legacy JSON)
+- [x] Metadata cleanup (removes instance-specific version, id, timestamps)
+- [x] Preserves essential fields (uid, panel IDs, datasource refs)
+- [x] CLI integration via manage.sh (`iot backup-dashboards`, `iot provision-dashboard`)
+- [x] Optional cron setup for daily automated backups
+
+**Purpose**: Streamlines dashboard version control and deployment by automating the export → clean → provision workflow. Dashboards backed up daily to `manual_dashboard_backup/`, manually promoted to `provisioning/dashboards/` when ready for deployment.
+
+**Benefits**:
+- Automated nightly backups prevent dashboard loss
+- One-command conversion eliminates manual JSON editing
+- Git-trackable provisioned dashboards for version control
+- Consistent deployment across stack instances
+
 **Status**: ✅ Complete - all deliverables shipped
 
 ---
@@ -416,6 +433,8 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [x] Zero manual config file editing after setup.sh
 - [x] All secrets in .env, nothing hardcoded
 - [x] Documentation covers 90%+ of common issues
+- [x] Dashboard backup utility automates export and provisioning workflow
+- [x] One-command dashboard conversion eliminates manual JSON editing
 
 **Phase 4:**
 - [ ] BLE latency under 5 seconds

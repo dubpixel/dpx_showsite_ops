@@ -210,6 +210,45 @@ The stack automatically discovers Govee devices from your account:
 
 **Note**: Devices MUST be assigned to a room in the Govee app, or the API won't return data.
 
+### Dashboard Backup & Provisioning
+
+Automate Grafana dashboard backups and convert them to provisioning format for version control:
+
+**First-time setup (on server):**
+```bash
+sudo pip3 install requests
+# or: sudo apt install python3-requests
+```
+
+**Backup dashboards:**
+```bash
+iot backup-dashboards     # Fetches all dashboards via API
+                          # Saves to grafana/manual_dashboard_backup/ with timestamps
+```
+
+**Convert to provisioning format:**
+```bash
+# Pick a backup file to convert
+iot provision-dashboard grafana/manual_dashboard_backup/dashboard-abc123-20260218-120000.json
+
+# Auto-detects format (v2beta1 or legacy JSON)
+# Removes instance-specific metadata (version, id, timestamps)
+# Saves to grafana/provisioning/dashboards/
+# Grafana auto-loads within 10 seconds
+```
+
+**Optional daily backups:**
+```bash
+iot setup-dashboard-cron    # Install 2am daily backup job
+iot remove-dashboard-cron   # Remove cron job
+```
+
+**Workflow:**
+1. Make dashboard changes in Grafana UI
+2. Run `iot backup-dashboards` to export
+3. Run `iot provision-dashboard <file>` to convert
+4. Git commit the provisioned file for version control
+
 ### Troubleshooting
 
 **govee2mqtt won't connect to AWS IoT (timeout errors)**

@@ -234,6 +234,53 @@ case "$1" in
     fi
     ;;
 
+  backup-dashboards)
+    echo "Backing up Grafana dashboards..."
+    
+    # Check if requests library is installed
+    if ! python3 -c "import requests" 2>/dev/null; then
+      echo ""
+      echo "ERROR: Python 'requests' library not installed on server"
+      echo ""
+      echo "Install it with (on this server):"
+      echo "  sudo pip3 install requests"
+      echo "  # or: sudo apt install python3-requests"
+      echo ""
+      echo "See README.md 'Dashboard Backup & Provisioning' section"
+      exit 1
+    fi
+    
+    cd "$REPO_ROOT"
+    if [ -f "$REPO_ROOT/.env" ]; then
+      source "$REPO_ROOT/.env"
+    fi
+    python3 "$SCRIPT_DIR/backup-grafana-dashboards.py"
+    ;;
+  
+  provision-dashboard)
+    if [ -z "$2" ]; then
+      echo "Usage: iot provision-dashboard <path-to-dashboard.json>"
+      echo ""
+      echo "Example:"
+      echo "  iot provision-dashboard grafana/manual_dashboard_backup/dashboard-abc123.json"
+      exit 1
+    fi
+    python3 "$SCRIPT_DIR/provision-dashboard.py" "$2"
+    ;;
+  
+  setup-dashboard-cron)
+    CRON_CMD="0 2 * * * cd $REPO_ROOT && source $REPO_ROOT/.env && python3 $SCRIPT_DIR/backup-grafana-dashboards.py >> /var/log/grafana-backup.log 2>&1"
+    (crontab -l 2>/dev/null | grep -v backup-grafana-dashboards; echo "$CRON_CMD") | crontab -
+    echo "✓ Dashboard backup cron job installed"
+    echo "  Schedule: Daily at 2:00 AM"
+    echo "  Log: /var/log/grafana-backup.log"
+    ;;
+  
+  remove-dashboard-cron)
+    crontab -l 2>/dev/null | grep -v backup-grafana-dashboards | crontab -
+    echo "✓ Dashboard backup cron job removed"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
@@ -311,6 +358,13 @@ case "$1" in
     echo "    ip                     Show VM IP address"
     echo "    web                    Show all service URLs"
     echo "    tunnel                 Start Cloudflare tunnel to Grafana"
+    echo ""
+    echo "  GRAFANA DASHBOARDS"
+    echo "    backup-dashboards      Fetch all dashboards via API and save to manual_dashboard_backup/"
+    echo "    provision-dashboard <file>  Convert exported dashboard to provisioning format"
+    echo "                           Example: iot provision-dashboard grafana/manual_dashboard_backup/dash.json"
+    echo "    setup-dashboard-cron   Install daily cron job for automatic dashboard backups"
+    echo "    remove-dashboard-cron  Remove automatic dashboard backup cron job"
     echo ""
     echo "  MAINTENANCE"
     echo "    backup                 Backup Grafana + InfluxDB volumes to ~/backups/"
