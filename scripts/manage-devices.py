@@ -477,73 +477,107 @@ def query_device_name_history(mac_suffix: str) -> List[Dict]:
     org = get_env_value("INFLUX_ORG", "home")
     bucket = get_env_value("INFLUX_BUCKET", "sensors")
     
-    results = []
-    sources = ["gv_cloud", "dpx_ops_decoder"]
+    debug = os.getenv("DEBUG_DEVICE_DELETE", "").lower() in ["1", "true", "yes"]
     
-    for source in sources:
-        # Flux query to get device_name values with counts and timestamps
-        flux_query = f'''
+    results = []
+    
+    # Query both sources together to get all device_name values
+    flux_query = f'''
 from(bucket: "{bucket}")
   |> range(start: 1970-01-01T00:00:00Z)
   |> filter(fn: (r) => r["_measurement"] == "sensor")
-  |> filter(fn: (r) => r.z_device_id =~ /{mac_suffix}$/)
-  |> filter(fn: (r) => r.source == "{source}")
-  |> keep(columns: ["_time", "device_name"])
-  |> group(columns: ["device_name"])
+  |> filter(fn: (r) => r["z_device_id"] =~ /{mac_suffix}$/)
+  |> filter(fn: (r) => exists r.device_name)
+  |> keep(columns: ["_time", "device_name", "source", "z_device_id"])
 '''
+    
+    try:
+        cmd = [
+            "docker", "exec", "influxdb", "influx", "query",
+            "--org", org,
+            "--token", token,
+            "--raw", flux_query
+        ]
         
-        try:
-            cmd = [
-                "docker", "exec", "influxdb", "influx", "query",
-                "--org", org,
-                "--token", token,
-                "--raw", flux_query
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                print(f"Warning: Query failed for source {source}: {result.stderr}", file=sys.stderr)
+        if debug:
+            print(f"\nDEBUG: Running query for MAC suffix: {mac_suffix}", file=sys.stderr)
+            print(f"DEBUG: Full MAC regex pattern: /{mac_suffix}$/", file=sys.stderr)
+            print(f"DEBUG: Query:\n{flux_query}", file=sys.stderr)
+            print(f"DEBUG: Command: {' '.join(cmd[:7])} ...", file=sys.stderr)
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode != 0:
+            print(f"Error: Query failed: {result.stderr}", file=sys.stderr)
+            if debug:
+                print(f"DEBUG: stdout: {result.stdout}", file=sys.stderr)
+            return []
+        
+        if debug:
+            print(f"DEBUG: Query returned {len(result.stdout)} bytes", file=sys.stderr)
+            print(f"DEBUG: First 1000 chars of output:", file=sys.stderr)
+            print(result.stdout[:1000], file=sys.stderr)
+            print(f"DEBUG: Output line count: {len(result.stdout.splitlines())}", file=sys.stderr)
+        
+        # Parse CSV output
+        lines = result.stdout.strip().split('\n')
+        if len(lines) < 2:
+            if debug:
+                print(f"DEBUG: No data rows found (only {len(lines)} lines)", file=sys.stderr)
+            return []
+        
+        # Group by device_name and source
+        device_data = {}
+        
+        # Skip empty lines and parse CSV
+        csv_lines = [line for line in lines if line.strip()]
+        if not csv_lines:
+            return []
+        
+        reader = csv.DictReader(csv_lines)
+        
+        for row in reader:
+            if not row:
                 continue
             
-            # Parse CSV output
-            lines = result.stdout.strip().split('\n')
-            if len(lines) < 2:
+            device_name = row.get('device_name', '').strip()
+            source = row.get('source', '').strip()
+            timestamp = row.get('_time', '').strip()
+            
+            if not device_name or not source:
                 continue
             
-            # Group by device_name and count
-            device_data = {}
-            reader = csv.DictReader(lines)
+            key = (device_name, source)
             
-            for row in reader:
-                if not row or '_time' not in row or 'device_name' not in row:
-                    continue
-                
-                device_name = row['device_name']
-                timestamp = row['_time']
-                
-                if device_name not in device_data:
-                    device_data[device_name] = {
-                        'timestamps': []
-                    }
-                
-                device_data[device_name]['timestamps'].append(timestamp)
+            if key not in device_data:
+                device_data[key] = {
+                    'timestamps': []
+                }
             
-            # Convert to result format
-            for device_name, data in device_data.items():
-                timestamps = sorted(data['timestamps'])
-                results.append({
-                    'device_name': device_name,
-                    'source': source,
-                    'count': len(timestamps),
-                    'first_seen': timestamps[0] if timestamps else 'unknown',
-                    'last_seen': timestamps[-1] if timestamps else 'unknown'
-                })
+            if timestamp:
+                device_data[key]['timestamps'].append(timestamp)
         
-        except subprocess.TimeoutExpired:
-            print(f"Warning: Query timeout for source {source}", file=sys.stderr)
-        except Exception as e:
-            print(f"Warning: Query error for source {source}: {e}", file=sys.stderr)
+        if debug:
+            print(f"DEBUG: Found {len(device_data)} unique (device_name, source) combinations", file=sys.stderr)
+        
+        # Convert to result format
+        for (device_name, source), data in device_data.items():
+            timestamps = sorted(data['timestamps']) if data['timestamps'] else []
+            results.append({
+                'device_name': device_name,
+                'source': source,
+                'count': len(timestamps),
+                'first_seen': timestamps[0] if timestamps else 'unknown',
+                'last_seen': timestamps[-1] if timestamps else 'unknown'
+            })
+    
+    except subprocess.TimeoutExpired:
+        print(f"Error: Query timeout", file=sys.stderr)
+    except Exception as e:
+        print(f"Error: Query failed: {e}", file=sys.stderr)
+        if debug:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
     
     return results
 
@@ -566,41 +600,69 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     
     if not history:
         print("No historical data found in InfluxDB for this device.")
+        print("\nTip: Enable debug mode to see query details:")
+        print("  DEBUG_DEVICE_DELETE=1 iot delete-device-data")
         return False
     
-    # Filter out current device_name if it's the only one
-    old_names = [h for h in history if h['device_name'] != device['name']]
+    # Separate current vs old names
+    current_entries = [h for h in history if h['device_name'] == device['name']]
+    old_entries = [h for h in history if h['device_name'] != device['name']]
     
-    if not old_names:
+    if not old_entries:
         print(f"No old data to delete. Only current device_name '{device['name']}' found.")
+        print("\nThis means:")
+        print(f"  - Device has NOT been renamed (or data was already cleaned up)")
+        print(f"  - All {sum(h['count'] for h in current_entries)} rows use current name '{device['name']}'")
         return False
     
-    # Display table of historical data
+    # Display table of historical data with clear OLD/CURRENT markers
     print(f"Found historical data for MAC {mac_suffix}:\n")
-    print(f"{'device_name':<25} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
-    print("─" * 110)
     
-    for h in history:
-        marker = " [CURRENT]" if h['device_name'] == device['name'] else ""
-        print(f"{h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}{marker}")
+    if current_entries:
+        print("CURRENT NAME (keep this):")
+        print(f"{'  device_name':<27} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
+        print("  " + "─" * 108)
+        for h in current_entries:
+            print(f"  {h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
+        print()
     
-    print()
+    if old_entries:
+        print("OLD NAME(S) (delete these to fix Grafana duplicates):")
+        print(f"{'  device_name':<27} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
+        print("  " + "─" * 108)
+        for h in old_entries:
+            print(f"  {h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
+        print()
+    
+    # If only one old name, suggest it
+    unique_old_names = list(set(h['device_name'] for h in old_entries))
+    
+    if len(unique_old_names) == 1:
+        suggested_name = unique_old_names[0]
+        print(f"💡 Suggestion: Delete '{suggested_name}' to remove ghost data")
+        print()
     
     # Prompt for device_name to delete
     while True:
-        old_name = input("Enter device_name to delete (or 'cancel'): ").strip()
+        if len(unique_old_names) == 1:
+            prompt = f"Enter device_name to delete [default: {suggested_name}] (or 'cancel'): "
+            old_name = input(prompt).strip()
+            if old_name == '':
+                old_name = suggested_name
+        else:
+            old_name = input("Enter device_name to delete (or 'cancel'): ").strip()
         
-        if old_name.lower() in ['cancel', 'c', '']:
+        if old_name.lower() in ['cancel', 'c']:
             print("Cancelled")
             return False
         
         if old_name == device['name']:
-            print(f"Cannot delete current device_name '{device['name']}'. Choose an old name.")
+            print(f"❌ Cannot delete CURRENT device_name '{device['name']}'. Choose an OLD name from the list above.")
             continue
         
         # Check if this device_name exists in history
         if not any(h['device_name'] == old_name for h in history):
-            print(f"device_name '{old_name}' not found in history. Try again.")
+            print(f"❌ device_name '{old_name}' not found in history. Try again.")
             continue
         
         break
