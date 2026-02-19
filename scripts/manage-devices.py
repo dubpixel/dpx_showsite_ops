@@ -108,7 +108,7 @@ def merge_devices(api_data: Optional[List[Dict]], overrides: Dict[str, Dict]) ->
     # Start with API devices
     if api_data:
         for d in api_data:
-            mac = normalize_mac(d["id"])
+            mac = get_mac_suffix(d["id"], 12)  # Use last 12 chars to match ble_decoder
             seen_macs.add(mac)
             
             device = {
