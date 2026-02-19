@@ -69,10 +69,13 @@ def load_devices():
     
     # Apply local overrides
     override_file = os.path.join(os.path.dirname(__file__), "..", "telegraf", "conf.d", "device-overrides.json")
+    print(f"DEBUG: Looking for override file at: {override_file}")
+    print(f"DEBUG: File exists: {os.path.exists(override_file)}")
     if os.path.exists(override_file):
         try:
             with open(override_file) as f:
                 overrides = json.load(f)
+            print(f"DEBUG: Loaded override data: {overrides}")
             override_count = 0
             for mac_full, override_data in overrides.items():
                 if mac_full.startswith("_"):  # Skip JSON comments

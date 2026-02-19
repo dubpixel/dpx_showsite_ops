@@ -77,6 +77,10 @@ def save_overrides(data: Dict[str, Dict]) -> bool:
         
         # Atomic rename
         os.rename(temp_path, override_path)
+        
+        # Set readable permissions for Docker container
+        os.chmod(override_path, 0o644)
+        
         return True
     except Exception as e:
         print(f"Error saving overrides: {e}", file=sys.stderr)
