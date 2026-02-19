@@ -251,8 +251,11 @@ case "$1" in
     fi
     
     cd "$REPO_ROOT"
+    # Export variables from .env file so Python can access them
     if [ -f "$REPO_ROOT/.env" ]; then
+      set -a
       source "$REPO_ROOT/.env"
+      set +a
     fi
     python3 "$SCRIPT_DIR/backup-grafana-dashboards.py"
     ;;
