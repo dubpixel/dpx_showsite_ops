@@ -691,7 +691,8 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     showsite = get_env_value("SHOWSITE_NAME", "demo_showsite")
     
     for h in sources_to_delete:
-        predicate = f'device_name="{old_name}" and z_device_id=~/{mac_suffix}$/'
+        # Note: delete command doesn't support regex, use simple device_name match
+        predicate = f'device_name="{old_name}"'
         print(f"Source: {h['source']}")
         print(f"Predicate: {predicate}")
         print(f"Estimated rows: {h['count']}")
@@ -714,8 +715,9 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         # Execute deletions
         deleted_count = 0
         for h in sources_to_delete:
-            predicate = f'device_name="{old_name}" and z_device_id=~/{mac_suffix}$/'
-            
+            # InfluxDB delete only supports basic operators, not regex
+            # device_name is unique enough since we queried by MAC
+            predicate = f'device_name="{old_name}"'            
             cmd = [
                 "docker", "exec", "influxdb", "influx", "delete",
                 "--org", org,
