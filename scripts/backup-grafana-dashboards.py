@@ -130,9 +130,9 @@ def main():
         safe_title = re.sub(r'[-\s]+', '-', safe_title).strip('-')
         safe_title = safe_title[:50]  # Limit length
         
-        # Save to file with format: dashboard-{safe-title}-{uid}-{timestamp}.json
-        filename = f"dashboard-{safe_title}-{uid}-{timestamp}.js.json
-        filename = f"dashboard-{safe_title}-{uid
+        # Save to file with format: dashboard-{safe-title}-{uid}.json
+        filename = f"dashboard-{safe_title}-{uid}.json"
+        filepath = BACKUP_DIR / filename
         
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
