@@ -63,12 +63,24 @@ def fetch_dashboards():
 
 
 def fetch_dashboard(uid):
-    """Fetch full dashboard JSON by UID."""
+    """Fetch full dashboard JSON by UID.
+    
+    Extracts the 'dashboard' object from Grafana's API response wrapper.
+    API returns: {"meta": {...}, "dashboard": {...}}
+    We need only the dashboard object for classic format export.
+    """
     url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
     try:
         response = requests.get(url, auth=(GRAFANA_USER, GRAFANA_PASSWORD), timeout=10)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        
+        # Extract dashboard from API wrapper
+        if 'dashboard' in data:
+            return data['dashboard']
+        else:
+            print(f"WARNING: Unexpected API response format for {uid}")
+            return data  # Fallback to full response
     except requests.exceptions.RequestException as e:
         print(f"ERROR: Failed to fetch dashboard {uid}: {e}")
         return None

@@ -223,21 +223,32 @@ sudo pip3 install requests
 **Backup dashboards:**
 ```bash
 iot backup-dashboards     # Fetches all dashboards via API
-                          # Saves to ~/backups/grafana/dashboards/YYYY-MM-DD/
+                          # Saves to ~/backups/grafana/dashboards/YYYY-MM-DD-HHMMSS/
 ```
 
 **Convert to provisioning format:**
 ```bash
-# Interactive picker - shows list of backups to choose from
+# Interactive picker - shows backups grouped by session
 iot provision-dashboard
 
 # Or specify file directly
-iot provision-dashboard ~/backups/grafana/dashboards/2026-02-18/dashboard-abc123.json
+iot provision-dashboard ~/backups/grafana/dashboards/2026-02-18-120000/dashboard-abc123.json
 
 # Auto-detects format (v2beta1 or legacy JSON)
 # Removes instance-specific metadata (version, id, timestamps)
 # Saves to grafana/provisioning/dashboards/
 # Grafana auto-loads within 10 seconds
+```
+
+**Remove from provisioning:**
+```bash
+# Interactive picker - shows all provisioned dashboards
+iot deprovision-dashboard
+
+# Or specify file directly
+iot deprovision-dashboard grafana/provisioning/dashboards/dashboard-xyz.json
+
+# Grafana auto-removes dashboard within 10 seconds
 ```
 
 **Optional daily backups:**
@@ -249,8 +260,9 @@ iot remove-dashboard-cron   # Remove cron job
 **Workflow:**
 1. Make dashboard changes in Grafana UI
 2. Run `iot backup-dashboards` to export
-3. Run `iot provision-dashboard <file>` to convert
+3. Run `iot provision-dashboard` to convert (interactive picker)
 4. Git commit the provisioned file for version control
+5. Run `iot deprovision-dashboard` to remove old versions (optional)
 
 ### Troubleshooting
 
