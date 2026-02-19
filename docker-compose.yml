@@ -67,12 +67,16 @@ services:
     networks:
       - iot
   telegraf:
-    image: telegraf:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.telegraf
+    image: telegraf-snmp:latest
     container_name: telegraf
     restart: unless-stopped
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
       - ./telegraf/conf.d:/etc/telegraf/telegraf.d:ro
+      - ./telegraf/mibs:/usr/share/snmp/mibs:ro
     command: --config /etc/telegraf/telegraf.conf --config-directory /etc/telegraf/telegraf.d
     environment:
       - TZ=${TZ} 

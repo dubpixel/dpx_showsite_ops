@@ -1,0 +1,22 @@
+# Custom Telegraf image with SNMP tools for MIB support
+FROM telegraf:latest
+
+# Enable non-free repository for snmp-mibs-downloader
+# Modify any existing sources files to add non-free components
+RUN find /etc/apt/sources.list.d -name "*.sources" -exec sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/g' {} \; || true && \
+    find /etc/apt/sources.list.d -name "*.list" -exec sed -i 's/ main$/ main contrib non-free non-free-firmware/g' {} \; || true
+
+# Install SNMP utilities and standard MIBs
+RUN apt-get update && \
+    apt-get install -y snmp libsnmp-dev snmp-mibs-downloader && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Enable MIB loading by commenting out "mibs :" restriction
+RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || echo "# MIBs enabled" > /etc/snmp/snmp.conf
+
+# Download standard IETF/IANA MIBs
+RUN download-mibs
+
+# Set MIBDIRS environment variable to include downloaded MIBs and Geist MIBs
+ENV MIBDIRS=/var/lib/mibs/ietf:/var/lib/mibs/iana:/usr/share/snmp/mibs:/usr/share/snmp/mibs/geist
