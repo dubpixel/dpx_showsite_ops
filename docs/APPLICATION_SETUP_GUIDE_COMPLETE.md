@@ -1445,9 +1445,15 @@ snmpget -v2c -c public 10.0.10.162 1.3.6.1.4.1.21239.5.1.1.7.0
 
 The Geist Watchdog integration is pre-configured in this repository:
 
-**File created**: `telegraf/conf.d/geist-watchdog.conf`
+**Files created:**
+- `telegraf/conf.d/geist-watchdog.conf` - SNMP polling configuration
+- `Dockerfile.telegraf` - Custom Telegraf image with SNMP tools
+- `telegraf/mibs/geist/` - Geist MIB files
+- `docker-compose.yml` - Updated to build custom Telegraf image
 
 **What it does**:
+- **Automatically installs SNMP packages**: The Dockerfile builds a custom Telegraf image with `snmp`, `libsnmp-dev`, and `snmp-mibs-downloader` pre-installed (no manual installation needed)
+- **Mounts MIB files**: Standard IETF/IANA MIBs + Geist-specific MIB for OID resolution
 - Polls device every 30 seconds via SNMP
 - Auto-discovers all connected sensors (internal + remote)
 - Scales temperature from 0.1 degrees to readable values
@@ -1460,6 +1466,7 @@ The Geist Watchdog integration is pre-configured in this repository:
 ```bash
 cd ~/dpx_showsite_ops
 cat telegraf/conf.d/geist-watchdog.conf
+cat Dockerfile.telegraf  # Custom image with SNMP support
 ```
 
 **Key settings**:

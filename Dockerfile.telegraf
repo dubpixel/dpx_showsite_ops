@@ -1,11 +1,14 @@
 # Custom Telegraf image with SNMP tools for MIB support
 FROM telegraf:latest
 
-# Install SNMP utilities for MIB parsing
+# Enable non-free repository for snmp-mibs-downloader
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/non-free.list
+
+# Install SNMP utilities and standard MIBs
 RUN apt-get update && \
-    apt-get install -y snmp libsnmp-dev && \
+    apt-get install -y snmp libsnmp-dev snmp-mibs-downloader && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Enable MIB loading (comment out the "mibs :" line in snmp.conf if it exists)
-RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || true
+# Enable MIB loading by commenting out "mibs :" restriction
+RUN sed -i 's/^mibs :/#mibs :/g' /etc/snmp/snmp.conf 2>/dev/null || echo "# MIBs enabled" > /etc/snmp/snmp.conf
