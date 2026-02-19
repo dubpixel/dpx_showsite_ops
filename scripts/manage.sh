@@ -234,6 +234,65 @@ case "$1" in
     fi
     ;;
 
+  backup-dashboards)
+    echo "Backing up Grafana dashboards..."
+    
+    # Check if requests library is installed
+    if ! python3 -c "import requests" 2>/dev/null; then
+      echo ""
+      echo "ERROR: Python 'requests' library not installed on server"
+      echo ""
+      echo "Install it with (on this server):"
+      echo "  sudo pip3 install requests"
+      echo "  # or: sudo apt install python3-requests"
+      echo ""
+      echo "See README.md 'Dashboard Backup & Provisioning' section"
+      exit 1
+    fi
+    
+    cd "$REPO_ROOT"
+    # Export variables from .env file so Python can access them
+    if [ -f "$REPO_ROOT/.env" ]; then
+      set -a
+      source "$REPO_ROOT/.env"
+      set +a
+    fi
+    python3 "$SCRIPT_DIR/backup-grafana-dashboards.py"
+    ;;
+  
+  provision-dashboard)
+    if [ -z "$2" ]; then
+      # No file provided - run interactive picker
+      python3 "$SCRIPT_DIR/provision-dashboard.py"
+    else
+      # File path provided - convert it
+      python3 "$SCRIPT_DIR/provision-dashboard.py" "$2"
+    fi
+    ;;
+  
+  deprovision-dashboard)
+    if [ -z "$2" ]; then
+      # No file provided - run interactive picker
+      python3 "$SCRIPT_DIR/deprovision-dashboard.py"
+    else
+      # File path provided - remove it
+      python3 "$SCRIPT_DIR/deprovision-dashboard.py" "$2"
+    fi
+    ;;
+  
+  setup-dashboard-cron)
+    CRON_CMD="0 2 * * * cd $REPO_ROOT && source $REPO_ROOT/.env && python3 $SCRIPT_DIR/backup-grafana-dashboards.py >> /var/log/grafana-backup.log 2>&1"
+    (crontab -l 2>/dev/null | grep -v backup-grafana-dashboards; echo "$CRON_CMD") | crontab -
+    echo "✓ Dashboard backup cron job installed"
+    echo "  Schedule: Daily at 2:00 AM"
+    echo "  Log: /var/log/grafana-backup.log"
+    ;;
+  
+  remove-dashboard-cron)
+    crontab -l 2>/dev/null | grep -v backup-grafana-dashboards | crontab -
+    echo "✓ Dashboard backup cron job removed"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
@@ -311,6 +370,15 @@ case "$1" in
     echo "    ip                     Show VM IP address"
     echo "    web                    Show all service URLs"
     echo "    tunnel                 Start Cloudflare tunnel to Grafana"
+    echo ""
+    echo "  GRAFANA DASHBOARDS"
+    echo "    backup-dashboards      Fetch all dashboards via API → ~/backups/grafana/dashboards/YYYY-MM-DD-HHMMSS/"
+    echo "    provision-dashboard [file]  Convert backup to provisioning format"
+    echo "                           No args = interactive picker (grouped by backup session) | With file = convert that file"
+    echo "    deprovision-dashboard [file]  Remove dashboard from provisioning directory"
+    echo "                           No args = interactive picker | With file = remove that file"
+    echo "    setup-dashboard-cron   Install daily cron job for automatic dashboard backups"
+    echo "    remove-dashboard-cron  Remove automatic dashboard backup cron job"
     echo ""
     echo "  MAINTENANCE"
     echo "    backup                 Backup Grafana + InfluxDB volumes to ~/backups/"
