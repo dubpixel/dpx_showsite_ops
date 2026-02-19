@@ -37,6 +37,9 @@ temp/
 # Telegraf backups
 telegraf/backups/
 
+# Device name overrides (local only)
+telegraf/conf.d/device-overrides.json
+
 # Local backup/temp files
 .env_bu
 hostname

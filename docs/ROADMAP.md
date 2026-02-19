@@ -77,6 +77,30 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
+## ✅ Phase 2.8: Device Name Override System (Completed)
+
+**Goal**: Provide persistent local device renaming independent of Govee Cloud API
+
+**What we built:**
+- Local JSON override file (`device-overrides.json`) with MAC → name/room mappings
+- Python helper script (`manage-devices.py`) for override management
+- Interactive rename commands (`iot rename-device`, `iot set-room`, `iot clear-override`)
+- Auto-detection of bad names with heuristic pattern matching
+- BLE decoder and Telegraf both load overrides on startup
+- Graceful degradation when govee2mqtt API is offline
+- Override file excluded from git tracking (local-only configuration)
+
+**Benefits:**
+- Replace auto-generated garbage names (e.g., `h5075_5a9`) with meaningful labels
+- Overrides survive `iot update` commands and service restarts
+- Works offline if Govee Cloud API is unavailable
+- Interactive menu-driven UI (no typing MAC addresses)
+- Automatic service restart prompts after rename
+
+**Status**: ✅ Complete - override system operational
+
+---
+
 ## 🚧 Phase 3: Deployment & Documentation (In Progress)
 
 **Goal**: Make the stack reproducible and shareable
@@ -404,7 +428,20 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] Grafana dashboard showing real-time sync status
 - [ ] rs-ltc-qc reports integrated into monitoring stack
 
-### Phase 11: Alert System
+### Phase 11: Device Override Backup & Sync
+- Backup device-overrides.json to cloud storage or scruot
+- Sync overrides across multiple showsite deployments
+- Version control integration for team collaboration
+- Optional removal of .gitignore for committed overrides
+- Merge conflict resolution for multi-operator scenarios
+
+**Success Metrics**:
+- [ ] Automated backup of device-overrides.json to external storage
+- [ ] Cross-site synchronization of device naming conventions
+- [ ] Conflict resolution strategy for simultaneous edits
+- [ ] Recovery time <1 minute for override restore
+
+### Phase 12: Alert System
 - Slack/Discord/email notifications
 - Temperature threshold alerts
 - Device offline detection
@@ -412,13 +449,13 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Schedule slip notifications
 - LTC sync loss alerts
 
-### Phase 12: Multi-Site Support
+### Phase 13: Multi-Site Support
 - Replicate stack to additional show sites
 - Centralized monitoring dashboard
 - Site comparison views
 - Federated data queries
 
-### Phase 13: Additional Sensor Types
+### Phase 14: Additional Sensor Types
 - Motion sensors (PIR)
 - Light sensors
 - Door/window sensors

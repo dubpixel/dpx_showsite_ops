@@ -11,9 +11,13 @@ LOG="$REPO_ROOT/scripts/update-device-map.log"
 mkdir -p "$(dirname "$CONF")"
 mkdir -p "$(dirname "$LOG")"
 
-DEVICES=$(curl -s --max-time 10 "$API")
-if [ -z "$DEVICES" ] || [ "$DEVICES" = "[]" ]; then
-  echo "$(date) - Failed to fetch devices. Skipping." >> "$LOG"
+# Use manage-devices.py to merge API data with local overrides
+DEVICES=$(python3 "$SCRIPT_DIR/manage-devices.py" merge 2>&1 | grep -v "^Applied")
+MERGE_EXIT=$?
+
+# Check for errors
+if [ $MERGE_EXIT -ne 0 ] || [ -z "$DEVICES" ] || [ "$DEVICES" = "[]" ]; then
+  echo "$(date) - Failed to fetch/merge devices. Skipping." >> "$LOG"
   exit 1
 fi
 
@@ -49,7 +53,7 @@ ${ROOM_MAPPINGS}
 EOF
 
 docker compose -f "$REPO_ROOT/docker-compose.yml" restart telegraf
-echo "$(date) - Device mappings updated:" >> "$LOG"
+echo "$(date) - Device mappings updated (with overrides):" >> "$LOG"
 echo "$DEVICES" | python3 -c "
 import json, sys
 for d in json.load(sys.stdin):

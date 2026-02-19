@@ -49,7 +49,7 @@ DEVICES = {}
 
 
 def load_devices():
-    """Load device info from govee2mqtt API."""
+    """Load device info from govee2mqtt API and apply local overrides."""
     try:
         resp = urllib.request.urlopen(API, timeout=5)
         devices = json.loads(resp.read())
@@ -67,6 +67,39 @@ def load_devices():
     except Exception as e:
         print(f"Failed to load devices: {e}")
         print("Continuing with empty device map...")
+    
+    # Apply local overrides
+    override_file = os.path.join(os.path.dirname(__file__), "..", "telegraf", "conf.d", "device-overrides.json")
+    if os.path.exists(override_file):
+        try:
+            with open(override_file) as f:
+                overrides = json.load(f)
+            override_count = 0
+            for mac_full, override_data in overrides.items():
+                if mac_full.startswith("_"):  # Skip JSON comments
+                    continue
+                mac_suffix = mac_full[-12:]  # Match by suffix like API devices
+                if mac_suffix in DEVICES:
+                    # Update existing device
+                    if "name" in override_data:
+                        DEVICES[mac_suffix]["name"] = override_data["name"]
+                    if "room" in override_data:
+                        DEVICES[mac_suffix]["room"] = override_data["room"]
+                    if "sku" in override_data:
+                        DEVICES[mac_suffix]["sku"] = override_data["sku"]
+                    override_count += 1
+                elif "name" in override_data:
+                    # Add override-only device (not in API)
+                    DEVICES[mac_suffix] = {
+                        "name": override_data["name"],
+                        "room": override_data.get("room", "unassigned"),
+                        "sku": override_data.get("sku", "unknown")
+                    }
+                    override_count += 1
+            if override_count > 0:
+                print(f"Applied {override_count} device override(s)")
+        except Exception as e:
+            print(f"Warning: Failed to load overrides: {e}")
 
 
 def decode_h5051(b):
