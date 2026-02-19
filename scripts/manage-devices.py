@@ -532,10 +532,16 @@ from(bucket: "{bucket}")
         # Group by device_name and source
         device_data = {}
         
-        # Skip empty lines and parse CSV
-        csv_lines = [line for line in lines if line.strip()]
+        # Skip empty lines and InfluxDB comment lines (starting with #)
+        csv_lines = [line for line in lines if line.strip() and not line.startswith('#')]
         if not csv_lines:
+            if debug:
+                print(f"DEBUG: No CSV data lines after filtering (all comments/empty)", file=sys.stderr)
             return []
+        
+        if debug:
+            print(f"DEBUG: CSV data lines after filtering: {len(csv_lines)}", file=sys.stderr)
+            print(f"DEBUG: First CSV line: {csv_lines[0][:200]}", file=sys.stderr)
         
         reader = csv.DictReader(csv_lines)
         
