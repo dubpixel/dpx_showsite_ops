@@ -491,7 +491,7 @@ from(bucket: "{bucket}")
   |> filter(fn: (r) => r["_measurement"] == "mqtt_consumer")
   |> filter(fn: (r) => r["z_device_id"] =~ /{mac_suffix}$/)
   |> filter(fn: (r) => exists r.device_name)
-  |> keep(columns: ["_time", "device_name", "source", "z_device_id"])
+  |> keep(columns: ["_time", "device_name", "room", "source", "z_device_id"])
 '''
     
     try:
@@ -550,13 +550,14 @@ from(bucket: "{bucket}")
                 continue
             
             device_name = row.get('device_name', '').strip()
+            room = row.get('room', '').strip()
             source = row.get('source', '').strip()
             timestamp = row.get('_time', '').strip()
             
             if not device_name or not source:
                 continue
             
-            key = (device_name, source)
+            key = (device_name, room, source)
             
             if key not in device_data:
                 device_data[key] = {
@@ -567,13 +568,14 @@ from(bucket: "{bucket}")
                 device_data[key]['timestamps'].append(timestamp)
         
         if debug:
-            print(f"DEBUG: Found {len(device_data)} unique (device_name, source) combinations", file=sys.stderr)
+            print(f"DEBUG: Found {len(device_data)} unique (device_name, room, source) combinations", file=sys.stderr)
         
         # Convert to result format
-        for (device_name, source), data in device_data.items():
+        for (device_name, room, source), data in device_data.items():
             timestamps = sorted(data['timestamps']) if data['timestamps'] else []
             results.append({
                 'device_name': device_name,
+                'room': room,
                 'source': source,
                 'count': len(timestamps),
                 'first_seen': timestamps[0] if timestamps else 'unknown',
@@ -629,18 +631,18 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     
     if current_entries:
         print("CURRENT NAME (keep this):")
-        print(f"{'  device_name':<27} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
-        print("  " + "─" * 108)
+        print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
+        print("  " + "─" * 125)
         for h in current_entries:
-            print(f"  {h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
+            print(f"  {h['device_name']:<25} {h['room']:<20} {h['source']:<17} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
         print()
     
     if old_entries:
         print("OLD NAME(S) (delete these to fix Grafana duplicates):")
-        print(f"{'  device_name':<27} {'source':<20} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
-        print("  " + "─" * 108)
+        print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
+        print("  " + "─" * 125)
         for h in old_entries:
-            print(f"  {h['device_name']:<25} {h['source']:<20} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
+            print(f"  {h['device_name']:<25} {h['room']:<20} {h['source']:<17} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
         print()
     
     # If only one old name, suggest it
@@ -676,8 +678,27 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         
         break
     
-    # Get sources that have this device_name
-    sources_to_delete = [h for h in history if h['device_name'] == old_name]
+    # Optional room filter for stuck/glitched devices
+    old_room = None
+    rooms_for_old_name = list(set(h['room'] for h in history if h['device_name'] == old_name))
+    
+    if len(rooms_for_old_name) > 1:
+        print(f"\n💡 This device_name appears in multiple rooms: {', '.join(rooms_for_old_name)}")
+        print("   You can optionally filter by room to target stuck/glitched data.")
+        room_input = input("\nFilter by room? [leave blank for all rooms]: ").strip()
+        
+        if room_input:
+            old_room = room_input.lower().replace(" ", "_")
+            if old_room not in rooms_for_old_name:
+                print(f"⚠ Warning: room '{old_room}' not found in history, will still use it as filter")
+    
+    # Get sources that have this device_name (and optionally room)
+    if old_room:
+        sources_to_delete = [h for h in history if h['device_name'] == old_name and h['room'] == old_room]
+        print(f"\n✓ Filtering deletion to device_name='{old_name}' AND room='{old_room}'")
+    else:
+        sources_to_delete = [h for h in history if h['device_name'] == old_name]
+    
     total_count = sum(h['count'] for h in sources_to_delete)
     
     # Display dry-run information
@@ -689,11 +710,17 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     org = get_env_value("INFLUX_ORG", "home")
     bucket = get_env_value("INFLUX_BUCKET", "sensors")
     showsite = get_env_value("SHOWSITE_NAME", "demo_showsite")
+    debug = os.getenv("DEBUG_DEVICE_DELETE", "").lower() in ["1", "true", "yes"]
     
     for h in sources_to_delete:
-        # Note: delete command doesn't support regex, use simple device_name match
-        predicate = f'device_name="{old_name}"'
+        # Build predicate with MAC filter (critical!) and optional room filter
+        predicate = f'device_name="{old_name}" AND z_device_id=~/{mac_suffix}$/'
+        if old_room:
+            predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id=~/{mac_suffix}$/'
+        
         print(f"Source: {h['source']}")
+        if old_room:
+            print(f"Room: {h['room']}")
         print(f"Predicate: {predicate}")
         print(f"Estimated rows: {h['count']}")
         print()
@@ -715,9 +742,11 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         # Execute deletions
         deleted_count = 0
         for h in sources_to_delete:
-            # InfluxDB delete only supports basic operators, not regex
-            # device_name is unique enough since we queried by MAC
-            predicate = f'device_name="{old_name}"'            
+            # Build predicate with MAC filter (CRITICAL!) and optional room filter
+            predicate = f'device_name="{old_name}" AND z_device_id=~/{mac_suffix}$/'
+            if old_room:
+                predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id=~/{mac_suffix}$/'
+            
             cmd = [
                 "docker", "exec", "influxdb", "influx", "delete",
                 "--org", org,
@@ -728,8 +757,18 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
                 "--predicate", predicate
             ]
             
+            if debug:
+                print(f"\nDEBUG: Deleting from source '{h['source']}'", file=sys.stderr)
+                print(f"DEBUG: Predicate: {predicate}", file=sys.stderr)
+                print(f"DEBUG: Command: {' '.join(cmd)}", file=sys.stderr)
+            
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                
+                if debug:
+                    print(f"DEBUG: returncode={result.returncode}", file=sys.stderr)
+                    print(f"DEBUG: stdout={result.stdout}", file=sys.stderr)
+                    print(f"DEBUG: stderr={result.stderr}", file=sys.stderr)
                 
                 if result.returncode == 0:
                     print(f"  ✓ Deleted from source: {h['source']}")
@@ -761,6 +800,29 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         print()
         print(f"✓ Deleted data for device_name='{old_name}' ({total_count} rows across {deleted_count} source(s))")
         print(f"✓ MQTT retained messages cleared")
+        
+        # Verify deletion by re-querying
+        print("\n🔍 Verifying deletion...")
+        verification_history = query_device_name_history(mac_suffix)
+        still_exists = [h for h in verification_history if h['device_name'] == old_name]
+        
+        if old_room:
+            still_exists = [h for h in still_exists if h['room'] == old_room]
+        
+        if still_exists:
+            remaining_count = sum(h['count'] for h in still_exists)
+            print(f"\n⚠ WARNING: Found {remaining_count} rows still in InfluxDB after deletion!")
+            print("\nPossible causes:")
+            print("  1. Telegraf replayed retained MQTT messages")
+            print("  2. Device is still broadcasting with old name")
+            print("  3. InfluxDB deletion is still processing (wait a few seconds)")
+            print("\nRecommended actions:")
+            print("  1. Verify MQTT retained messages were cleared")
+            print("  2. Restart Telegraf: iot restart telegraf")
+            print("  3. Wait 30 seconds and run delete-device-data again")
+        else:
+            print("✓ Verification passed - no data remains for deleted device_name")
+        
         print()
         print("Recommendation: Restart Telegraf to verify ghost data doesn't reappear:")
         print("  iot restart telegraf")
