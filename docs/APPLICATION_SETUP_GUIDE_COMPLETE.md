@@ -509,6 +509,32 @@ Before proceeding to Docker deployment, verify everything is working:
 
 **If all checks pass, your VM is ready!**
 
+**Troubleshooting: Can't ping from VM to Windows host?**
+
+If you can ping **from Windows to the VM** but **not from the VM to Windows**, this is a Windows Firewall issue.
+
+**On the Windows host**, run PowerShell as Administrator:
+
+```powershell
+New-NetFirewallRule -DisplayName "Allow ICMPv4-In" -Protocol ICMPv4 -IcmpType 8 -Enabled True -Direction Inbound -Action Allow
+```
+
+**Alternative (GUI method)**:
+1. Open **Windows Defender Firewall with Advanced Security**
+2. **Inbound Rules** → **New Rule**
+3. Rule Type: **Custom**
+4. Protocol: **ICMPv4** → Customize → **Echo Request**
+5. Scope: **Any IP** (or restrict to 192.168.1.0/24)
+6. Action: **Allow**
+7. Name: "Allow Ping" → Finish
+
+**Test from VM**:
+```bash
+ping <windows-ip>  # e.g., ping 192.168.1.31
+```
+
+Should now respond successfully.
+
 ### 3.10: Quick Reference
 
 Keep this handy for future access:
