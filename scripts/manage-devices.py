@@ -474,7 +474,8 @@ def interactive_clear_override(device: Dict) -> bool:
 def query_device_name_history(mac_suffix: str) -> List[Dict]:
     """
     Query InfluxDB for all historical device_name values for a given MAC.
-    Returns list of dicts with device_name, source, count, first_seen, last_seen.
+    Returns list of dicts with device_name, room, source, count, first_seen, last_seen.
+    Note: Query uses regex =~ but delete predicates must use exact = match.
     """
     token = get_env_value("INFLUX_TOKEN", "my-super-secret-token")
     org = get_env_value("INFLUX_ORG", "home")
@@ -714,9 +715,10 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     
     for h in sources_to_delete:
         # Build predicate with MAC filter (critical!) and optional room filter
-        predicate = f'device_name="{old_name}" AND z_device_id=~/{mac_suffix}$/'
+        # Note: InfluxDB delete only supports = and !=, not regex =~
+        predicate = f'device_name="{old_name}" AND z_device_id="{mac_suffix}"'
         if old_room:
-            predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id=~/{mac_suffix}$/'
+            predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
         
         print(f"Source: {h['source']}")
         if old_room:
@@ -743,9 +745,10 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         deleted_count = 0
         for h in sources_to_delete:
             # Build predicate with MAC filter (CRITICAL!) and optional room filter
-            predicate = f'device_name="{old_name}" AND z_device_id=~/{mac_suffix}$/'
+            # Note: InfluxDB delete only supports = and !=, not regex =~
+            predicate = f'device_name="{old_name}" AND z_device_id="{mac_suffix}"'
             if old_room:
-                predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id=~/{mac_suffix}$/'
+                predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
             
             cmd = [
                 "docker", "exec", "influxdb", "influx", "delete",
