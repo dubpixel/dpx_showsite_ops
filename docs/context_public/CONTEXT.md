@@ -391,8 +391,10 @@ Dashboard
 - Container: ble-decoder (auto-starts with stack)
 - Management: `iot ble-up/down/restart/rebuild/logs` or `iot lb`
 - Manual debug mode: `iot ble-decode` (requires python3-paho-mqtt on host)
+- Subscribes to both ESP32 (`+/BTtoMQTT/#`) and Theengs (`home/TheengsGateway/BTtoMQTT/#`) gateway patterns
 - Both dpx_ops_1 (ESP32) and TheengsGateway sources operational
 - Uses `retain=True` on published topics
+- **Critical**: ESP32 gateway `pubadvdata` setting resets on reboot - must re-enable or manufacturerdata stops flowing
 
 ### MQTT Topics
 
@@ -422,6 +424,11 @@ demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/temperature  �
 demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/humidity     → 51.19
 demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/battery      → 100
 ```
+
+**Topic path breakdown:**
+- **Inbound** (gateway → decoder): `{base}/{gateway_name}/BTtoMQTT/{MAC}`
+- **Outbound** (decoder → Telegraf): `{site}/dpx_ops_decoder/{source_node}/{room}/{device_name}/{MAC}/{metric}`
+- Room and device_name come from Govee API, source_node extracted from inbound topic
 
 ---
 
