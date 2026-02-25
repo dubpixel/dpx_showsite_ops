@@ -76,7 +76,8 @@ def validate_dashboard(data):
 
 
 def add_provision_prefix(data):
-    """Add [P] prefix to dashboard title to mark it as provisioned."""
+    """Add [P] prefix to dashboard title and modify UID to prevent conflicts."""
+    # Modify title
     title = data.get('title', 'untitled')
     
     # Check if already prefixed (case-insensitive)
@@ -86,6 +87,15 @@ def add_provision_prefix(data):
         print(f"  ✓ Added provision prefix: '{title}' → '{new_title}'")
     else:
         print(f"  ℹ Title already has [P] prefix: '{title}'")
+    
+    # Modify UID to prevent overwriting existing dashboards
+    uid = data.get('uid', '')
+    if uid and not uid.endswith('-p'):
+        new_uid = f"{uid}-p"
+        data['uid'] = new_uid
+        print(f"  ✓ Modified UID to prevent conflicts: '{uid}' → '{new_uid}'")
+    elif uid and uid.endswith('-p'):
+        print(f"  ℹ UID already has -p suffix: '{uid}'")
     
     return data
 
