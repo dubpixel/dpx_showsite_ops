@@ -31,6 +31,7 @@ case "$1" in
   query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
   query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} | ts '[%H:%M:%S]' ;;
+  watch-gv2) docker exec mosquitto mosquitto_sub -t "gv2mqtt/sensor/+/state" -v ${2:+-C $2} | ts '[%H:%M:%S]' ;;
   backup)
     mkdir -p ~/backups
     docker run --rm -v dpx_govee_stack_grafana-data:/data -v ~/backups:/backup alpine tar czf /backup/grafana-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
