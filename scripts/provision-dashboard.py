@@ -77,39 +77,47 @@ def validate_dashboard(data):
     return True
 
 
-def add_provision_prefix(data, uid_suffix=None):
-    """Add [P] prefix to dashboard title and modify UID to prevent conflicts.
+def apply_customizations(data, custom_title=None, custom_uid=None):
+    """Apply custom title and UID to dashboard.
     
     Args:
         data: Dashboard JSON data
-        uid_suffix: Optional friendly suffix for UID (e.g., 'v2', 'test')
-                   If not provided, generates random 5-char suffix
+        custom_title: Optional custom title (includes [P] prefix if not present)
+        custom_uid: Optional custom UID (if not provided, generates random)
     """
-    # Modify title
-    title = data.get('title', 'untitled')
+    # Handle title
+    original_title = data.get('title', 'untitled')
     
-    # Check if already prefixed (case-insensitive)
-    if not title.lower().startswith('[p]'):
-        new_title = f"[P] {title}"
+    if custom_title:
+        # Use custom title, add [P] prefix if not present
+        if not custom_title.lower().startswith('[p]'):
+            new_title = f"[P] {custom_title}"
+        else:
+            new_title = custom_title
         data['title'] = new_title
-        print(f"  ✓ Added provision prefix: '{title}' → '{new_title}'")
+        print(f"  ✓ Set custom title: '{original_title}' → '{new_title}'")
     else:
-        print(f"  ℹ Title already has [P] prefix: '{title}'")
+        # Add [P] prefix to existing title
+        if not original_title.lower().startswith('[p]'):
+            new_title = f"[P] {original_title}"
+            data['title'] = new_title
+            print(f"  ✓ Added provision prefix: '{original_title}' → '{new_title}'")
+        else:
+            print(f"  ℹ Title already has [P] prefix: '{original_title}'")
     
-    # Modify UID to make this provision unique
-    uid = data.get('uid', '')
+    # Handle UID
+    original_uid = data.get('uid', '')
     
-    if uid_suffix:
-        # Use provided friendly suffix
-        new_uid = f"{uid}-p-{uid_suffix}"
-        print(f"  ✓ Generated UID with custom suffix: '{uid}' → '{new_uid}'")
+    if custom_uid:
+        # Use custom UID as-is
+        data['uid'] = custom_uid
+        print(f"  ✓ Set custom UID: '{original_uid}' → '{custom_uid}'")
     else:
-        # Generate random suffix (5 lowercase letters/numbers)
-        random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
-        new_uid = f"{uid}-p{random_suffix}"
-        print(f"  ✓ Generated UID with random suffix: '{uid}' → '{new_uid}'")
+        # Generate random UID (8 chars, similar to Grafana style)
+        random_uid = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        data['uid'] = random_uid
+        print(f"  ✓ Generated random UID: '{original_uid}' → '{random_uid}'")
     
-    data['uid'] = new_uid
     return data
     
     return data
@@ -231,22 +239,31 @@ def main():
     print("Customization Options:")
     print("-" * 50)
     
-    # Prompt for friendly UID suffix
-    original_uid = data.get('uid', '')
-    print(f"Current UID: {original_uid}")
-    uid_suffix_input = input("Enter friendly UID suffix (e.g., 'v2', 'test', 'prod') or press Enter for random: ").strip()
-    uid_suffix = uid_suffix_input if uid_suffix_input else None
+    # Prompt 1: Dashboard title
+    original_title = data.get('title', 'untitled')
+    print(f"Current title: {original_title}")
+    custom_title_input = input("Enter new title (without [P] prefix) or press Enter to keep current: ").strip()
+    custom_title = custom_title_input if custom_title_input else None
     
-    # Prompt for custom filename
-    default_title = data.get('title', 'untitled')
-    safe_default = sanitize_filename(default_title)
+    # Prompt 2: Dashboard UID
+    original_uid = data.get('uid', '')
+    print(f"\nCurrent UID: {original_uid}")
+    custom_uid_input = input("Enter custom UID (e.g., 'sensor-v2', 'temp-prod') or press Enter for random: ").strip()
+    custom_uid = custom_uid_input if custom_uid_input else None
+    
+    # Prompt 3: Filename
+    # Use custom title if provided, otherwise use original/modified title
+    title_for_filename = custom_title if custom_title else original_title
+    if not title_for_filename.lower().startswith('[p]'):
+        title_for_filename = f"[P] {title_for_filename}"
+    safe_default = sanitize_filename(title_for_filename)
     print(f"\nDefault filename: dashboard-{safe_default}.json")
     custom_filename = input("Enter custom filename (without .json) or press Enter for default: ").strip()
     
     print()
     
-    # Add [P] prefix to mark as provisioned
-    data = add_provision_prefix(data, uid_suffix=uid_suffix)
+    # Apply customizations
+    data = apply_customizations(data, custom_title=custom_title, custom_uid=custom_uid)
     
     # Determine output path
     script_dir = Path(__file__).parent
