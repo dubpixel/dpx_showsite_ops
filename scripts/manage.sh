@@ -13,7 +13,25 @@ case "$1" in
   restart)  docker compose restart ${2:-} ;;
   status)   docker compose ps ;;
   fixnet)   sudo systemctl restart network-route-fix.service ;;
-  ble-decode) cd "$SCRIPT_DIR" && source "$REPO_ROOT/.env" && python3 ble_decoder.py ;;
+  ble-decode)
+    # Kill any existing instances first
+    if pgrep -f "python3.*ble_decoder.py" > /dev/null; then
+      PIDS=$(pgrep -f "python3.*ble_decoder.py")
+      echo "Found running ble_decoder.py instances (PIDs: $PIDS)"
+      echo "Stopping existing instances..."
+      pkill -f "python3.*ble_decoder.py"
+      sleep 1
+      # Force kill if any survived
+      if pgrep -f "python3.*ble_decoder.py" > /dev/null; then
+        echo "Force killing stubborn processes..."
+        pkill -9 -f "python3.*ble_decoder.py"
+        sleep 1
+      fi
+      echo "✓ Existing instances stopped"
+    fi
+    # Start new instance
+    cd "$SCRIPT_DIR" && source "$REPO_ROOT/.env" && python3 ble_decoder.py
+    ;;
   ble-up)   docker compose up -d ble-decoder ;;
   ble-down) docker compose stop ble-decoder ;;
   ble-restart) docker compose restart ble-decoder ;;

@@ -186,3 +186,32 @@ So future deployments know to set it.
 - **Dockerfile in `scripts/`**: Co-located with the decoder it builds, keeps root clean
 
 - **`SHOWSITE_NAME` from `.env`**: Single source of truth for the site name across docker-compose
+
+---
+
+## ✅ Completion Summary
+
+**Status**: Complete (2026-02-24)
+
+All steps implemented successfully:
+
+1. ✅ **Kill-guard for `iot ble-decode`**: Added process guard logic to prevent duplicate instances
+   - Detects running instances with `pgrep`
+   - Graceful SIGTERM with fallback to SIGKILL
+   - Clear user feedback on what's happening
+   
+2. ✅ **Environment variable configuration**: Implemented via Dockerfile `sed` replacement (alternative to source-level changes)
+
+3. ✅ **requirements-ble-decoder.txt**: Created with `paho-mqtt>=1.6.1,<2.0.0`
+
+4. ✅ **Dockerfile.ble-decoder**: Python 3.11-slim image with proper dependencies
+
+5. ✅ **docker-compose.yml integration**: Service added with proper networking via `host.docker.internal`
+
+6. ✅ **manage.sh updates**: `lb` log command, help text, all log aggregation
+
+7. ✅ **.env.example**: SHOWSITE_NAME variable added
+
+8. ✅ **Documentation updates**: CHANGELOG.md, ROADMAP.md, CONTEXT.md all updated
+
+**Final deliverable**: BLE decoder fully containerized and operational with both production (Docker) and debug (manual) modes supported.
