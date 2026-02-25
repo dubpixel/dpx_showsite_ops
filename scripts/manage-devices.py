@@ -631,18 +631,11 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     current_entries = [h for h in history if h['device_name'] == device['name']]
     old_entries = [h for h in history if h['device_name'] != device['name']]
     
-    if not old_entries:
-        print(f"No old data to delete. Only current device_name '{device['name']}' found.")
-        print("\nThis means:")
-        print(f"  - Device has NOT been renamed (or data was already cleaned up)")
-        print(f"  - All {sum(h['count'] for h in current_entries)} rows use current name '{device['name']}'")
-        return False
-    
     # Display table of historical data with clear OLD/CURRENT markers
     print(f"Found historical data for MAC {mac_suffix}:\n")
     
     if current_entries:
-        print("CURRENT NAME (keep this):")
+        print("CURRENT NAME:")
         print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
         print("  " + "─" * 125)
         for h in current_entries:
@@ -650,72 +643,148 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         print()
     
     if old_entries:
-        print("OLD NAME(S) (delete these to fix Grafana duplicates):")
+        print("OLD NAME(S):")
         print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
         print("  " + "─" * 125)
         for h in old_entries:
             print(f"  {h['device_name']:<25} {h['room']:<20} {h['source']:<17} {h['count']:<10} {h['first_seen']:<25} {h['last_seen']:<25}")
         print()
     
-    # If only one old name, suggest it
-    unique_old_names = list(set(h['device_name'] for h in old_entries))
+    # Prompt for deletion mode
+    print("Select deletion mode:")
+    print("  [O]ld     - Delete only OLD names (fix Grafana duplicates)")
+    print("  [C]urrent - Delete only CURRENT name (destructive!)")
+    print("  [A]ll     - Delete ALL data for this device MAC (nuclear option)")
+    print()
     
-    if len(unique_old_names) == 1:
-        suggested_name = unique_old_names[0]
-        print(f"💡 Suggestion: Delete '{suggested_name}' to remove ghost data")
-        print()
-    
-    # Prompt for device_name to delete
     while True:
-        if len(unique_old_names) == 1:
-            prompt = f"Enter device_name to delete [default: {suggested_name}] (or 'cancel'): "
-            old_name = input(prompt).strip()
-            if old_name == '':
-                old_name = suggested_name
-        else:
-            old_name = input("Enter device_name to delete (or 'cancel'): ").strip()
+        mode_input = input("Delete mode [O/C/A] (or 'cancel'): ").strip().lower()
         
-        if old_name.lower() in ['cancel', 'c']:
+        if mode_input in ['cancel', 'q', 'quit']:
             print("Cancelled")
             return False
         
-        if old_name == device['name']:
-            print(f"❌ Cannot delete CURRENT device_name '{device['name']}'. Choose an OLD name from the list above.")
-            continue
-        
-        # Check if this device_name exists in history
-        if not any(h['device_name'] == old_name for h in history):
-            print(f"❌ device_name '{old_name}' not found in history. Try again.")
-            continue
-        
-        break
+        if mode_input in ['o', 'old']:
+            delete_mode = 'old'
+            break
+        elif mode_input in ['c', 'current']:
+            delete_mode = 'current'
+            break
+        elif mode_input in ['a', 'all']:
+            delete_mode = 'all'
+            break
+        else:
+            print("❌ Invalid choice. Enter O, C, or A")
     
-    # Optional room filter for stuck/glitched devices
+    print()
+    
+    # Based on mode, determine what to delete
+    if delete_mode == 'old':
+        if not old_entries:
+            print(f"No old data to delete. Only current device_name '{device['name']}' found.")
+            return False
+        
+        # Prompt for specific old device_name to delete
+        unique_old_names = list(set(h['device_name'] for h in old_entries))
+        
+        if len(unique_old_names) == 1:
+            suggested_name = unique_old_names[0]
+            print(f"💡 Suggestion: Delete '{suggested_name}' to remove ghost data")
+            print()
+        
+        while True:
+            if len(unique_old_names) == 1:
+                prompt = f"Enter device_name to delete [default: {suggested_name}] (or 'cancel'): "
+                old_name = input(prompt).strip()
+                if old_name == '':
+                    old_name = suggested_name
+            else:
+                old_name = input("Enter device_name to delete (or 'cancel'): ").strip()
+            
+            if old_name.lower() in ['cancel', 'c']:
+                print("Cancelled")
+                return False
+            
+            if old_name == device['name']:
+                print(f"❌ Cannot delete CURRENT device_name '{device['name']}'. Choose an OLD name from the list above.")
+                continue
+            
+            # Check if this device_name exists in history
+            if not any(h['device_name'] == old_name for h in history):
+                print(f"❌ device_name '{old_name}' not found in history. Try again.")
+                continue
+            
+            break
+        
+        target_name = old_name
+        
+    elif delete_mode == 'current':
+        if not current_entries:
+            print(f"No current data found for device_name '{device['name']}'")
+            return False
+        
+        print(f"⚠️  WARNING: You are about to delete ALL data for CURRENT name '{device['name']}'")
+        print("   This will remove all historical data for this device's current identity!")
+        print()
+        confirm_current = input(f"Type the device name '{device['name']}' to confirm: ").strip()
+        
+        if confirm_current != device['name']:
+            print("Cancelled - device name did not match")
+            return False
+        
+        target_name = device['name']
+        old_name = target_name
+        
+    else:  # delete_mode == 'all'
+        print(f"⚠️  WARNING: You are about to delete ALL data for this device (all {len(history)} name/source combinations)")
+        print(f"   MAC: {device['mac']}")
+        print(f"   Total rows: {sum(h['count'] for h in history)}")
+        print()
+        confirm_mac = input(f"Type the last 12 chars of MAC '{mac_suffix}' to confirm: ").strip().upper()
+        
+        if confirm_mac != mac_suffix:
+            print("Cancelled - MAC suffix did not match")
+            return False
+        
+        target_name = None  # Will delete all names
+        old_name = None
+    
+    # Optional room filter for stuck/glitched devices (only for old/current modes)
     old_room = None
-    rooms_for_old_name = list(set(h['room'] for h in history if h['device_name'] == old_name))
     
-    if len(rooms_for_old_name) > 1:
-        print(f"\n💡 This device_name appears in multiple rooms: {', '.join(rooms_for_old_name)}")
-        print("   You can optionally filter by room to target stuck/glitched data.")
-        room_input = input("\nFilter by room? [leave blank for all rooms]: ").strip()
+    if delete_mode in ['old', 'current'] and target_name:
+        rooms_for_target = list(set(h['room'] for h in history if h['device_name'] == target_name))
         
-        if room_input:
-            old_room = room_input.lower().replace(" ", "_")
-            if old_room not in rooms_for_old_name:
-                print(f"⚠ Warning: room '{old_room}' not found in history, will still use it as filter")
+        if len(rooms_for_target) > 1:
+            print(f"\n💡 This device_name appears in multiple rooms: {', '.join(rooms_for_target)}")
+            print("   You can optionally filter by room to target stuck/glitched data.")
+            room_input = input("\nFilter by room? [leave blank for all rooms]: ").strip()
+            
+            if room_input:
+                old_room = room_input.lower().replace(" ", "_")
+                if old_room not in rooms_for_target:
+                    print(f"⚠ Warning: room '{old_room}' not found in history, will still use it as filter")
     
-    # Get sources that have this device_name (and optionally room)
-    if old_room:
-        sources_to_delete = [h for h in history if h['device_name'] == old_name and h['room'] == old_room]
-        print(f"\n✓ Filtering deletion to device_name='{old_name}' AND room='{old_room}'")
+    # Get sources to delete based on mode
+    if delete_mode == 'all':
+        # Delete everything for this MAC
+        sources_to_delete = history
+    elif old_room:
+        sources_to_delete = [h for h in history if h['device_name'] == target_name and h['room'] == old_room]
+        print(f"\n✓ Filtering deletion to device_name='{target_name}' AND room='{old_room}'")
     else:
-        sources_to_delete = [h for h in history if h['device_name'] == old_name]
+        sources_to_delete = [h for h in history if h['device_name'] == target_name]
     
     total_count = sum(h['count'] for h in sources_to_delete)
     
     # Display dry-run information
     print(f"\n{'='*80}")
-    print("DRY RUN - Will delete:")
+    if delete_mode == 'old':
+        print(f"DRY RUN - Will delete OLD NAME '{target_name}' for device:")
+    elif delete_mode == 'current':
+        print(f"DRY RUN - Will delete CURRENT NAME '{target_name}' for device:")
+    else:
+        print(f"DRY RUN - Will delete ALL DATA for device MAC {mac_suffix}:")
     print(f"{'='*80}\n")
     
     token = get_env_value("INFLUX_TOKEN", "my-super-secret-token")
@@ -725,20 +794,29 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     debug = os.getenv("DEBUG_DEVICE_DELETE", "").lower() in ["1", "true", "yes"]
     
     for h in sources_to_delete:
-        # Build predicate with MAC filter (critical!) and optional room filter
+        # Build predicate with MAC filter (critical!) and optional filters
         # Note: InfluxDB delete only supports = and !=, not regex =~
-        predicate = f'device_name="{old_name}" AND z_device_id="{mac_suffix}"'
-        if old_room:
-            predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
+        if delete_mode == 'all':
+            # Delete everything for this MAC
+            predicate = f'z_device_id="{mac_suffix}"'
+        elif old_room:
+            predicate = f'device_name="{target_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
+        else:
+            predicate = f'device_name="{target_name}" AND z_device_id="{mac_suffix}"'
         
         print(f"Source: {h['source']}")
+        print(f"Device name: {h['device_name']}")
         if old_room:
             print(f"Room: {h['room']}")
         print(f"Predicate: {predicate}")
         print(f"Estimated rows: {h['count']}")
         print()
     
-    print(f"MQTT cleanup: {showsite}/dpx_ops_decoder/*/*/{old_name}/#")
+    # MQTT cleanup message
+    if delete_mode == 'all':
+        print(f"MQTT cleanup: {showsite}/dpx_ops_decoder/*/*/*/#  (all names for this device)")
+    else:
+        print(f"MQTT cleanup: {showsite}/dpx_ops_decoder/*/*/{target_name}/#")
     print(f"\nTotal estimated rows: {total_count} across {len(sources_to_delete)} source(s)")
     print(f"{'='*80}\n")
     
@@ -755,11 +833,14 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         # Execute deletions
         deleted_count = 0
         for h in sources_to_delete:
-            # Build predicate with MAC filter (CRITICAL!) and optional room filter
+            # Build predicate with MAC filter (CRITICAL!) and optional filters
             # Note: InfluxDB delete only supports = and !=, not regex =~
-            predicate = f'device_name="{old_name}" AND z_device_id="{mac_suffix}"'
-            if old_room:
-                predicate = f'device_name="{old_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
+            if delete_mode == 'all':
+                predicate = f'z_device_id="{mac_suffix}"'
+            elif old_room:
+                predicate = f'device_name="{target_name}" AND room="{old_room}" AND z_device_id="{mac_suffix}"'
+            else:
+                predicate = f'device_name="{target_name}" AND z_device_id="{mac_suffix}"'
             
             cmd = [
                 "docker", "exec", "influxdb", "influx", "delete",
@@ -796,46 +877,67 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
                 print(f"  ❌ Error deleting from {h['source']}: {e}")
         
         # Clear MQTT retained messages
-        print(f"\nClearing MQTT retained messages for '{old_name}'...")
-        mqtt_pattern = f"{showsite}/dpx_ops_decoder/*/*/{old_name}/#"
+        if delete_mode == 'all':
+            print(f"\nClearing ALL MQTT retained messages for device MAC {mac_suffix}...")
+            # For 'all' mode, we'd need to know all device names to clear MQTT properly
+            # For now, skip MQTT cleanup in 'all' mode since we don't track all names
+            mqtt_pattern = None
+        else:
+            print(f"\nClearing MQTT retained messages for '{target_name}'...")
+            mqtt_pattern = f"{showsite}/dpx_ops_decoder/*/*/{target_name}/#"
         
-        try:
-            mqtt_cmd = ["iot", "clear-retained", mqtt_pattern]
-            mqtt_result = subprocess.run(mqtt_cmd, capture_output=True, text=True, timeout=30)
+        if mqtt_pattern:
+            try:
+                mqtt_cmd = ["iot", "clear-retained", mqtt_pattern]
+                mqtt_result = subprocess.run(mqtt_cmd, capture_output=True, text=True, timeout=30)
+                
+                if mqtt_result.returncode == 0:
+                    print(f"  ✓ MQTT retained messages cleared")
+                else:
+                    print(f"  ⚠ MQTT cleanup had issues (may be okay if no retained messages exist)")
             
-            if mqtt_result.returncode == 0:
-                print(f"  ✓ MQTT retained messages cleared")
-            else:
-                print(f"  ⚠ MQTT cleanup had issues (may be okay if no retained messages exist)")
-        
-        except Exception as e:
-            print(f"  ⚠ MQTT cleanup error: {e}")
+            except Exception as e:
+                print(f"  ⚠ MQTT cleanup error: {e}")
+        else:
+            print(f"  ⚠ MQTT cleanup skipped (all mode - manually clear if needed)")
         
         print()
-        print(f"✓ Deleted data for device_name='{old_name}' ({total_count} rows across {deleted_count} source(s))")
-        print(f"✓ MQTT retained messages cleared")
+        if delete_mode == 'all':
+            print(f"✓ Deleted ALL data for device MAC {mac_suffix} ({total_count} rows across {deleted_count} source(s))")
+        else:
+            print(f"✓ Deleted data for device_name='{target_name}' ({total_count} rows across {deleted_count} source(s))")
+        
+        if mqtt_pattern:
+            print(f"✓ MQTT retained messages cleared")
         
         # Verify deletion by re-querying
         print("\n🔍 Verifying deletion...")
         verification_history = query_device_name_history(mac_suffix)
-        still_exists = [h for h in verification_history if h['device_name'] == old_name]
         
-        if old_room:
-            still_exists = [h for h in still_exists if h['room'] == old_room]
+        if delete_mode == 'all':
+            still_exists = verification_history  # Should be empty
+        else:
+            still_exists = [h for h in verification_history if h['device_name'] == target_name]
+            
+            if old_room:
+                still_exists = [h for h in still_exists if h['room'] == old_room]
         
         if still_exists:
             remaining_count = sum(h['count'] for h in still_exists)
             print(f"\n⚠ WARNING: Found {remaining_count} rows still in InfluxDB after deletion!")
             print("\nPossible causes:")
             print("  1. Telegraf replayed retained MQTT messages")
-            print("  2. Device is still broadcasting with old name")
+            print("  2. Device is still broadcasting")
             print("  3. InfluxDB deletion is still processing (wait a few seconds)")
             print("\nRecommended actions:")
             print("  1. Verify MQTT retained messages were cleared")
             print("  2. Restart Telegraf: iot restart telegraf")
             print("  3. Wait 30 seconds and run delete-device-data again")
         else:
-            print("✓ Verification passed - no data remains for deleted device_name")
+            if delete_mode == 'all':
+                print("✓ Verification passed - ALL data deleted for this device")
+            else:
+                print(f"✓ Verification passed - no data remains for device_name '{target_name}'")
         
         print()
         print("Recommendation: Restart Telegraf to verify ghost data doesn't reappear:")

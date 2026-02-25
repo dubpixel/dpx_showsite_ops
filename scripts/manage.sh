@@ -435,7 +435,7 @@ case "$1" in
     echo "    rename-device          Interactive device rename (prompts for service restart)"
     echo "    set-room               Interactive room change (prompts for service restart)"
     echo "    clear-override         Remove local override for a device (reverts to API name)"
-    echo "    delete-device-data     Delete InfluxDB data for renamed devices (interactive)"
+    echo "    delete-device-data     Delete InfluxDB data (interactive: old/current/all modes)"
     echo ""
     echo "  NETWORK"
     echo "    ip                     Show VM IP address"
