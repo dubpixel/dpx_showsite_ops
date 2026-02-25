@@ -16,7 +16,9 @@ Example:
 """
 
 import json
+import random
 import re
+import string
 import sys
 from pathlib import Path
 
@@ -88,14 +90,14 @@ def add_provision_prefix(data):
     else:
         print(f"  ℹ Title already has [P] prefix: '{title}'")
     
-    # Modify UID to prevent overwriting existing dashboards
+    # Generate random suffix to make each provision unique
+    # This allows provisioning the same dashboard multiple times without conflicts
     uid = data.get('uid', '')
-    if uid and not uid.endswith('-p'):
-        new_uid = f"{uid}-p"
-        data['uid'] = new_uid
-        print(f"  ✓ Modified UID to prevent conflicts: '{uid}' → '{new_uid}'")
-    elif uid and uid.endswith('-p'):
-        print(f"  ℹ UID already has -p suffix: '{uid}'")
+    # Generate 5 random lowercase letters/numbers (similar to Grafana's UID style)
+    random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    new_uid = f"{uid}-p{random_suffix}"
+    data['uid'] = new_uid
+    print(f"  ✓ Generated unique provisioning UID: '{uid}' → '{new_uid}'")
     
     return data
 
