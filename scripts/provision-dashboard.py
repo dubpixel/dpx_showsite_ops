@@ -194,6 +194,35 @@ def list_backups():
         sys.exit(1)
 
 
+def check_duplicate_title(provision_dir, proposed_title):
+    """Check if a dashboard with the same title already exists in provisioning.
+    
+    Args:
+        provision_dir: Path to provisioning dashboards directory
+        proposed_title: Title to check for duplicates
+    
+    Returns:
+        list: List of filenames with matching titles (empty if no duplicates)
+    """
+    duplicates = []
+    
+    if not provision_dir.exists():
+        return duplicates
+    
+    for dashboard_file in provision_dir.glob('*.json'):
+        try:
+            with open(dashboard_file, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                existing_title = existing_data.get('title', '')
+                if existing_title.lower() == proposed_title.lower():
+                    duplicates.append(dashboard_file.name)
+        except (json.JSONDecodeError, IOError):
+            # Skip files that can't be read
+            continue
+    
+    return duplicates
+
+
 def main():
     """Main conversion workflow."""
     if len(sys.argv) < 2:
@@ -272,6 +301,20 @@ def main():
     
     # Create provision directory if needed
     provision_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check for duplicate titles (Grafana will refuse to load duplicates)
+    final_title = data.get('title', 'untitled')
+    duplicates = check_duplicate_title(provision_dir, final_title)
+    if duplicates:
+        print()
+        print("⚠ ERROR: Duplicate title detected!")
+        print(f"Title '{final_title}' already exists in:")
+        for dup in duplicates:
+            print(f"  - {dup}")
+        print()
+        print("Grafana will refuse to load dashboards with duplicate titles.")
+        print("Please choose a different title.")
+        sys.exit(1)
     
     # Generate filename
     if custom_filename:

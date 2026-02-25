@@ -30,8 +30,8 @@ def list_provisioned():
         print(f"ERROR: Provisioning directory not found: {provision_dir}")
         sys.exit(1)
     
-    # Find all provisioned dashboards (exclude YAML config files)
-    dashboards = sorted(provision_dir.glob('dashboard-*.json'))
+    # Find all JSON files (dashboards), exclude YAML config files
+    dashboards = sorted([f for f in provision_dir.glob('*.json') if f.is_file()])
     
     if not dashboards:
         print("No provisioned dashboards found.")
