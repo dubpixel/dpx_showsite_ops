@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements-ble-decoder.txt .
 RUN pip install --no-cache-dir -r requirements-ble-decoder.txt
 
+# Copy VERSION file for version display
+COPY VERSION .
+
 # Copy the decoder script
 COPY scripts/ble_decoder.py .
 

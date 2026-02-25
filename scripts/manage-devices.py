@@ -16,10 +16,16 @@ from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
 
-# Read version from VERSION file
-VERSION_FILE = Path(__file__).parent.parent / "VERSION"
+# Read version from VERSION file (parent dir for local)
+VERSION_FILE_PARENT = Path(__file__).parent.parent / "VERSION"
+VERSION_FILE_SAME = Path(__file__).parent / "VERSION"
 try:
-    VERSION = VERSION_FILE.read_text().strip()
+    if VERSION_FILE_PARENT.exists():
+        VERSION = VERSION_FILE_PARENT.read_text().strip()
+    elif VERSION_FILE_SAME.exists():
+        VERSION = VERSION_FILE_SAME.read_text().strip()
+    else:
+        VERSION = "unknown"
 except:
     VERSION = "unknown"
 
