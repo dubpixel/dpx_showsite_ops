@@ -1502,37 +1502,48 @@ cat Dockerfile.telegraf  # Custom image with SNMP support
 - **Auto-discovery**: Walks all sensor tables
 - **Scaling**: Temperature divided by 10 (725 → 72.5)
 
-### 11.3: Customize Device IP (if needed)
+### 11.3: Update Device IP When It Changes
 
-If your Geist Watchdog has a different IP address:
+The Geist Watchdog is configured to use hostname `dpx-geist.local` instead of a hardcoded IP address. This allows the device IP to change without editing multiple config files.
 
-**Edit the config file**:
+**Why use a hostname?**
+- mDNS `.local` addresses don't resolve inside Docker containers by default
+- Using `extra_hosts` in docker-compose.yml maps the hostname to the current IP
+- When the IP changes, you only update one file instead of hunting through telegraf configs
+
+**If the Geist device IP changes:**
+
+1. **Edit docker-compose.yml**:
 
 ```bash
-nano telegraf/conf.d/geist-watchdog.conf
+nano docker-compose.yml
 ```
 
-**Find this line** (near top):
+2. **Find the telegraf service's `extra_hosts` section**:
 
-```toml
-agents = ["10.0.10.162:161"]
+```yaml
+telegraf:
+  # ... other settings ...
+  extra_hosts:
+    - "dpx-geist.local:192.168.1.214"  # <-- Update this IP
 ```
 
-**Change to your device IP**:
+3. **Change to the new IP address**:
 
-```toml
-agents = ["192.168.1.100:161"]  # Example
+```yaml
+  extra_hosts:
+    - "dpx-geist.local:192.168.1.XXX"  # Your new IP
 ```
 
-**Also update** the static tag further down:
+4. **Save and restart Telegraf**:
 
-```toml
-[inputs.snmp.tags]
-  source = "geist_watchdog"
-  device_ip = "192.168.1.100"  # Match your IP
+```bash
+iot restart telegraf
 ```
 
-**Save**: `Ctrl+O`, `Enter`, `Ctrl+X`
+**If the device hostname changes** (unlikely, but possible):
+
+Edit both `docker-compose.yml` (extra_hosts) and `telegraf/conf.d/geist-watchdog.conf` (agents line) to use the new hostname.
 
 ### 11.4: Deploy and Verify
 
