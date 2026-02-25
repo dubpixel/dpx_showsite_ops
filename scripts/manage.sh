@@ -344,6 +344,16 @@ case "$1" in
     fi
     ;;
   
+  restore-dashboard)
+    if [ -z "$2" ]; then
+      # No file provided - run interactive picker
+      python3 "$SCRIPT_DIR/restore-dashboard.py"
+    else
+      # File path provided - restore it
+      python3 "$SCRIPT_DIR/restore-dashboard.py" "$2"
+    fi
+    ;;
+  
   setup-dashboard-cron)
     CRON_CMD="0 2 * * * cd $REPO_ROOT && source $REPO_ROOT/.env && python3 $SCRIPT_DIR/backup-grafana-dashboards.py >> /var/log/grafana-backup.log 2>&1"
     (crontab -l 2>/dev/null | grep -v backup-grafana-dashboards; echo "$CRON_CMD") | crontab -
@@ -444,8 +454,10 @@ case "$1" in
     echo ""
     echo "  GRAFANA DASHBOARDS"
     echo "    backup-dashboards      Fetch all dashboards via API → ~/backups/grafana/dashboards/YYYY-MM-DD-HHMMSS/"
-    echo "    provision-dashboard [file]  Convert backup to provisioning format"
+    echo "    provision-dashboard [file]  Convert backup to provisioning format (read-only, [P] prefix)"
     echo "                           No args = interactive picker (grouped by backup session) | With file = convert that file"
+    echo "    restore-dashboard [file]  Restore backup as editable dashboard via API (new UID)"
+    echo "                           No args = interactive picker | With file = restore that file"
     echo "    deprovision-dashboard [file]  Remove dashboard from provisioning directory"
     echo "                           No args = interactive picker | With file = remove that file"
     echo "    setup-dashboard-cron   Install daily cron job for automatic dashboard backups"
