@@ -345,6 +345,14 @@ case "$1" in
     ;;
   
   restore-dashboard)
+    cd "$REPO_ROOT"
+    # Export variables from .env file so Python can access them
+    if [ -f "$REPO_ROOT/.env" ]; then
+      set -a
+      source "$REPO_ROOT/.env"
+      set +a
+    fi
+    
     if [ -z "$2" ]; then
       # No file provided - run interactive picker
       python3 "$SCRIPT_DIR/restore-dashboard.py"
