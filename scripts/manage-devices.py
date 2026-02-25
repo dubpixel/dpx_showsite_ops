@@ -631,18 +631,11 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
     current_entries = [h for h in history if h['device_name'] == device['name']]
     old_entries = [h for h in history if h['device_name'] != device['name']]
     
-    if not old_entries:
-        print(f"No old data to delete. Only current device_name '{device['name']}' found.")
-        print("\nThis means:")
-        print(f"  - Device has NOT been renamed (or data was already cleaned up)")
-        print(f"  - All {sum(h['count'] for h in current_entries)} rows use current name '{device['name']}'")
-        return False
-    
     # Display table of historical data with clear OLD/CURRENT markers
     print(f"Found historical data for MAC {mac_suffix}:\n")
     
     if current_entries:
-        print("CURRENT NAME (keep this):")
+        print("CURRENT NAME:")
         print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
         print("  " + "─" * 125)
         for h in current_entries:
@@ -650,7 +643,7 @@ def interactive_delete_device_data(device: Dict, all_devices: List[Dict]) -> boo
         print()
     
     if old_entries:
-        print("OLD NAME(S) (delete these to fix Grafana duplicates):")
+        print("OLD NAME(S):")
         print(f"{'  device_name':<27} {'room':<20} {'source':<17} {'count':<10} {'first_seen':<25} {'last_seen':<25}")
         print("  " + "─" * 125)
         for h in old_entries:
