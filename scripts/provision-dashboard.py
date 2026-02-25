@@ -77,27 +77,48 @@ def validate_dashboard(data):
     return True
 
 
-def add_provision_prefix(data):
-    """Add [P] prefix to dashboard title and modify UID to prevent conflicts."""
-    # Modify title
-    title = data.get('title', 'untitled')
+def apply_customizations(data, custom_title=None, custom_uid=None):
+    """Apply custom title and UID to dashboard.
     
-    # Check if already prefixed (case-insensitive)
-    if not title.lower().startswith('[p]'):
-        new_title = f"[P] {title}"
+    Args:
+        data: Dashboard JSON data
+        custom_title: Optional custom title (includes [P] prefix if not present)
+        custom_uid: Optional custom UID (if not provided, generates random)
+    """
+    # Handle title
+    original_title = data.get('title', 'untitled')
+    
+    if custom_title:
+        # Use custom title, add [P] prefix if not present
+        if not custom_title.lower().startswith('[p]'):
+            new_title = f"[P] {custom_title}"
+        else:
+            new_title = custom_title
         data['title'] = new_title
-        print(f"  ✓ Added provision prefix: '{title}' → '{new_title}'")
+        print(f"  ✓ Set custom title: '{original_title}' → '{new_title}'")
     else:
-        print(f"  ℹ Title already has [P] prefix: '{title}'")
+        # Add [P] prefix to existing title
+        if not original_title.lower().startswith('[p]'):
+            new_title = f"[P] {original_title}"
+            data['title'] = new_title
+            print(f"  ✓ Added provision prefix: '{original_title}' → '{new_title}'")
+        else:
+            print(f"  ℹ Title already has [P] prefix: '{original_title}'")
     
-    # Generate random suffix to make each provision unique
-    # This allows provisioning the same dashboard multiple times without conflicts
-    uid = data.get('uid', '')
-    # Generate 5 random lowercase letters/numbers (similar to Grafana's UID style)
-    random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
-    new_uid = f"{uid}-p{random_suffix}"
-    data['uid'] = new_uid
-    print(f"  ✓ Generated unique provisioning UID: '{uid}' → '{new_uid}'")
+    # Handle UID
+    original_uid = data.get('uid', '')
+    
+    if custom_uid:
+        # Use custom UID as-is
+        data['uid'] = custom_uid
+        print(f"  ✓ Set custom UID: '{original_uid}' → '{custom_uid}'")
+    else:
+        # Generate random UID (8 chars, similar to Grafana style)
+        random_uid = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        data['uid'] = random_uid
+        print(f"  ✓ Generated random UID: '{original_uid}' → '{random_uid}'")
+    
+    return data
     
     return data
 
@@ -173,6 +194,35 @@ def list_backups():
         sys.exit(1)
 
 
+def check_duplicate_title(provision_dir, proposed_title):
+    """Check if a dashboard with the same title already exists in provisioning.
+    
+    Args:
+        provision_dir: Path to provisioning dashboards directory
+        proposed_title: Title to check for duplicates
+    
+    Returns:
+        list: List of filenames with matching titles (empty if no duplicates)
+    """
+    duplicates = []
+    
+    if not provision_dir.exists():
+        return duplicates
+    
+    for dashboard_file in provision_dir.glob('*.json'):
+        try:
+            with open(dashboard_file, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                existing_title = existing_data.get('title', '')
+                if existing_title.lower() == proposed_title.lower():
+                    duplicates.append(dashboard_file.name)
+        except (json.JSONDecodeError, IOError):
+            # Skip files that can't be read
+            continue
+    
+    return duplicates
+
+
 def main():
     """Main conversion workflow."""
     if len(sys.argv) < 2:
@@ -213,8 +263,36 @@ def main():
         print()
         print("⚠ Dashboard may be invalid, but continuing anyway...")
     
-    # Add [P] prefix to mark as provisioned
-    data = add_provision_prefix(data)
+    # Interactive prompts for customization
+    print()
+    print("Customization Options:")
+    print("-" * 50)
+    
+    # Prompt 1: Dashboard title
+    original_title = data.get('title', 'untitled')
+    print(f"Current title: {original_title}")
+    custom_title_input = input("Enter new title (without [P] prefix) or press Enter to keep current: ").strip()
+    custom_title = custom_title_input if custom_title_input else None
+    
+    # Prompt 2: Dashboard UID
+    original_uid = data.get('uid', '')
+    print(f"\nCurrent UID: {original_uid}")
+    custom_uid_input = input("Enter custom UID (e.g., 'sensor-v2', 'temp-prod') or press Enter for random: ").strip()
+    custom_uid = custom_uid_input if custom_uid_input else None
+    
+    # Prompt 3: Filename
+    # Use custom title if provided, otherwise use original/modified title
+    title_for_filename = custom_title if custom_title else original_title
+    if not title_for_filename.lower().startswith('[p]'):
+        title_for_filename = f"[P] {title_for_filename}"
+    safe_default = sanitize_filename(title_for_filename)
+    print(f"\nDefault filename: dashboard-{safe_default}.json")
+    custom_filename = input("Enter custom filename (without .json) or press Enter for default: ").strip()
+    
+    print()
+    
+    # Apply customizations
+    data = apply_customizations(data, custom_title=custom_title, custom_uid=custom_uid)
     
     # Determine output path
     script_dir = Path(__file__).parent
@@ -224,10 +302,28 @@ def main():
     # Create provision directory if needed
     provision_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate filename from title
-    title = data.get('title', 'untitled')
-    safe_title = sanitize_filename(title)
-    output_filename = f"dashboard-{safe_title}.json"
+    # Check for duplicate titles (Grafana will refuse to load duplicates)
+    final_title = data.get('title', 'untitled')
+    duplicates = check_duplicate_title(provision_dir, final_title)
+    if duplicates:
+        print()
+        print("⚠ ERROR: Duplicate title detected!")
+        print(f"Title '{final_title}' already exists in:")
+        for dup in duplicates:
+            print(f"  - {dup}")
+        print()
+        print("Grafana will refuse to load dashboards with duplicate titles.")
+        print("Please choose a different title.")
+        sys.exit(1)
+    
+    # Generate filename
+    if custom_filename:
+        output_filename = f"{custom_filename}.json"
+    else:
+        title = data.get('title', 'untitled')
+        safe_title = sanitize_filename(title)
+        output_filename = f"dashboard-{safe_title}.json"
+    
     output_path = provision_dir / output_filename
     
     # Save provisioning version
