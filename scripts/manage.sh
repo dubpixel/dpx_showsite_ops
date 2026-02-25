@@ -364,8 +364,10 @@ case "$1" in
             echo "Set-Schedule: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8000"
             ;;
   *)
+    # Read version from VERSION file
+    VERSION="$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo 'unknown')"
     echo ""
-    echo "  iot - Govee IoT Stack Manager"
+    echo "  iot - Govee IoT Stack Manager v$VERSION"
     echo "  ============================================"
     echo ""
     echo "  STACK CONTROL"

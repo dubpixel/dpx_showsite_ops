@@ -49,8 +49,11 @@ NC='\033[0m' # No Color
 # Get absolute path to script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Read version from VERSION file
+VERSION="$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo 'unknown')"
+
 echo "=================================="
-echo "dpx-showsite-ops Setup"
+echo "dpx-showsite-ops Setup v$VERSION"
 echo "=================================="
 echo ""
 

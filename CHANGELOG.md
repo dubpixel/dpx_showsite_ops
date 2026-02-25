@@ -6,14 +6,62 @@ All notable changes to dpx-showsite-ops.
 
 ## [Unreleased]
 
-### Phase 4 - BLE Gateway (Planned)
-- ESP32 or Windows Theengs Gateway integration
-- Unified Telegraf config with source tagging
-
 ### Phase 5 - Network Backups (Planned)  
 - TFTP server deployment
 - M4300 automated backup scripts
 - Monitoring integration
+
+### Future Phases
+- See ROADMAP.md for Phases 7-14 (device control, consumables tracking, etc.)
+
+---
+
+## [1.4.0] - 2026-02-24
+
+### Added
+- **BLE Decoder Service Containerization** (Phase 4j):
+  - Created `Dockerfile.ble-decoder` for production deployment (Python 3.11-slim with curl, ping debugging tools)
+  - Added `ble-decoder` service to docker-compose.yml with mosquitto integration
+  - Process guard for `iot ble-decode` command prevents duplicate instances (pgrep/pkill logic)
+  - Environment variable configuration via Dockerfile (BROKER, GOVEE_API_URL, SHOWSITE_NAME)
+  - Docker service runs with `host.docker.internal` networking for govee2mqtt API access
+  - Volume mount for device-overrides.json (read-only)
+  - New management commands: `ble-up`, `ble-down`, `ble-restart`, `ble-rebuild`, `ble-status`, `ble-logs`, `ble-follow`
+  - Log shortcut: `lb [n]` for ble-decoder logs
+  - Added to `iot la` (all logs) command
+- **Set-Schedule Service Integration** (Phase 6):
+  - Git submodule integration at `services/set-schedule` (https://github.com/macswg/coachella_set_schedule)
+  - Docker service for festival schedule tracking app on port 8000
+  - Development instance support on port 8001
+  - 16 new management commands:
+    - Production: `schedule-up`, `schedule-down`, `schedule-restart`, `schedule-status`, `schedule-logs`, `schedule-follow`, `schedule-rebuild`, `schedule-shell`
+    - Development: `schedule-dev-build`, `schedule-dev-up`, `schedule-dev-down`, `schedule-dev-restart`, `schedule-dev-logs`, `schedule-dev-follow`, `schedule-dev-rebuild`, `schedule-dev-shell`
+  - Configuration via .env (STAGE_NAME, TIMEZONE, Google Sheets integration, Art-Net DMX support)
+  - WebSocket-based real-time schedule sync across all clients
+  - Operator mode (edit times) and view-only mode
+  - Tracks "slip" (lateness vs scheduled times) and projects downstream impacts
+  - Optional Google Sheets integration for schedule data persistence
+  - Documentation: `docs/Plan-Integrate Set-Schedule Service i.md` (integration guide)
+- **MQTT Maintenance Tools**:
+  - `iot clear-retained [topic]` command for cleaning stale MQTT retained messages
+  - Interactive cleanup with confirmation and progress reporting
+  - Default clears all topics (`#`), accepts specific topic patterns
+  - Resolves ghost data issues from device renames
+
+### Changed
+- Updated `setup.sh` to initialize set-schedule git submodule automatically
+- Enhanced `scripts/manage.sh` help text with BLE Decoder and Set-Schedule sections
+- Updated `.env.example` with:
+  - `SHOWSITE_NAME` for site identification
+  - Comprehensive set-schedule configuration variables (SCHEDULE_PORT, STAGE_NAME, TIMEZONE, USE_GOOGLE_SHEETS, GOOGLE_SHEETS_ID, GOOGLE_SHEET_TAB, GOOGLE_SERVICE_ACCOUNT_FILE, ARTNET_* variables)
+- Updated `iot web` command to include set-schedule URL (port 8000)
+- Updated `iot la` (all logs) command to include ble-decoder service
+
+### Documentation
+- Created `docs/Plan-Integrate Set-Schedule Service i.md` - Comprehensive integration guide (477 lines)
+- Created `docs/context_public/set-schedule-development.md` - Development workflow documentation
+- Updated `docs/ROADMAP.md` marking Phase 4 complete (2026-02-24), Phase 6 complete (2026-02-24)
+- Updated `docs/context_public/CONTEXT.md` with Phase 6 section
 
 ---
 

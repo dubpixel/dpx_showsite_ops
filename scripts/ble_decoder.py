@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLE Decoder v2.3 - MQTT Payload Decoder
+BLE Decoder - MQTT Payload Decoder
 Decodes BLE manufacturer data from ESP32/Theengs gateways and publishes to normalized topics.
 
 Topic Structure: {site}/{node}/{source_node}/{room}/{device}/{metric}
@@ -19,7 +19,14 @@ import urllib.request
 import paho.mqtt.client as mqtt
 import sys
 from datetime import datetime
+from pathlib import Path
 
+# Read version from VERSION file
+VERSION_FILE = Path(__file__).parent.parent / "VERSION"
+try:
+    VERSION = VERSION_FILE.read_text().strip()
+except:
+    VERSION = "unknown"
 
 # Configuration
 BROKER = "localhost"
@@ -309,7 +316,7 @@ def on_disconnect(client, userdata, rc):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("DPX BLE Decoder v2.3")
+    print(f"DPX BLE Decoder v{VERSION}")
     print("=" * 60)
     print()
     

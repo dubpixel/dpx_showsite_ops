@@ -13,10 +13,15 @@ import sys
 import urllib.request
 import tempfile
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
 
-# Version
-VERSION = "1.1.0"  # Added delete-device-data command
+# Read version from VERSION file
+VERSION_FILE = Path(__file__).parent.parent / "VERSION"
+try:
+    VERSION = VERSION_FILE.read_text().strip()
+except:
+    VERSION = "unknown"
 
 # Configuration
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
