@@ -248,46 +248,49 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-## � Phase 6: Set Schedule Integration (Planned)
+## ✅ Phase 6: Set Schedule Integration (Completed)
 
 **Goal**: Integrate real-time show schedule tracking for festival operations
 
 **Sean's Repo**: https://github.com/macswg/coachella_set_schedule
 
-**What we'll build:**
+**What we built:**
 
-### Phase 6.1: Git Submodule Setup
-- Add Sean's repo as `services/set-schedule/` submodule
-- Enables easy updates without code duplication
-- Tracks his commits independently
+### Phase 6.1: Git Submodule Setup ✅
+- Added Sean's repo as `services/set-schedule/` submodule
+- Easy updates without code duplication
+- Tracks commits independently
 
-### Phase 6.2: Docker Service
-- Create `Dockerfile.showsite` for containerization
-- Add `set-schedule` service to docker-compose.yml
-- Runs on port 8000 alongside other services
-- Restart policy and volume mounts configured
+### Phase 6.2: Docker Service ✅
+- Integrated existing Dockerfile from upstream repo
+- Added `set-schedule` service to docker-compose.yml
+- Runs on port 8000 alongside other services (dev instance on 8001)
+- Restart policy and volume mounts configured for Google Sheets auth
 
-### Phase 6.3: CLI Integration
-- Add `iot ls` command for set-schedule logs
-- Add `iot web` URL for schedule access
-- Update `manage.sh` to handle set-schedule lifecycle
+### Phase 6.3: CLI Integration ✅
+- Added 16 management commands for production and development instances
+- Added `iot web` URL for schedule access
+- Updated `manage.sh` with set-schedule lifecycle management
 
-### Phase 6.4: Update Scripts
-- Update `setup.sh` for submodule initialization
-- Update `manage.sh` for logs and web commands
+### Phase 6.4: Update Scripts ✅
+- Updated `setup.sh` for automatic submodule initialization
+- Updated `manage.sh` with comprehensive command set and help text
 
 **What It Is:**
 - FastAPI web app for real-time schedule tracking
-- WebSocket sync across clients
-- Google Sheets integration
+- WebSocket sync across all connected clients
+- Google Sheets integration for schedule data persistence
 - Operator mode (edit times) + view-only mode
-- Tracks "slip" (lateness vs scheduled times)
+- Tracks "slip" (lateness vs scheduled times) and projects downstream impacts
+- Optional Art-Net DMX integration for lighting control
 
 **Benefits:**
 - Central operations dashboard for set times
 - Real-time visibility across mobile + desktop clients
 - Historical tracking for post-event analysis
-- Optional: Log slip data to InfluxDB for Grafana dashboards
+- Optional: Future InfluxDB integration for slip metrics in Grafana dashboards
+
+**Status**: ✅ Complete - service operational and documented
 
 **Status**: 📋 Planned - can be done anytime (independent of 4/5)
 
@@ -515,10 +518,10 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 ## Timeline
 
 **Phase 3**: ✅ Complete (2026-02-05)  
-**Phase 4**: ✅ Complete (2026-02-16) - BLE decoder dockerized and operational  
+**Phase 4**: ✅ Complete (2026-02-24) - BLE decoder dockerized and operational  
 **Phase 5**: After Phase 4 completes - hardware available at studio  
-**Phase 6**: 🔄 In Progress - set-schedule integration underway  
-**Phase 7**: After Phase 4 + Phase 6 - requires BLE data and schedule integration  
+**Phase 6**: ✅ Complete (2026-02-24) - set-schedule service integrated and operational  
+**Phase 7**: After Phase 4 + Phase 6 - requires BLE data and schedule integration (now ready)  
 **Phase 8**: Independent - can start anytime, NFC + HID keyboard tracking  
 **Phase 9**: After Phase 4 - requires BLE infrastructure and decoder framework  
 **Phase 10**: Planning - LTC monitoring integration with rs-ltc-qc  

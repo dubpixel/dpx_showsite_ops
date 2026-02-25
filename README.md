@@ -383,24 +383,30 @@ docker compose logs [service-name]
 - Volume backup/restore scripts
 - Full deployment testing
 
-### ✅ Phase 4: BLE Gateway (Completed)
-- ble-decoder service dockerized and operational
-- ESP32 gateways deployed (OpenMQTTGateway firmware)
-- Theengs Gateway available as fallback
-- Real-time BLE data (<5 sec latency) alongside cloud data
-- Unified Telegraf config with source tagging (gv_cloud, dpx_ops_decoder)
-- Grafana dashboards showing both data sources
+### ✅ Phase 4: BLE Gateway + Decoder Containerization (Completed)
+- **ble-decoder service** dockerized and operational (Dockerfile.ble-decoder, docker-compose integration)
+- **ESP32 gateways** deployed with OpenMQTTGateway firmware
+- **Theengs Gateway** available as fallback
+- **Real-time BLE data** (<5 sec latency) alongside cloud data
+- **Unified Telegraf config** with source tagging (gv_cloud, dpx_ops_decoder)
+- **Process guards** prevent duplicate decoder instances
+- **Management commands**: ble-up/down/restart/rebuild/status/logs/follow
+- **Grafana dashboards** showing both data sources
 
 ### 📋 Phase 5: Network Backups (Planned)
 - TFTP server deployment
 - M4300 automated backup scripts
 - Monitoring integration
 
-### 📋 Phase 6: Set Schedule Integration (Planned)
-- Integration of Sean's coachella_set_schedule app
-- Git submodule + Docker service deployment
-- Real-time show schedule tracking and WebSocket updates
-- Optional InfluxDB integration for slip tracking
+### ✅ Phase 6: Set Schedule Integration (Completed)
+- **Git submodule** integration (services/set-schedule)
+- **Docker service** deployment on port 8000 (production) + 8001 (dev)
+- **Real-time WebSocket sync** across all connected clients
+- **Operator + view-only modes** for schedule tracking
+- **Google Sheets integration** for schedule data persistence
+- **Art-Net DMX support** for lighting control
+- **16 management commands** for production and development workflows
+- **Slip tracking** and downstream impact projections
 
 See the [open issues](https://github.com/dubpixel/dpx_showsite_ops/issues) for a full list of proposed features (and known issues).
 
