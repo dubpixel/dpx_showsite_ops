@@ -77,8 +77,14 @@ def validate_dashboard(data):
     return True
 
 
-def add_provision_prefix(data):
-    """Add [P] prefix to dashboard title and modify UID to prevent conflicts."""
+def add_provision_prefix(data, uid_suffix=None):
+    """Add [P] prefix to dashboard title and modify UID to prevent conflicts.
+    
+    Args:
+        data: Dashboard JSON data
+        uid_suffix: Optional friendly suffix for UID (e.g., 'v2', 'test')
+                   If not provided, generates random 5-char suffix
+    """
     # Modify title
     title = data.get('title', 'untitled')
     
@@ -90,14 +96,21 @@ def add_provision_prefix(data):
     else:
         print(f"  ℹ Title already has [P] prefix: '{title}'")
     
-    # Generate random suffix to make each provision unique
-    # This allows provisioning the same dashboard multiple times without conflicts
+    # Modify UID to make this provision unique
     uid = data.get('uid', '')
-    # Generate 5 random lowercase letters/numbers (similar to Grafana's UID style)
-    random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
-    new_uid = f"{uid}-p{random_suffix}"
+    
+    if uid_suffix:
+        # Use provided friendly suffix
+        new_uid = f"{uid}-p-{uid_suffix}"
+        print(f"  ✓ Generated UID with custom suffix: '{uid}' → '{new_uid}'")
+    else:
+        # Generate random suffix (5 lowercase letters/numbers)
+        random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+        new_uid = f"{uid}-p{random_suffix}"
+        print(f"  ✓ Generated UID with random suffix: '{uid}' → '{new_uid}'")
+    
     data['uid'] = new_uid
-    print(f"  ✓ Generated unique provisioning UID: '{uid}' → '{new_uid}'")
+    return data
     
     return data
 
@@ -213,8 +226,27 @@ def main():
         print()
         print("⚠ Dashboard may be invalid, but continuing anyway...")
     
+    # Interactive prompts for customization
+    print()
+    print("Customization Options:")
+    print("-" * 50)
+    
+    # Prompt for friendly UID suffix
+    original_uid = data.get('uid', '')
+    print(f"Current UID: {original_uid}")
+    uid_suffix_input = input("Enter friendly UID suffix (e.g., 'v2', 'test', 'prod') or press Enter for random: ").strip()
+    uid_suffix = uid_suffix_input if uid_suffix_input else None
+    
+    # Prompt for custom filename
+    default_title = data.get('title', 'untitled')
+    safe_default = sanitize_filename(default_title)
+    print(f"\nDefault filename: dashboard-{safe_default}.json")
+    custom_filename = input("Enter custom filename (without .json) or press Enter for default: ").strip()
+    
+    print()
+    
     # Add [P] prefix to mark as provisioned
-    data = add_provision_prefix(data)
+    data = add_provision_prefix(data, uid_suffix=uid_suffix)
     
     # Determine output path
     script_dir = Path(__file__).parent
@@ -224,10 +256,14 @@ def main():
     # Create provision directory if needed
     provision_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate filename from title
-    title = data.get('title', 'untitled')
-    safe_title = sanitize_filename(title)
-    output_filename = f"dashboard-{safe_title}.json"
+    # Generate filename
+    if custom_filename:
+        output_filename = f"{custom_filename}.json"
+    else:
+        title = data.get('title', 'untitled')
+        safe_title = sanitize_filename(title)
+        output_filename = f"dashboard-{safe_title}.json"
+    
     output_path = provision_dir / output_filename
     
     # Save provisioning version
