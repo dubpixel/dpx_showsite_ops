@@ -16,6 +16,25 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [1.412] - 2026-02-25
+
+### Added
+- **Dashboard Restore Utility**:
+  - New `restore-dashboard.py` script for restoring backups as fully editable dashboards via Grafana API
+  - Interactive picker UI matching provision-dashboard workflow
+  - Generates unique UIDs (timestamp-based) to prevent conflicts with existing dashboards
+  - New `iot restore-dashboard [file]` command with .env environment variable support
+  - Complements existing provisioning workflow for complete backup/restore/provision lifecycle
+
+### Changed
+- **Dashboard Provisioning Enhancements**:
+  - `provision-dashboard.py` now adds `[P]` prefix to dashboard titles for visual identification
+  - Appends `-p` suffix to UIDs to prevent provisioned dashboards from overwriting live copies
+  - Updated help text in manage.sh to clarify provisioning creates read-only dashboards
+  - Prevents accidental deletion of working dashboards when provisioning from similar backups
+
+---
+
 ## [1.4.0] - 2026-02-24
 
 ### Added
