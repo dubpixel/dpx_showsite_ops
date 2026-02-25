@@ -58,6 +58,16 @@ case "$1" in
     ls -la ~/backups/
     ;;
   nuke)     docker exec influxdb influx delete --org home --token my-super-secret-token --bucket sensors --start 1970-01-01T00:00:00Z --stop 2030-01-01T00:00:00Z && echo "Bucket nuked." ;;
+  nuke-geist)
+    docker exec influxdb influx delete \
+      --org home \
+      --token my-super-secret-token \
+      --bucket sensors \
+      --start 1970-01-01T00:00:00Z \
+      --stop 2030-01-01T00:00:00Z \
+      --predicate '_measurement="geist_internal" OR _measurement="geist_temp_remote" OR _measurement="geist_airflow_remote"'
+    echo "Geist measurements deleted. Restart Telegraf to recreate with correct schema."
+    ;;
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
@@ -442,6 +452,7 @@ case "$1" in
     echo "    mqtt [topic] [count]   Subscribe to MQTT messages"
     echo "                           examples: iot mqtt / iot mqtt gv2mqtt/# 10"
     echo "    nuke                   DELETE all data in govee bucket (no undo!)"
+    echo "    nuke-geist             DELETE all Geist measurement data (fixes schema issues)"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"
