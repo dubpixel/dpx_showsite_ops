@@ -16,6 +16,26 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [1.4.2] - 2026-02-27
+
+### Documentation
+- **ROADMAP Updates**:
+  - Added Phase 4.5: Geist Watchdog SNMP Integration (✅ Complete) - documents existing SNMP monitoring deployed alongside BLE infrastructure
+  - Updated Phase 9: Changed from "Planned" to "Feasibility Check" - quick 30-minute validation test for temperature probes
+  - Elevated Phase 10: LTC Monitoring from "Future Ideas" to "Production Priority" with expanded implementation plan (awaiting rs-ltc-qc repo access)
+  - Phase 6: Updated Art-Net testing approach - using USB NIC workaround (KISS) instead of waiting for Phase 11 VLAN work. Phase 11 provides production-ready VLAN isolation later.
+  - Phase 8: Updated to reflect H5194 meat probe proof-of-concept work in progress
+  - Phase 11: Removed "blocks Phase 6" language - now provides production-ready Art-Net isolation while Phase 6 proceeds with USB NIC approach
+- **CONTEXT.md Updates**:
+  - Changed "Planned Phase 6 addition" to "Phase 6 Integration (🚧 In Progress)" - service deployed but not fully tested/complete
+- **File Management**:
+  - Renamed `docs/context_public/ Plan-Integrate Set-Schedule Service i.md` to `Plan-Integrate-Set-Schedule-Service.md` (removed leading space, added hyphens)
+  - Archived old session notes to `docs/context_private/archive/`: phase6-set-schedule-context.md, session-2026-02-12-documentation-consolidation.md, govee-iot-context*.md, phase4_session_context.md, CONTEXT_old.md, GIT_QUICK_REFERENCE_old.md
+- **git-workflow-cheatsheet.md**:
+  - Added comprehensive "Releases & Tags" section with git tag, GitHub CLI, and release workflow examples
+
+---
+
 ## [1.412] - 2026-02-25
 
 ### Added
