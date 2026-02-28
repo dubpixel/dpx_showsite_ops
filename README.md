@@ -393,20 +393,66 @@ docker compose logs [service-name]
 - **Management commands**: ble-up/down/restart/rebuild/status/logs/follow
 - **Grafana dashboards** showing both data sources
 
-### 📋 Phase 5: Network Backups (Planned)
-- TFTP server deployment
-- M4300 automated backup scripts
-- Monitoring integration
+### � Phase 5: Network Device Backups (In Progress)
+- **TFTP server deployment** (from dpx-netgear-backup repo work)
+- **dpx-netgear-backup integration** as submodule with iot CLI commands
+- **M4300 connectivity** (192.168.0.x subnet access from VM)
+- **M4300 SNMP monitoring** (port status, VLANs, errors, uptime)
+- **Automated daily backups** with InfluxDB tracking and Grafana dashboards
 
-### ✅ Phase 6: Set Schedule Integration (Completed)
+### 🚧 Phase 6: Set Schedule Integration (Art-Net Testing Incomplete)
 - **Git submodule** integration (services/set-schedule)
 - **Docker service** deployment on port 8000 (production) + 8001 (dev)
 - **Real-time WebSocket sync** across all connected clients
 - **Operator + view-only modes** for schedule tracking
 - **Google Sheets integration** for schedule data persistence
-- **Art-Net DMX support** for lighting control
+- **Art-Net DMX implementation** complete (app/artnet.py, test_artnet.py)
+- **Outstanding**: Art-Net testing with hardware, blocked by Phase 11 VLAN config
 - **16 management commands** for production and development workflows
 - **Slip tracking** and downstream impact projections
+
+### 📋 Phase 7: Metrics-Driven Device Control (Planned)
+- **Govee + Hue API** integration for lighting control
+- **ControlByWeb** relay devices (HTTP/SNMP API)
+- **Digital Loggers** Web Power Switch integration
+- **Rule engine** for threshold-based automation
+- **Grafana control panels** for manual device control
+
+### 🚧 Phase 8: Consumables Tracking (In Progress - H5194 Proof of Concept)
+- **Govee H5194 meat probe** BLE decoder (proof-of-concept underway)
+- **Scripts**: scan_h5194.py/scan_h5194_simple.py for packet reverse engineering
+- **Integration plan**: Merge H5194 logic into ble_decoder.py container
+- **HID keyboard + push button** input interfaces
+- **Hotdog consumption tracking** with leaderboard/stats dashboards
+- **Temperature monitoring** for food safety compliance
+- **InfluxDB + Grafana** for consumption analytics
+
+### 📋 Phase 9: Wireless Temperature Probes (Planned)
+- Compatibility research (H5179, H5075 models)
+- BLE integration for multi-probe deployment
+- Specialized monitoring dashboards
+- Use cases: food storage, equipment rooms, HVAC validation
+
+### 🚧 Phase 10: LTC Monitoring (Proof of Concept)
+- Real-time Linear Timecode signal monitoring
+- rs-ltc-qc integration for quality analysis
+- Sub-100ms latency target
+- Grafana dashboards for A/V sync health
+- **Outstanding**: Hardware setup adjacent to NIC
+
+### 📋 Phase 11: External Network VLAN Integration (Planned)
+- **VLAN segmentation** for show site operations
+- **Traffic analysis**: Art-Net (VLAN 20), IoT (110), Internet (90), System (50)
+- **IP schema redesign** with CIDR ranges (ready/in-progress)
+- **M4300 VLAN configuration** with inter-VLAN routing
+- **Coachella spreadsheet** network documentation
+- **Blocks**: Phase 6 Art-Net testing (requires VLAN 20)
+
+### 📋 Phase 12: VLAN Meistro Configuration Tool (Exploratory)
+- Web-based VLAN config generator
+- Outputs deployment scripts for M4300
+- Streamlines multi-site deployments
+- **Status**: Low priority, may be deferred indefinitely
 
 See the [open issues](https://github.com/dubpixel/dpx_showsite_ops/issues) for a full list of proposed features (and known issues).
 

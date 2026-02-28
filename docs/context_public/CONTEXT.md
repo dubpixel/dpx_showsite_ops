@@ -204,12 +204,12 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
     └── dubpixel_identicon.png  ← Identity icon
 ```
 
-**Planned Phase 6 addition**:
+**Phase 6 Integration (✅ Complete)**:
 ```
 └── services/
     └── set-schedule/           ← Sean's repo as git submodule
-        ├── (his files here)
-        └── Dockerfile.showsite ← Custom Dockerfile for integration
+        ├── (complete festival schedule app)
+        └── Dockerfile          ← Integrated in docker-compose stack
 ```
 
 **Not tracked in git** (gitignored):
