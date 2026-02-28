@@ -297,7 +297,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-## 🚧 Phase 6: Set Schedule Integration (Art-Net Testing Incomplete)
+## 🚧 Phase 6: Set Schedule Integration (Testing in Progress)
 
 **Goal**: Integrate real-time show schedule tracking for festival operations
 
@@ -325,17 +325,21 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Updated `setup.sh` for automatic submodule initialization
 - Updated `manage.sh` with comprehensive command set and help text
 
-### Phase 6.5: Art-Net DMX Integration (Incomplete)
-- **Implementation Status**: ✅ Complete (app/artnet.py, test_artnet.py)
+### Phase 6.5: Art-Net DMX Integration (Testing in Progress)
+- **Implementation Status**: ✅ Code Complete (app/artnet.py, test_artnet.py)
   - UDP listener on port 6454
   - 16-bit DMX value parsing (channels 1-512)
   - Converts to nits (0-11,000)
   - WebSocket broadcast on value change
   - Disabled by default (ARTNET_ENABLED=false)
+- **Testing Approach**: USB NIC workaround (KISS)
+  - Temporary Art-Net input via separate USB network interface
+  - Avoids VLAN complexity for initial testing
+  - Phase 11 VLAN approach can be implemented later if needed
+  - Fallback: Additional USB NICs if VLAN approach proves difficult
 - **Outstanding Items**:
   - [ ] Art-Net testing with actual DMX controller hardware
   - [ ] Usage documentation (enable/configure/troubleshoot)
-  - [ ] Network configuration for Art-Net traffic (blocked by Phase 11)
   - [ ] Production deployment validation
 
 **What It Is:**
@@ -351,9 +355,9 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Real-time visibility across mobile + desktop clients
 - Historical tracking for post-event analysis
 - Optional: Future InfluxDB integration for slip metrics in Grafana dashboards
-- DMX lighting control via Art-Net (pending testing)
+- DMX lighting control via Art-Net (implemented, testing with USB NIC workaround)
 
-**Status**: 🚧 In Progress - core features complete, Art-Net testing depends on Phase 11
+**Status**: 🚧 In Progress - core features complete, Art-Net hardware testing pending (USB NIC approach)
 
 ---
 
@@ -565,7 +569,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **Goal**: Design and implement VLAN segmentation for show site operations with new IP addressing schema
 
-**Status**: 📋 Planned - blocks Phase 6 Art-Net testing completion
+**Status**: 📋 Planned - CIDR design in progress, provides production-ready Art-Net isolation (Phase 6 using USB NIC workaround)
 
 **What we'll build:**
 
@@ -603,7 +607,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ### Phase 11.5: Testing & Validation
 - Connectivity testing per VLAN
-- Art-Net traffic validation on VLAN 20 (unblocks Phase 6)
+- Art-Net traffic validation on VLAN 20 (production approach, Phase 6 using USB NIC workaround for now)
 - IoT sensor communication on VLAN 110
 - Inter-VLAN routing verification
 - Performance benchmarking (latency, throughput)
@@ -613,8 +617,9 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Phase 5.3-5.4 (M4300 connectivity and monitoring) should be complete for visibility
 - M4300 switch at studio (currently at 192.168.0.238/239, needs connectivity from VM)
 
-**Blocks**: 
-- Phase 6.5 Art-Net testing cannot complete without VLAN 20 configured
+**Note**: 
+- Phase 6 Art-Net testing proceeding with USB NIC workaround (KISS approach)
+- VLAN 20 configuration provides production-ready Art-Net isolation when implemented
 
 **Status**: 📋 Planned - CIDR design in progress, spreadsheet documentation pending
 
@@ -767,7 +772,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] IP schema redesigned and documented (CIDR ranges)
 - [ ] Coachella spreadsheet network documentation complete
 - [ ] M4300 VLANs configured and tested
-- [ ] Art-Net traffic isolated on VLAN 20 (unblocks Phase 6)
+- [ ] Art-Net traffic isolated on VLAN 20 (production-ready approach, Phase 6 using USB NIC workaround)
 - [ ] Inter-VLAN routing validated
 
 **Phase 12:**
@@ -783,19 +788,19 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 **Phase 3**: ✅ Complete (2026-02-05)  
 **Phase 4**: ✅ Complete (2026-02-24) - BLE decoder dockerized and operational  
 **Phase 5**: 🚧 In Progress (2026-02-27) - TFTP server and M4300 connectivity work underway  
-**Phase 6**: 🚧 In Progress - Core complete, Art-Net testing blocked by Phase 11  
+**Phase 6**: 🚧 In Progress - Core complete, Art-Net testing with USB NIC workaround (KISS)  
 **Phase 7**: 📋 Planned - After Phase 4 + Phase 6, requires BLE data and schedule integration  
 **Phase 8**: 🚧 In Progress (2026-02-27) - H5194 proof-of-concept, detoured from Phase 5  
 **Phase 9**: 📋 Planned - After Phase 4, extends BLE infrastructure  
 **Phase 10**: 🚧 Proof of Concept (2026-02-27) - LTC monitoring exploration, parallel with Phase 8  
-**Phase 11**: 📋 Planned - CIDR ranges in progress, blocks Phase 6 completion  
+**Phase 11**: 📋 Planned - CIDR ranges in progress, VLAN approach for Art-Net (Phase 6 using USB NIC for now)  
 **Phase 12**: 📋 Exploratory - Low priority, multi-site deployment tool  
 
 **Current Focus** (2026-02-27): 
 - **Primary**: Phase 5 (M4300 setup) - should be working on this
 - **Detour**: Phase 8 (H5194 meat probes) - proof-of-concept exploration
 - **Parallel**: Phase 10 (timecode monitoring) - proof-of-concept exploration
-- **Blocked**: Phase 6 Art-Net testing - requires Phase 11 VLAN configuration
+- **Ready to Test**: Phase 6 Art-Net - USB NIC workaround approach (hardware testing pending)
 
 ---
 
@@ -804,10 +809,10 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Each phase builds on previous phases without breaking existing functionality
 - Phases can be skipped or reordered based on priority
 - **Phase 5**: TFTP work comes FIRST (dpx-netgear-backup repo), then M4300 connectivity, then SNMP monitoring
-- **Phase 6**: Art-Net code complete but untested - requires Phase 11 VLAN configuration
+- **Phase 6**: Art-Net code complete, testing with USB NIC workaround (KISS) - Phase 11 VLAN approach for production later
 - **Phase 8**: Currently exploring H5194 meat probe integration as proof-of-concept (detour from Phase 5)
 - **Phase 10**: Timecode monitoring in proof-of-concept phase (parallel with Phase 8)
-- **Phase 11**: VLAN work blocks Phase 6 Art-Net testing - CIDR ranges ready/in-progress
+- **Phase 11**: VLAN work provides production-ready Art-Net isolation - CIDR ranges ready/in-progress, Phase 6 proceeding with USB NIC workaround
 - **Phase 12**: Exploratory concept, may be deferred indefinitely
 - Custom ESP32 BLE gateways: Deployed and operational (Phase 4 complete)
 - M4300 8x8 switch available at studio (192.168.0.238 or .239, needs connectivity from VM at 192.168.1.100)
