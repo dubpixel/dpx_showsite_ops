@@ -73,6 +73,44 @@ case "$1" in
     echo "Geist measurements deleted. Restart Telegraf to recreate with correct schema."
     echo "Run: iot restart telegraf"
     ;;
+  
+  # M4300 Netgear Backup Commands
+  m4300-backup)
+    echo "Running M4300 config backup..."
+    docker compose run --rm netgear-backup
+    echo "✓ Backup complete. Check logs with: iot m4300-logs"
+    ;;
+  
+  m4300-backup-mock)
+    echo "Running M4300 backup in MOCK mode (no real switches)..."
+    docker compose run --rm netgear-backup python3 netgear_system_backup_TFTP-v0d1.py --mock
+    echo "✓ Mock backup complete"
+    ;;
+  
+  m4300-logs)
+    echo "M4300 Backup Logs:"
+    echo "=================="
+    docker compose run --rm netgear-backup ls -lth /backups/logs 2>/dev/null | head -${2:-10}
+    echo ""
+    echo "View full log: docker compose run --rm netgear-backup cat /backups/logs/<filename>"
+    ;;
+  
+  m4300-list)
+    echo "Recent M4300 backups:"
+    echo "====================="
+    docker compose run --rm netgear-backup ls -ltdh /backups/202* 2>/dev/null | head -${2:-10}
+    ;;
+  
+  m4300-network-fix)
+    "$REPO_ROOT/scripts/setup-m4300-network.sh"
+    ;;
+  
+  m4300-build)
+    echo "Building netgear-backup container image..."
+    docker compose build netgear-backup
+    echo "✓ Image built"
+    ;;
+  
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
@@ -458,6 +496,14 @@ case "$1" in
     echo "                           examples: iot mqtt / iot mqtt gv2mqtt/# 10"
     echo "    nuke                   DELETE all data in govee bucket (no undo!)"
     echo "    nuke-geist             DELETE all Geist measurement data (fixes schema issues)"
+    echo ""
+    echo "  M4300 NETGEAR BACKUP"
+    echo "    m4300-backup           Run M4300 config backup now (containerized)"
+    echo "    m4300-backup-mock      Run backup in MOCK mode (no real switches)"
+    echo "    m4300-logs [n]         View recent backup logs (default: 10)"
+    echo "    m4300-list [n]         List recent backup folders (default: 10)"
+    echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
+    echo "    m4300-build            Rebuild netgear-backup container image"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"
