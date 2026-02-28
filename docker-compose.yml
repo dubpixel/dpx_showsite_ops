@@ -134,6 +134,20 @@ services:
     networks:
       - iot
 
+  tftp-server:
+    image: pghalliday/tftp:latest
+    container_name: tftp-server
+    restart: unless-stopped
+    ports:
+      - "69:69/udp"
+    volumes:
+      - tftp-data:/var/tftpboot
+    environment:
+      # Temporary IP until management VLAN deployed
+      - BIND_ADDRESS=0.0.0.0
+    networks:
+      - iot
+
 networks:
   iot:
     driver: bridge
@@ -142,3 +156,4 @@ volumes:
   govee2mqtt-data:
   influxdb-data:
   grafana-data:
+  tftp-data:

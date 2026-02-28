@@ -181,6 +181,15 @@ else
     fi
 fi
 
+# Install netgear-backup dependencies
+echo ""
+echo -n "Installing netgear-backup dependencies... "
+if [ -f "$SCRIPT_DIR/services/netgear-backup/requirements.txt" ]; then
+    pip3 install -q -r "$SCRIPT_DIR/services/netgear-backup/requirements.txt" 2>/dev/null && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}WARN${NC}"
+else
+    echo -e "${YELLOW}SKIP${NC} (submodule not initialized)"
+fi
+
 # Install iot wrapper
 echo ""
 echo -n "Installing 'iot' command... "

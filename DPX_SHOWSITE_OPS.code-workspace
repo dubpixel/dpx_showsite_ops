@@ -7,6 +7,9 @@
 		{
 			"path": "../COACHELLA_SET_SCHEDULE",
 			"name": "🔧 Set-Schedule (Dev)"
+		},
+		{
+			"path": "../../_.PYTHON/dpx-netgear-backup"
 		}
 	],
 	"settings": {}

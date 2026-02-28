@@ -1,3 +1,6 @@
 [submodule "services/set-schedule"]
 	path = services/set-schedule
 	url = https://github.com/dubpixel/coachella_set_schedule.git
+[submodule "services/netgear-backup"]
+	path = services/netgear-backup
+	url = https://github.com/dubpixel/dpx-netgear-backup.git
