@@ -52,7 +52,7 @@ ${NAME_MAPPINGS}
 ${ROOM_MAPPINGS}
 EOF
 
-(cd "$REPO_ROOT" && docker compose restart telegraf ble-decoder)
+docker compose -f "$REPO_ROOT/docker-compose.yml" restart telegraf ble-decoder
 echo "$(date) - Device mappings updated (with overrides):" >> "$LOG"
 echo "$DEVICES" | python3 -c "
 import json, sys
