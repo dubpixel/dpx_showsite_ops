@@ -148,6 +148,31 @@ services:
     networks:
       - iot
 
+  netgear-backup:
+    build:
+      context: ./services/netgear-backup
+      dockerfile: Dockerfile
+    container_name: netgear-backup
+    restart: "no"  # Manual/cron triggered, not always-on
+    environment:
+      - M4300_USERNAME=${M4300_USERNAME}
+      - M4300_PASSWORD_M4300=${M4300_PASSWORD_M4300}
+      - M4300_PASSWORD_OTHER=${M4300_PASSWORD_OTHER}
+      - M4300_TFTP_SERVER=tftp-server
+      - M4300_SWITCHES=${M4300_SWITCHES}
+      - M4300_BACKUP_DIR=/backups
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-home}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-sensors}
+    volumes:
+      - netgear-backups:/backups
+    networks:
+      - iot
+    depends_on:
+      - tftp-server
+      - influxdb
+
 networks:
   iot:
     driver: bridge
@@ -157,3 +182,4 @@ volumes:
   influxdb-data:
   grafana-data:
   tftp-data:
+  netgear-backups:
