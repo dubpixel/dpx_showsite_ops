@@ -111,6 +111,12 @@ case "$1" in
     echo "✓ Image built"
     ;;
   
+  m4300-list-switches)
+    echo "Configured switches (from switches.conf):"
+    echo "========================================="
+    docker compose run --rm netgear-backup python3 netgear_system_backup_TFTP-v0d1.py --list-switches
+    ;;
+  
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
@@ -504,6 +510,7 @@ case "$1" in
     echo "    m4300-list [n]         List recent backup folders (default: 10)"
     echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
     echo "    m4300-build            Rebuild netgear-backup container image"
+    echo "    m4300-list-switches    Show parsed switch inventory from switches.conf"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"

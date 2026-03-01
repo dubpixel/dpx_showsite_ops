@@ -159,7 +159,6 @@ services:
       - M4300_PASSWORD_M4300=${M4300_PASSWORD_M4300}
       - M4300_PASSWORD_OTHER=${M4300_PASSWORD_OTHER}
       - M4300_TFTP_SERVER=tftp-server
-      - M4300_SWITCHES=${M4300_SWITCHES}
       - M4300_BACKUP_DIR=/backups
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
@@ -167,6 +166,7 @@ services:
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-sensors}
     volumes:
       - netgear-backups:/backups
+      - ./services/netgear-backup/switches.conf:/config/switches.conf:ro
     networks:
       - iot
     depends_on:
