@@ -40,6 +40,9 @@ telegraf/backups/
 # Device name overrides (local only)
 telegraf/conf.d/device-overrides.json
 
+# Deployment-specific configs
+config/switches.conf
+
 # Local backup/temp files
 .env_bu
 hostname

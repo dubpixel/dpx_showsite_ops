@@ -1,0 +1,20 @@
+# Netgear Switch Backup Configuration
+# Format: IP  NAME  MODEL
+# Comment out switches with # to skip them during backup
+#
+# MODEL values:
+#   M4300 - Uses M4300_PASSWORD_M4300 from .env
+#   other - Uses M4300_PASSWORD_OTHER from .env
+
+# Coachella 2025 Switch Inventory
+#192.168.105.241  CORE-101.241     M4300
+#192.168.105.242  12x12L.102.242   M4300
+#192.168.105.243  52G-R.103.243    M4300
+#192.168.105.244  52g-L.104.244    M4300
+#192.168.105.245  TD.105.245       other
+#192.168.105.246  PROG.106.246     other
+#192.168.105.247  EIC.107.247      other
+#192.168.105.248  SR.102.248       M4300
+192.168.105.249   FOH.103.249      M4300
+
+# Add additional switches below:
