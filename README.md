@@ -15,7 +15,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
+[![GPL-3.0 License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 </div>
 
@@ -477,17 +477,37 @@ Don't forget to give the project a star! Thanks again!
 
 <!-- LICENSE -->
 ## License
-This work is licensed under CC BY-SA 4.0 with the following additional restriction: __commercial sale of unmodified reproductions is prohibited.__ Modified versions that constitute a substantial remix may be sold under the same terms.
+
+This software is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — the Free Software Foundation's strong copyleft license for software.
 
 __In plain terms:__
 
-* Use it, learn from it, build on it — go buck wild!!
-* Give credit back to this project
-* _Don't_ just clone this and sell it— __that's not allowed__
-* Remixes, improvements, and real derivatives? Sell them, just keep the attribution and share-alike
-* Share your modifications under these same terms
+* **Use it, learn from it, build on it** — go buck wild!!
+* **Modify and distribute** — you can change it and share your changes
+* **Share your source code** — if you distribute modified versions, you must share the source under GPL-3.0
+* **Give credit** — preserve copyright notices and attributions
+* **Commercial use is allowed** — sell it, deploy it commercially, just keep it open source
+* **No warranty** — software is provided as-is
 
-_Questions about commercial use? Open an issue or reach out._
+The GPL-3.0 ensures this remains free and open source software forever. See the [LICENSE](LICENSE) file for the full legal text.
+
+_Questions about the license? Open an issue or reach out._
+
+### License History
+
+This project has evolved through different licenses:
+
+| Version | License | Period | Git Reference |
+|---------|---------|--------|---------------|
+| v1.0 | MIT License | Feb 5, 2026 | [f9a0428](https://github.com/dubpixel/dpx_showsite_ops/commit/f9a0428) |
+| v1.0.1 - v1.4.2 | CC BY-SA 4.0 | Feb 5 - Mar 5, 2026 | [1a415f0](https://github.com/dubpixel/dpx_showsite_ops/commit/1a415f0) onwards |
+| v2.0.0+ | **GPL-3.0** | March 5, 2026+ | Current |
+
+**Why the changes?**
+- **MIT → CC BY-SA 4.0**: Initial attempt to prevent unmodified commercial resale
+- **CC BY-SA 4.0 → GPL-3.0**: CC BY-SA is designed for creative works (documentation, art), not software. GPL-3.0 is the proper strong copyleft license for software projects.
+
+As the sole copyright holder, the author has relicensed the codebase. Previous versions obtained during earlier license periods remain available under those original licenses.
 
 <!-- CONTACT -->
 ## Contact
@@ -520,7 +540,7 @@ Project Link: [https://github.com/dubpixel/dpx_showsite_ops](https://github.com/
 [issues-shield]: https://img.shields.io/github/issues/dubpixel/dpx_showsite_ops.svg?style=flat-square
 [issues-url]: https://github.com/dubpixel/dpx_showsite_ops/issues
 [license-shield]: https://img.shields.io/github/license/dubpixel/dpx_showsite_ops.svg?style=flat-square
-[license-url]: https://github.com/dubpixel/dpx_showsite_ops/blob/main/LICENSE.txt
+[license-url]: https://github.com/dubpixel/dpx_showsite_ops/blob/main/LICENSE
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/jfleitell
 [product-architecture]: images/architecture.png
