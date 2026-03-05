@@ -1,6 +1,7 @@
-# Agent Workflow & Documentation Standards
+# dpx Agent Workflow & Documentation Standards - v1d6
 
 This document provides operational directives for AI coding assistants (GitHub Copilot, Claude Code, Cursor, etc.) working on dubpixel projects. These rules ensure consistent workflow automation, code quality, and documentation maintenance across all repositories.
+
 
 ---
 
@@ -102,6 +103,7 @@ If project has CHANGELOG.md, update it with version bump:
 ### Changed
 - Breaking change description
 ```
+**If no CHANGELOG.MD file exists:** Create one in the root of the project.
 
 **Where to bump version:**
 - Python: `__version__` in `__init__.py` or `pyproject.toml`
@@ -316,19 +318,7 @@ All code files must include a comprehensive header comment section:
 # ================================================================================
 # [FILE TYPE] - [FILE PURPOSE]
 # ================================================================================
-#
-# This project includes AI-generated code assistance provided by GitHub Copilot,
-# Claude Code, and other AI programming assistants.
-# 
-# Ground Rules for AI Assistance:
-# - No modifications to working code without explicit request
-# - Comprehensive commenting of all code (preserve existing, remove obsolete)
-# - Small, incremental changes to maintain code stability
-# - Verification before implementation of any suggestions
-# - Stay focused on the current task
-# - Answer only what is asked
-# - All user prompts and AI solutions documented in change log
-#
+# you can maybe write some stuff here - tagline etc.
 # ================================================================================
 # PROJECT: [project_name]
 # ================================================================================
@@ -337,14 +327,7 @@ All code files must include a comprehensive header comment section:
 # Purpose: [what this file does]
 # Dependencies: [key dependencies if any]
 #
-# CHANGE LOG:
-# 
-# YYYY-MM-DD: Initial creation
-# → Brief description of initial implementation
 #
-# YYYY-MM-DD: [User prompt as single line]
-# → Itemized solution point 1
-# → Itemized solution point 2
 #
 # ================================================================================
 ```
@@ -353,10 +336,7 @@ All code files must include a comprehensive header comment section:
 
 - Use consistent separator lines (80 characters of `=`)
 - Adjust comment syntax for the language (`#` for Python/bash, `//` for JS/C++, etc.)
-- Include AI assistance rules in every file
-- Maintain change log with user prompts and solutions
-- Update change log for EVERY modification to the file
-- Remove comments that become false or obsolete when code changes
+
 
 ---
 
@@ -417,6 +397,7 @@ Every project should have a `CONTEXT.md` file in the root directory. This is the
 
 ## 5. Core Principles
 
+
 ### No Modifications to Working Code
 
 - Do not refactor, optimize, or "improve" code that is working unless explicitly requested
@@ -445,9 +426,9 @@ Every project should have a `CONTEXT.md` file in the root directory. This is the
 
 ### Document Everything
 
-- All user prompts must be recorded in file change logs
-- All AI solutions must be itemized with `→` bullet points
-- Update change logs BEFORE committing code changes
+- README.md must be updated and maintaned when appropriate as per these guidelines
+- CONTEXT.md must be updated and maintaned when appropriate as per these guidelines
+- a comprehensive CHANGELOG.md must be kept updated and maintaned when appropriate as per these guidelines
 
 ---
 
@@ -461,12 +442,21 @@ Every project should have a `CONTEXT.md` file in the root directory. This is the
 - Include usage examples for complex functions
 - Explain algorithms and business logic
 
+
 ### README Files
 
 - Keep README.md current and accurate
 - README is user-facing - focus on how to USE the project
 - **Confirm all changes to README with the user before committing**
 - README should not duplicate CONTEXT.md (different audiences)
+
+### CHANGELOG.MD
+
+- Keep CHANGELOG.md current and accurate
+- CHANGELOG is user-facing - focus on changes, version numbers, dates and git hashes if needed
+- **keep this automated in background**
+- changelog could be retroactively updated to reflect git commit names if that adds clariy
+- **any changes to existing changelog line items should be confirmed with user**
 
 ### Markdown Style
 
@@ -502,6 +492,7 @@ Agents should infer and follow the conventions of the language they're working i
 - Use deterministic inputs for tests (inject time/randomness, don't read system state)
 - Name tests by behavior (e.g., `test_early_finish_extends_break`)
 - Include both positive and negative test cases
+- if the process includes: using ssh into a remote server, or user input in any way. open a terminal first for the user so you both can read it. 
 
 ---
 
