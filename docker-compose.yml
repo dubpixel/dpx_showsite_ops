@@ -138,16 +138,13 @@ services:
     image: pghalliday/tftp:latest
     container_name: tftp-server
     restart: unless-stopped
-    command: ["-c", "-vvv", "/var/tftpboot"]  # -c allows file creation, -vvv verbose logging
-    ports:
-      - "69:69/udp"
+    command: ["-L", "-c", "/var/tftpboot"]  # -L logging, -c allows file creation
+    network_mode: host  # Required for TFTP dynamic port allocation
     volumes:
       - tftp-data:/var/tftpboot
     environment:
-      # Temporary IP until management VLAN deployed
+      # TFTP listens on all interfaces - switches reach via host IP
       - BIND_ADDRESS=0.0.0.0
-    networks:
-      - iot
 
   netgear-backup:
     build:
