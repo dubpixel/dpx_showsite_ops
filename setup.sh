@@ -25,6 +25,12 @@
 #
 # CHANGE LOG:
 # 
+# 2026-03-06: Add cloudflared installation
+# → User prompt: Add cloudflared to setup.sh as required dependency
+# → Check if cloudflared exists, download and install if missing
+# → Required because management CLI has built-in tunnel commands
+# → Downloads latest .deb from GitHub releases, installs via dpkg
+#
 # 2026-02-16: Initial creation
 # → User prompt: Create missing setup.sh referenced in docs
 # → Check Docker prerequisites
@@ -87,6 +93,41 @@ if ! groups | grep -q docker; then
     echo ""
 else
     echo -e "${GREEN}OK${NC}"
+fi
+
+# Check for cloudflared (required for tunnel commands)
+echo -n "Checking cloudflared installation... "
+if command -v cloudflared &> /dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${YELLOW}NOT FOUND${NC}"
+    echo "cloudflared is required for 'iot tunnel' commands."
+    echo "Installing cloudflared..."
+    
+    # Download and install cloudflared
+    CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb"
+    TEMP_DEB="/tmp/cloudflared-$$.deb"
+    
+    if curl -L --silent --show-error --fail "$CLOUDFLARED_URL" -o "$TEMP_DEB"; then
+        if sudo dpkg -i "$TEMP_DEB" &>/dev/null; then
+            rm -f "$TEMP_DEB"
+            if command -v cloudflared &> /dev/null; then
+                echo -e "${GREEN}INSTALLED${NC} ($(cloudflared --version 2>&1 | head -n1))"
+            else
+                echo -e "${YELLOW}WARNING${NC}: Installation completed but cloudflared not in PATH"
+            fi
+        else
+            rm -f "$TEMP_DEB"
+            echo -e "${RED}FAILED${NC}"
+            echo "Could not install cloudflared. You can install it manually later:"
+            echo "  curl -L $CLOUDFLARED_URL -o cloudflared.deb"
+            echo "  sudo dpkg -i cloudflared.deb"
+        fi
+    else
+        rm -f "$TEMP_DEB"
+        echo -e "${RED}FAILED${NC}"
+        echo "Could not download cloudflared. You can install it manually later."
+    fi
 fi
 
 # Create .env if it doesn't exist
