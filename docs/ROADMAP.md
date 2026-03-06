@@ -335,12 +335,25 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - **Testing Approach**: USB NIC workaround (KISS)
   - Temporary Art-Net input via separate USB network interface
   - Avoids VLAN complexity for initial testing
-  - Phase 11 VLAN approach can be implemented later if needed
+  - Phase 10 VLAN approach can be implemented later if needed
   - Fallback: Additional USB NICs if VLAN approach proves difficult
 - **Outstanding Items**:
   - [ ] Art-Net testing with actual DMX controller hardware
   - [ ] Usage documentation (enable/configure/troubleshoot)
   - [ ] Production deployment validation
+
+### Phase 6.6: Google Sheets Integration Testing 📋
+- **Goal**: Validate end-to-end Google Sheets integration with production data
+- **Setup**:
+  - [ ] Configure service account credentials
+  - [ ] Connect to Coachella spreadsheet
+  - [ ] Verify column-based parsing (B, D, E, F, G columns)
+- **Testing**:
+  - [ ] Test background polling (30-second sync)
+  - [ ] Verify actual time writes back to Google Sheets
+  - [ ] Validate WebSocket broadcast on sheet updates
+  - [ ] Test conflict resolution (multiple operators)
+- **Validation**: Real-time schedule updates flowing bidirectionally
 
 **What It Is:**
 - FastAPI web app for real-time schedule tracking
@@ -395,155 +408,75 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-## � Phase 8: Consumables Tracking (In Progress - H5194 Proof of Concept)
+## 📢 Phase 8: Alert System (Planned)
 
-**Goal**: Monitor and track consumable item usage by person, type, and over time
+**Goal**: Foundational notification system for all monitoring phases
 
-**Current Status**: Detoured to proof-of-concept for Govee H5194 meat probe integration
+**What we'll build:**
 
-**What we're building:**
+### Phase 8.1: Notification Channels
+- Slack/Discord/email integration
+- Configurable delivery preferences per alert type
+- Alert severity levels (info, warning, critical)
+- Rate limiting and de-duplication
 
-### Phase 8.0: Govee H5194 Meat Probe Integration (Active Development)
-- **Status**: 🔬 Proof-of-concept phase
-- **Current Work**:
-  - BLE packet reverse engineering complete
-  - Scripts: `scripts/scan_h5194.py` (advanced), `scan_h5194_simple.py` (basic)
-  - Multiple scanning modes: 60s watch, 20s fast, deep scan, live monitoring
-  - Multi-probe support (up to 4 probes per H5194 base unit)
-- **Next Steps**:
-  - Merge H5194 decoder logic into `ble_decoder.py` container
-  - MQTT payload standardization with existing sensor topics
-  - Test with ESP32 gateways (currently script uses direct BLE on Mac)
-  - InfluxDB integration for temperature history
-  - Grafana dashboards for multi-probe monitoring
-- **Use Case**: Temperature monitoring for food prep/service at show sites
+### Phase 8.2: Alert Rules
+- Temperature threshold alerts (Phase 13 integration)
+- Device offline detection
+- API health monitoring
+- Schedule slip notifications (Phase 6 integration)
+- LTC sync loss alerts (Phase 9 integration)
+- Backup failure notifications (Phase 5 integration)
 
-### Phase 8.1: HID Input Integration
-- USB barcode scanner / HID keyboard support
-- Alphanumeric ID entry interface
-- Quantity input forms
-- Person/item/timestamp association
-- Integration with H5194 temperature data
-
-### Phase 8.2: Consumables Database
-- InfluxDB schema for consumption events
-- Person ID tracking (badge scan, manual entry)
-- Item type taxonomy (food, beverage, supplies, etc.)
-- Quantity and timestamp logging
-- Temperature history from H5194 probes
-
-### Phase 8.3: Reporting & Analytics
-- Grafana dashboards for consumption trends
-- Per-person usage tracking
-- Item type breakdowns over time
-- Inventory depletion projections
-- Peak consumption period analysis
-- Temperature compliance reporting
-
-### Phase 8.4: Input Interfaces
-- Web form for manual entry
-- Dedicated HID keyboard station for fast entry
-- Mobile-friendly interface for field use
-- Batch entry support for bulk logging
-
-### Phase 8.5: Hotdog Consumption Tracking
-- **Temperature Monitoring**: Govee H5194 meat probes for food safety
-- **Consumption Tracking UI**:
-  - Push button interface for general consumption counter
-  - Numeric keyboard with 3-letter ID entry (localized, secure)
-  - Alternative: Typing observed but acceptable for event environment
-- **Leaderboard/Stats Board**:
-  - Real-time consumption stats per person
-  - Total consumption counters
-  - InfluxDB storage for historical analysis
-- **Optional**: SMS short code integration to link 3-letter ID to phone number
-- **Grafana Integration**: Live leaderboard dashboard with competitor rankings
+### Phase 8.3: Alert Dashboard
+- Grafana alerts configuration
+- Alert history and acknowledgment
+- Silencing and muting options
+- On-call rotation management (optional)
 
 **Use Cases:**
-- Track catering consumption per person per meal
-- Monitor supplies depletion rates
-- Food temperature compliance monitoring
-- Hotdog eating contest scoring and leaderboards
-- Identify high-use items for restocking
-- Generate per-event expense reports
-- Analyze consumption patterns across multiple events
+- Proactive response to sensor failures
+- Show-critical synchronization loss detection
+- Infrastructure health degradation warnings
+- Schedule deviation alerts during live events
 
-**Status**: 🚧 In Progress - H5194 BLE decoder proof-of-concept underway, full phase follows
+**Dependencies:**
+- Integrates with Phase 5 (backup monitoring), Phase 6 (schedule slip), Phase 9 (LTC sync), Phase 13 (temperature)
 
----
-
-## 🌡️ Phase 9: Wireless Temperature Probes (Feasibility Check)
-
-**Goal**: Integrate Govee wireless temperature/humidity probes into monitoring stack
-
-**What we'll explore:**
-
-### Phase 9.1: Device Compatibility Research
-- Identify compatible Govee temperature probe models (H5179, H5075, etc.)
-- Protocol analysis (BLE advertisement format)
-- Range and battery life testing
-- Multi-probe deployment feasibility
-
-### Phase 9.2: BLE Integration
-- Extend ble_decoder.py with temperature probe support
-- Add probe-specific MQTT topics and parsing
-- Handle multiple probes simultaneously
-- Source tagging and device mapping
-
-### Phase 9.3: Specialized Monitoring
-- Probe-specific Grafana dashboards
-- Temperature gradient visualization (multiple locations)
-- Alert thresholds for critical temperatures
-- Historical trend analysis for venue climate patterns
-
-### Phase 9.4: Use Case Applications
-- Food storage temperature compliance
-- Equipment room thermal monitoring
-- Outdoor vs indoor temperature differentials
-- HVAC performance validation
-- Cold chain monitoring for perishables
-
-**Feasibility Questions:**
-- Can existing ESP32/Theengs gateways decode probe formats?
-- What's the practical range with existing BLE infrastructure?
-- Battery life under continuous monitoring?
-- Cost-effectiveness vs wired sensors?
-
-**Status**: 🧪 Feasibility Test - Quick 30-minute validation test with probes on hand. Just need to verify BLE broadcast format compatibility with existing decoder infrastructure.
+**Status**: 📋 Planned - foundational for all monitoring phases
 
 ---
 
-## 🔮 Future Phases (Additional Ideas)
-
-### Phase 10: LTC Monitoring Real-Time Dashboard (Production Priority)
+## 🎬 Phase 9: LTC Monitoring Real-Time Dashboard (Production Priority)
 
 **Goal**: Real-time Linear Timecode monitoring for A/V sync validation in live show environments
 
 **What we'll build:**
 
-### Phase 10.1: rs-ltc-qc Integration
+### Phase 9.1: rs-ltc-qc Integration
 - Integrate rs-ltc-qc (private repo - awaiting access for detailed planning)
+- https://github.com/dubpixel/rs-ltc-qc/ (our fork of sp's project)
 - Parse timecode quality analysis output
 - Extract sync health metrics, drift detection, signal loss events
 - Determine data format (JSON, text logs, metrics endpoint?)
 - Define deployment architecture (same host, separate machine?)
 
-### Phase 10.2: Data Pipeline
+### Phase 9.2: Data Pipeline
 - Stream rs-ltc-qc output to InfluxDB
 - Schema design: timecode values, drift measurements, quality scores
 - Sub-100ms latency from signal capture to database write
 - Timestamp synchronization strategy
 
-### Phase 10.3: Real-Time Dashboard
+### Phase 9.3: Real-Time Dashboard
 - Grafana panel showing live timecode display
 - Visual alerts for drift >2 frames
 - Signal loss/recovery indicators
 - Historical drift trend visualization
 - Multi-source timecode comparison (if applicable)
 
-### Phase 10.4: Alert System
+### Phase 9.4: Alert Integration
 - Trigger conditions: drift threshold, signal loss, quality degradation
-- Alert delivery mechanism (Grafana alerts, external notification?)
+- Integration with Phase 8 alert system
 - Configurable thresholds per show environment
 
 **Use Cases:**
@@ -559,13 +492,12 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] Testing with rs-ltc-qc decoder
 - [ ] Network latency profiling for sub-100ms target
 - [ ] Deployment target specification
-- [ ] Alert delivery requirements
 
-**Status**: 📋 Production Requirement - awaiting rs-ltc-qc repo access to begin implementation
+**Status**: 🧪 Proof of Concept - exploration in progress
 
 ---
 
-## 📋 Phase 11: External Network VLAN Integration (Planned)
+## 📡 Phase 10: External Network VLAN Integration (Planned)
 
 **Goal**: Design and implement VLAN segmentation for show site operations with new IP addressing schema
 
@@ -573,7 +505,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **What we'll build:**
 
-### Phase 11.1: Traffic Analysis & Requirements
+### Phase 10.1: Traffic Analysis & Requirements
 - **Document traffic types and VLAN assignments**:
   - **VLAN 20**: Art-Net (DMX/lighting control)
   - **VLAN 110**: IoT devices (sensors, Govee, Geist)
@@ -583,7 +515,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Inter-VLAN routing rules and policies
 - Security considerations (ACLs, isolation)
 
-### Phase 11.2: IP Schema Redesign
+### Phase 10.2: IP Schema Redesign
 - **CIDR ranges**: User has VLAN CIDR ranges ready/in progress
 - New subnet allocation per VLAN
 - Static IP assignments for critical devices (dpx-showsite-ops VM, switches, gateways)
@@ -591,21 +523,21 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - DNS/mDNS considerations across VLANs
 - Migration plan from current flat 192.168.1.0/24 network
 
-### Phase 11.3: Documentation & Planning
+### Phase 10.3: Documentation & Planning
 - **Coachella Spreadsheet**: Document network architecture for event ("killing 2 stoners with 1 bong")
 - Network diagrams (logical topology, physical layout)
 - IP allocation tables per VLAN
 - Device inventory with VLAN assignments
 - Cabling plan and port assignments
 
-### Phase 11.4: M4300 VLAN Configuration
+### Phase 10.4: M4300 VLAN Configuration
 - Port VLAN assignments (access vs trunk)
 - Inter-VLAN routing setup (L3 switch or external router)
 - ACLs for traffic isolation
 - QoS policies for Art-Net priority (VLAN 20)
 - VLAN tagging and untagged port configuration
 
-### Phase 11.5: Testing & Validation
+### Phase 10.5: Testing & Validation
 - Connectivity testing per VLAN
 - Art-Net traffic validation on VLAN 20 (production approach, Phase 6 using USB NIC workaround for now)
 - IoT sensor communication on VLAN 110
@@ -625,7 +557,171 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-## 📋 Phase 12: VLAN Meistro Configuration Tool (Exploratory)
+## 🎭 Phase 11: D3 Show Management Center Integration (Planned)
+
+**Goal**: Monitor and control disguise media servers via SMC API for live show operations
+
+**What we'll build:**
+
+### Phase 11.1: SMC API Client
+- Python wrapper for D3 SMC REST API
+- Authentication and session management
+- API endpoint coverage:
+  - Power management (IPMI on/off/cycle/status)
+  - D3 host status and session info
+  - Network configuration monitoring
+  - Rear LED strip control (status indication)
+  - System health metrics
+
+### Phase 11.2: Metrics Collection
+- InfluxDB integration for SMC data:
+  - D3 host status (online/offline/session state)
+  - Session name and timecode sync status
+  - Server uptime and performance metrics
+  - Power state history
+  - Network interface statistics
+- Polling interval: 10-30 seconds for show-critical data
+
+### Phase 11.3: Grafana Dashboard
+- Real-time D3 server health panel
+- Session state visualization
+- Power state indicators
+- LED strip status display
+- Historical uptime tracking
+- Alert thresholds integrated with Phase 8
+
+### Phase 11.4: Control Integration
+- Remote power management interface
+- Optional: Phase 6 set-schedule integration
+  - Trigger D3 session start based on act times
+  - Power management based on show schedule
+  - Automated pre-show server wake-up
+
+**Use Cases:**
+- Monitor D3 media servers during live shows
+- Remote power control for troubleshooting
+- Track server uptime and session states
+- Post-event analysis of server health
+- Automated show workflows with schedule integration
+
+**API Reference:** [docs/smc.swagger.json](docs/smc.swagger.json)
+
+**Status**: 📋 Planned - SMC API spec available, implementation pending
+
+---
+
+## 🍔 Phase 12: Consumables Tracking (Planned)
+
+**Goal**: Monitor and track consumable item usage by person, type, and over time
+
+**What we'll build:**
+
+### Phase 12.1: HID Input Integration
+- USB barcode scanner / HID keyboard support
+- Alphanumeric ID entry interface
+- Quantity input forms
+- Person/item/timestamp association
+
+### Phase 12.2: Consumables Database
+- InfluxDB schema for consumption events
+- Person ID tracking (badge scan, manual entry)
+- Item type taxonomy (food, beverage, supplies, etc.)
+- Quantity and timestamp logging
+
+### Phase 12.3: Reporting & Analytics
+- Grafana dashboards for consumption trends
+- Per-person usage tracking
+- Item type breakdowns over time
+- Inventory depletion projections
+- Peak consumption period analysis
+
+### Phase 12.4: Input Interfaces
+- Web form for manual entry
+- Dedicated HID keyboard station for fast entry
+- Mobile-friendly interface for field use
+- Batch entry support for bulk logging
+
+### Phase 12.5: Hotdog Consumption Tracking
+- **Consumption Tracking UI**:
+  - Push button interface for general consumption counter
+  - Numeric keyboard with 3-letter ID entry (localized, secure)
+  - Alternative: Typing observed but acceptable for event environment
+- **Leaderboard/Stats Board**:
+  - Real-time consumption stats per person
+  - Total consumption counters
+  - InfluxDB storage for historical analysis
+- **Optional**: SMS short code integration to link 3-letter ID to phone number
+- **Grafana Integration**: Live leaderboard dashboard with competitor rankings
+
+**Use Cases:**
+- Track catering consumption per person per meal
+- Monitor supplies depletion rates
+- Hotdog eating contest scoring and leaderboards
+- Identify high-use items for restocking
+- Generate per-event expense reports
+- Analyze consumption patterns across multiple events
+
+**Status**: 📋 Planned - human interface focus for consumption tracking
+
+---
+
+## 🌡️ Phase 13: Wireless Temperature Probes (POC Complete)
+
+**Goal**: Integrate wireless temperature/humidity probes via BLE into monitoring stack
+
+**What we've built and will build:**
+
+### Phase 13.0: H5194 Meat Probe Integration ✅ POC Complete
+- **Status**: ✅ Proof-of-concept complete
+- **Current Work**:
+  - ✅ BLE packet reverse engineering complete
+  - ✅ Scripts: `scripts/scan_h5194.py` (advanced), `scan_h5194_simple.py` (basic)
+  - ✅ Multiple scanning modes: 60s watch, 20s fast, deep scan, live monitoring
+  - ✅ Multi-probe support (up to 4 probes per H5194 base unit)
+- **Next Steps**:
+  - Merge H5194 decoder logic into `ble_decoder.py` container
+  - MQTT payload standardization with existing sensor topics
+  - Test with ESP32 gateways (currently script uses direct BLE on Mac)
+  - InfluxDB integration for temperature history
+  - Grafana dashboards for multi-probe monitoring
+- **Use Case**: Temperature monitoring for food prep/service at show sites, food safety compliance
+
+### Phase 13.1: Device Compatibility Research
+- Identify compatible Govee temperature probe models (H5179, H5075, etc.)
+- Protocol analysis (BLE advertisement format)
+- Range and battery life testing
+- Multi-probe deployment feasibility
+
+### Phase 13.2: BLE Integration
+- Extend ble_decoder.py with temperature probe support
+- Add probe-specific MQTT topics and parsing
+- Handle multiple probes simultaneously
+- Source tagging and device mapping
+
+### Phase 13.3: Specialized Monitoring
+- Probe-specific Grafana dashboards
+- Temperature gradient visualization (multiple locations)
+- Alert thresholds for critical temperatures (Phase 8 integration)
+- Historical trend analysis for venue climate patterns
+
+### Phase 13.4: Use Case Applications
+- Food storage temperature compliance
+- Equipment room thermal monitoring
+- Outdoor vs indoor temperature differentials
+- HVAC performance validation
+- Cold chain monitoring for perishables
+
+**Feasibility Questions:**
+- Can existing ESP32/Theengs gateways decode probe formats? (H5194: TBD)
+- What's the practical range with existing BLE infrastructure?
+- Battery life under continuous monitoring?
+- Cost-effectiveness vs wired sensors?
+
+**Status**: 🚧 POC Complete - H5194 scan scripts operational, ble_decoder.py integration next
+
+---
+
+## 📋 Phase 14: VLAN Meistro Configuration Tool (Exploratory)
 
 **Goal**: Web-based VLAN configuration generator that outputs deployment scripts
 
@@ -633,7 +729,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **What we'll explore:**
 
-### Phase 12.1: Requirements & Design
+### Phase 14.1: Requirements & Design
 - **User Input**:
   - Device types and quantities
   - Network topology (switch count, uplink configuration)
@@ -642,7 +738,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - **Template System**: Common show site layouts (single-stage, multi-stage, festival)
 - **Validation**: IP schema conflicts, VLAN ID availability, port capacity
 
-### Phase 12.2: Web Interface (If Pursuing)
+### Phase 14.2: Web Interface (If Pursuing)
 - FastAPI or Flask web application
 - Form-based configuration wizard
 - Real-time IP allocation preview
@@ -650,7 +746,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - Download generated configuration script
 - Optional: Direct API integration to push configs to switches
 
-### Phase 12.3: Script Generation
+### Phase 14.3: Script Generation
 - **M4300 CLI command templates**:
   - VLAN creation and naming
   - Port VLAN assignment (access/trunk)
@@ -669,7 +765,43 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
-### Phase 13: Device Override Backup & Sync
+## 🌍 Phase 15: Multi-Site Support (Planned)
+
+**Goal**: Replicate stack to additional show sites with centralized monitoring
+
+**What we'll build:**
+- Replicate stack to additional show sites
+- Centralized monitoring dashboard
+- Site comparison views
+- Federated data queries
+- Cross-site device naming conventions
+- Multi-tenant Grafana dashboards
+
+**Status**: 📋 Planned - depends on successful single-site deployment
+
+---
+
+## 🔌 Phase 16: Additional Sensor Types (Planned)
+
+**Goal**: Expand sensor coverage beyond temperature/humidity
+
+**What we'll explore:**
+- Motion sensors (PIR)
+- Light sensors
+- Door/window sensors
+- Energy monitoring (smart plugs)
+- Occupancy detection
+- Sound level monitoring
+
+**Status**: 📋 Planned - extends Phase 4 BLE infrastructure
+
+---
+
+## 💾 Phase 17: Device Override Backup & Sync (Planned)
+
+**Goal**: Cloud backup and synchronization of local device naming overrides
+
+**What we'll build:**
 - Backup device-overrides.json to cloud storage or scruot
 - Sync overrides across multiple showsite deployments
 - Version control integration for team collaboration
@@ -682,25 +814,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] Conflict resolution strategy for simultaneous edits
 - [ ] Recovery time <1 minute for override restore
 
-### Phase 14: Alert System
-- Slack/Discord/email notifications
-- Temperature threshold alerts
-- Device offline detection
-- API health monitoring
-- Schedule slip notifications
-- LTC sync loss alerts
-
-### Phase 15: Multi-Site Support
-- Replicate stack to additional show sites
-- Centralized monitoring dashboard
-- Site comparison views
-- Federated data queries
-
-### Phase 16: Additional Sensor Types
-- Motion sensors (PIR)
-- Light sensors
-- Door/window sensors
-- Energy monitoring (smart plugs)
+**Status**: 📋 Planned - unclear immediate priority, deferred to later phases
 
 ---
 
@@ -721,19 +835,21 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [x] Windows NUC Theengs Gateway configured and tested
 
 **Phase 5:**
-- [ ] TFTP server deployed and operational
-- [ ] dpx-netgear-backup repo integrated as submodule
-- [ ] M4300 connectivity established from VM (192.168.0.x subnet access)
-- [ ] M4300 SNMP monitoring live in Grafana
-- [ ] Network configs backed up daily
-- [ ] 30-day retention of config history
-- [ ] Recovery time < 5 minutes for switch restore
+- [x] TFTP server deployed and operational ✅
+- [x] dpx-netgear-backup repo integrated ✅
+- [x] M4300 connectivity established ✅
+- [x] M4300 SNMP monitoring live in Grafana ✅
+- [x] Network configs backed up daily ✅
+- [ ] Backup success dashboard with failure alerts (Phase 5.5)
+- [ ] NTP server deployed (Phase 5.7)
+- [ ] iperf3 installed on VM (Phase 5.7)
 
 **Phase 6:**
 - [x] Set-schedule service running in Docker
 - [x] Real-time schedule updates via WebSocket
 - [x] Manual set time tracking working end-to-end
-- [ ] Art-Net implementation tested with DMX hardware
+- [ ] Art-Net implementation tested with DMX hardware (Phase 6.5)
+- [ ] Google Sheets integration tested with Coachella spreadsheet (Phase 6.6)
 - [ ] Art-Net usage documentation complete
 - [ ] Optional: Slip data flowing to InfluxDB
 
@@ -745,41 +861,51 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 - [ ] Manual override capability working
 - [ ] Dashboard shows device states and automation status
 
-**Phase 8:**
-- [ ] H5194 BLE decoder integrated into ble_decoder.py
-- [ ] H5194 temperature data flowing to InfluxDB
+**Phase 8** (Alert System):
+- [ ] Slack/Discord/email integration functional
+- [ ] Temperature threshold alerts operational
+- [ ] Device offline detection working
+- [ ] Schedule slip notifications via Phase 6 integration
+- [ ] Alert delivery <30 seconds from trigger
+- [ ] Rate limiting and de-duplication active
+
+**Phase 9** (LTC Monitoring):
+- [ ] LTC hardware interface selected and procured
+- [ ] Timecode generation setup adjacent to NIC
+- [ ] rs-ltc-qc integration complete
+- [ ] Sub-100ms latency achieved
+- [ ] Grafana dashboard showing real-time sync status
+- [ ] Drift alerts via Phase 8 integration
+
+**Phase 10** (VLAN Integration):
+- [ ] VLAN traffic requirements documented
+- [ ] IP schema redesigned and documented (CIDR ranges)
+- [ ] Coachella spreadsheet network documentation complete
+- [ ] M4300 VLANs configured and tested
+- [ ] Art-Net traffic isolated on VLAN 20 (production-ready approach)
+- [ ] Inter-VLAN routing validated
+
+**Phase 11** (D3 SMC):
+- [ ] SMC API client wrapper complete
+- [ ] D3 host metrics flowing to InfluxDB
+- [ ] Grafana dashboard for server health deployed
+- [ ] IPMI power control tested
+- [ ] Optional: set-schedule trigger integration
+
+**Phase 12** (Consumables Tracking):
 - [ ] HID keyboard input working for ID + quantity entry
 - [ ] Data flowing to InfluxDB with person/item/timestamp
 - [ ] Grafana dashboards show consumption trends per person and item type
 - [ ] Hotdog leaderboard dashboard operational
 - [ ] Sub-30 second entry time for typical transaction
 
-**Phase 9:**
-- [ ] Feasibility assessment complete (range, battery, cost)
-- [ ] At least 1 Govee temperature probe model decoded
+**Phase 13** (Wireless Temperature Probes):
+- [x] H5194 BLE protocol decoded ✅
+- [x] scan_h5194.py POC scripts complete ✅
+- [ ] H5194 decoder integrated into ble_decoder.py
+- [ ] H5194 temperature data flowing to InfluxDB
 - [ ] Multi-probe tracking working simultaneously
 - [ ] Specialized dashboard showing temperature gradients
-
-**Phase 10:**
-- [ ] LTC hardware interface selected and procured
-- [ ] Timecode generation setup adjacent to NIC
-- [ ] rs-ltc-qc integration complete
-- [ ] Sub-100ms latency achieved
-- [ ] Grafana dashboard showing real-time sync status
-
-**Phase 11:**
-- [ ] VLAN traffic requirements documented
-- [ ] IP schema redesigned and documented (CIDR ranges)
-- [ ] Coachella spreadsheet network documentation complete
-- [ ] M4300 VLANs configured and tested
-- [ ] Art-Net traffic isolated on VLAN 20 (production-ready approach, Phase 6 using USB NIC workaround)
-- [ ] Inter-VLAN routing validated
-
-**Phase 12:**
-- [ ] Requirements defined and approved
-- [ ] Web interface deployed (if pursuing)
-- [ ] Script generation tested on M4300
-- [ ] Multi-site deployment validated
 
 ---
 
@@ -787,20 +913,25 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 **Phase 3**: ✅ Complete (2026-02-05)  
 **Phase 4**: ✅ Complete (2026-02-24) - BLE decoder dockerized and operational  
-**Phase 5**: 🚧 In Progress (2026-02-27) - TFTP server and M4300 connectivity work underway  
-**Phase 6**: 🚧 In Progress - Core complete, Art-Net testing with USB NIC workaround (KISS)  
+**Phase 5**: ✅ Mostly Complete (2026-03-06) - TFTP/backup/M4300/SNMP operational, dashboard design pending  
+**Phase 6**: 🚧 In Progress - Core complete, Art-Net + Google Sheets testing pending  
 **Phase 7**: 📋 Planned - After Phase 4 + Phase 6, requires BLE data and schedule integration  
-**Phase 8**: 🚧 In Progress (2026-02-27) - H5194 proof-of-concept, detoured from Phase 5  
-**Phase 9**: 📋 Planned - After Phase 4, extends BLE infrastructure  
-**Phase 10**: 🚧 Proof of Concept (2026-02-27) - LTC monitoring exploration, parallel with Phase 8  
-**Phase 11**: 📋 Planned - CIDR ranges in progress, VLAN approach for Art-Net (Phase 6 using USB NIC for now)  
-**Phase 12**: 📋 Exploratory - Low priority, multi-site deployment tool  
+**Phase 8**: 📋 Planned - Alert System (foundational for monitoring phases)  
+**Phase 9**: 🧪 POC In Progress (2026-03-06) - LTC monitoring exploration  
+**Phase 10**: 📋 Planned - VLAN integration, CIDR ranges in design phase  
+**Phase 11**: 📋 Planned - D3 SMC integration, API spec available  
+**Phase 12**: 📋 Planned - Consumables tracking (HID input, leaderboards)  
+**Phase 13**: ✅ POC Complete (2026-03-06) - H5194 meat probe scripts operational  
+**Phase 14**: 📋 Exploratory - VLAN Meistro (low priority configuration tool)  
+**Phase 15-17**: 📋 Planned - Multi-site support, additional sensors, device override backup  
 
-**Current Focus** (2026-02-27): 
-- **Primary**: Phase 5 (M4300 setup) - should be working on this
-- **Detour**: Phase 8 (H5194 meat probes) - proof-of-concept exploration
-- **Parallel**: Phase 10 (timecode monitoring) - proof-of-concept exploration
-- **Ready to Test**: Phase 6 Art-Net - USB NIC workaround approach (hardware testing pending)
+**Current Focus** (2026-03-06): 
+- **Completed**: Phase 5 core work (TFTP ✅, backup script ✅, M4300 ✅, SNMP ✅)
+- **Completed**: Phase 13.0 POC (H5194 scan scripts ✅)
+- **Next Up**: Phase 5.7 (NTP + iperf3), Phase 6.6 (Google Sheets testing)
+- **Ready to Test**: Phase 6.5 Art-Net (USB NIC workaround, hardware pending)
+- **POC Active**: Phase 9 (LTC monitoring exploration)
+- **Design Phase**: Phase 10 (VLAN CIDR ranges)
 
 ---
 
@@ -808,13 +939,16 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 - Each phase builds on previous phases without breaking existing functionality
 - Phases can be skipped or reordered based on priority
-- **Phase 5**: TFTP work comes FIRST (dpx-netgear-backup repo), then M4300 connectivity, then SNMP monitoring
-- **Phase 6**: Art-Net code complete, testing with USB NIC workaround (KISS) - Phase 11 VLAN approach for production later
-- **Phase 8**: Currently exploring H5194 meat probe integration as proof-of-concept (detour from Phase 5)
-- **Phase 10**: Timecode monitoring in proof-of-concept phase (parallel with Phase 8)
-- **Phase 11**: VLAN work provides production-ready Art-Net isolation - CIDR ranges ready/in-progress, Phase 6 proceeding with USB NIC workaround
-- **Phase 12**: Exploratory concept, may be deferred indefinitely
+- **Phase 5**: Mostly complete - TFTP ✅, backup ✅, M4300 ✅, SNMP ✅, dashboard design pending
+- **Phase 6**: Art-Net code complete, testing with USB NIC workaround (KISS) - Phase 10 VLAN approach for production later
+- **Phase 8**: Alert System promoted to foundational status - integrates with phases 5, 6, 9, 13
+- **Phase 9**: LTC monitoring in POC phase (production priority for show sync validation)
+- **Phase 10**: VLAN work provides production-ready Art-Net isolation - CIDR ranges in progress
+- **Phase 11**: D3 SMC integration for disguise server monitoring - API spec available
+- **Phase 12**: Consumables tracking refocused on human interface (HID, leaderboards)
+- **Phase 13**: H5194 meat probe POC complete ✅ - integration into ble_decoder.py next
+- **Phase 14**: VLAN Meistro exploratory concept, may be deferred indefinitely
 - Custom ESP32 BLE gateways: Deployed and operational (Phase 4 complete)
-- M4300 8x8 switch available at studio (192.168.0.238 or .239, needs connectivity from VM at 192.168.1.100)
-- dpx-netgear-backup repo (private): Backup script mostly complete, needs integration
+- M4300 8x8 switch at studio: Connected and monitored
+- dpx-netgear-backup repo (private): Integrated and operational
 - Naming convention (dpx-showsite-ops) enables multi-site deployments
