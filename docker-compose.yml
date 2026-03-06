@@ -158,6 +158,7 @@ services:
       - M4300_PASSWORD_OTHER=${M4300_PASSWORD_OTHER}
       - M4300_TFTP_SERVER=${M4300_TFTP_SERVER:-tftp-server}
       - M4300_BACKUP_DIR=/backups
+      - TZ=${TZ:-America/New_York}
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       - INFLUXDB_ORG=${INFLUXDB_ORG:-home}
