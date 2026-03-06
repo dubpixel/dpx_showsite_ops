@@ -92,13 +92,34 @@ case "$1" in
     echo "=================="
     docker compose run --rm netgear-backup ls -lth /backups/logs 2>/dev/null | head -${2:-10}
     echo ""
-    echo "View full log: docker compose run --rm netgear-backup cat /backups/logs/<filename>"
+    echo "View full log: iot m4300-log-view <filename>"
+    ;;
+  
+  m4300-log-view)
+    if [ -z "$2" ]; then
+      echo "Usage: iot m4300-log-view <filename>"
+      echo "List logs with: iot m4300-logs"
+    else
+      docker compose run --rm netgear-backup cat /backups/logs/$2
+    fi
     ;;
   
   m4300-list)
     echo "Recent M4300 backups:"
     echo "====================="
-    docker compose run --rm netgear-backup ls -ltdh /backups/202* 2>/dev/null | head -${2:-10}
+    docker compose run --rm netgear-backup sh -c '
+      for dir in $(ls -dt /backups/202* 2>/dev/null | head -'${2:-10}'); do
+        echo ""
+        echo "📁 $(basename $dir)"
+        ls -lh $dir/*.cfg 2>/dev/null | awk "{printf \"  %-25s %5s  %s %s %s\n\", \$9, \$5, \$6, \$7, \$8}" | sed "s|.*/||"
+      done
+    '
+    ;;
+  
+  m4300-list-all)
+    echo "All M4300 backup files:"
+    echo "======================="
+    docker compose run --rm netgear-backup find /backups -name "*.cfg" -exec ls -lh {} \; | awk "{print \$9, \$5, \$6, \$7, \$8}" | column -t
     ;;
   
   m4300-network-fix)
@@ -521,7 +542,9 @@ case "$1" in
     echo "    m4300-backup           Run M4300 config backup now (containerized)"
     echo "    m4300-backup-mock      Run backup in MOCK mode (no real switches)"
     echo "    m4300-logs [n]         View recent backup logs (default: 10)"
-    echo "    m4300-list [n]         List recent backup folders (default: 10)"
+    echo "    m4300-log-view <file>  Display full backup log file"
+    echo "    m4300-list [n]         List recent backups with config files (default: 10)"
+    echo "    m4300-list-all         List all backup files across all dates"
     echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
     echo "    m4300-build            Rebuild netgear-backup container image"
     echo "    m4300-list-switches    Show parsed switch inventory from switches.conf"
