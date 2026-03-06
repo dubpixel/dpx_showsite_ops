@@ -105,10 +105,10 @@ case "$1" in
     "$REPO_ROOT/scripts/setup-m4300-network.sh"
     ;;
   
-  m4300-build)
-    echo "Building netgear-backup container image..."
+  m4300-rebuild)
+    echo "Rebuilding netgear-backup container image..."
     docker compose build netgear-backup
-    echo "✓ Image built"
+    echo "✓ Image rebuilt"
     ;;
   
   m4300-list-switches)
