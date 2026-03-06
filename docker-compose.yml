@@ -165,6 +165,7 @@ services:
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-sensors}
     volumes:
       - netgear-backups:/backups
+      - tftp-data:/tftp:ro  # Read-only access to TFTP files for retrieval
       - ./config/switches.conf:/config/switches.conf:ro
     networks:
       - iot
