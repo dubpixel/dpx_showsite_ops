@@ -138,6 +138,7 @@ services:
     image: pghalliday/tftp:latest
     container_name: tftp-server
     restart: unless-stopped
+    command: ["-L", "-c", "/var/tftpboot"]  # -c allows file creation, -L enables logging
     ports:
       - "69:69/udp"
     volumes:

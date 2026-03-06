@@ -117,6 +117,13 @@ case "$1" in
     docker compose run --rm netgear-backup python3 netgear_system_backup_TFTP-v0d1.py --list-switches
     ;;
   
+  tftp-rebuild)
+    echo "Recreating TFTP server with updated configuration..."
+    docker stop tftp-server && docker rm tftp-server && docker compose up -d tftp-server
+    echo "✓ TFTP server recreated"
+    docker inspect tftp-server --format '{{.Args}}' | grep -q '\-c' && echo "✓ File creation enabled" || echo "⚠️  File creation NOT enabled"
+    ;;
+  
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
