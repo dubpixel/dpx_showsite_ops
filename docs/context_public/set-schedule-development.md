@@ -1,192 +1,477 @@
-# Set Schedule App - Development & Contribution Workflow
+# Set-Schedule Service - Operations Guide
 
-**For production integration** into dpx_showsite_ops stack:  
-See [CONTEXT.md](CONTEXT.md#phase-6---set-schedule-integration)
+**Real-time festival schedule tracking integrated into dpx_showsite_ops stack**
 
 ---
 
-## Repository Info
-- **Upstream**: https://github.com/macswg/coachella_set_schedule (Sean's original)
-- **Fork**: https://github.com/dubpixel/coachella_set_schedule
+## Architecture Overview
 
-## Contribution History
+The set-schedule service uses a **dual-instance approach** for safe live operations:
 
-### 1. First PR - Reset Endpoint (✅ MERGED by Sean)
-**PR**: #2
-**Branch**: `add-reset-endpoint`
-Added `/api/reset` endpoint to clear all actual times programmatically.
+| Instance | Location | Port | Management | Purpose |
+|----------|----------|------|------------|---------|
+| **Production** | `services/set-schedule` (submodule) | 8000 | docker-compose | Stable production service, pinned to specific commit |
+| **Development** | `../COACHELLA_SET_SCHEDULE` (standalone folder) | 8001 | Direct docker commands | Active development workspace |
 
-### 2. Second PR - Reset Button (CLEAN, PENDING)
-**Branch**: `add-reset-button-clean`
-**Commit**: `648aec2`
+### Why Two Instances?
 
-**What We Did (Feb 7, 2026)**:
-- ✅ Updated local `main` from Sean's upstream (he had merged more changes)
-- ✅ Created NEW clean branch `add-reset-button-clean` from updated main
-- ✅ Manually added ONLY the button changes (no accidental JS refactoring)
-- ✅ Clean commit with proper message
-- ✅ Pushed to fork and created PR
+**During live shows**, you need the ability to develop features without touching production:
+- Production instance runs stable code (never modified during shows)
+- Dev instance allows rapid feature development and testing on port 8001
+- If a feature is approved, promote it by updating the submodule pointer
+- Provides safe rollback if something goes wrong
 
-**Changes**:
-- Added "Reset All Times" button to schedule header (edit mode only)
-- Uses existing confirmation modal
-- Styled as red warning button
-- Button calls the `/api/reset` endpoint that's already merged
+### Git Workflow Pattern
 
-**Files Modified**:
-- `templates/index.html` - Added button at lines 46-50
-- `static/styles.css` - Added `.btn-reset-all` styling (RED button)
+**CRITICAL**: Never edit code directly in the submodule folder. The submodule is a "pointer" to a specific commit in the remote repository, not a development workspace.
 
-**Key Learning**: The old `add-reset-endpoint` branch had messy commits mixing endpoint + button + accidental JS changes. We created a fresh branch and cherry-picked only the button code to keep the PR clean.
+```
+Development Flow:
+1. Edit in standalone folder (COACHELLA_SET_SCHEDULE)
+2. Commit & push to dubpixel/coachella_set_schedule fork
+3. Merge feature branch to main
+4. Update submodule pointer in DPX_SHOWSITE_OPS to reference new commit
+5. Rebuild production service
 
-## Local Deployment
-
-**Location**: `~/coachella_set_schedule/`
-
-### Docker Commands
-
-**Initial Build & Run** (first time only):
-```bash
-cd ~/coachella_set_schedule
-
-# Build image
-docker build -t set-schedule:test .
-
-# Create and start container
-docker run -d \
-  --name set-schedule-test \
-  -p 8000:8000 \
-  --env-file .env \
-  set-schedule:test
-  
+The submodule just points to a commit hash - it doesn't store code!
 ```
 
-**Regular Operations** (after container exists):
+---
+
+## Repository Links
+
+- **Your fork (production source)**: https://github.com/dubpixel/coachella_set_schedule
+- **Upstream (Sean's original)**: https://github.com/macswg/coachella_set_schedule
+
+---
+
+## Initial Setup (One-Time)
+
+### Prerequisites
+- Docker and docker-compose installed
+- Git submodule initialized: `git submodule update --init --recursive`
+- Standalone development folder exists as sibling to DPX_SHOWSITE_OPS
+
+### 1. Verify Submodule
+
 ```bash
-# Start the container (after reboot, etc)
-docker start set-schedule-test
+cd DPX_SHOWSITE_OPS
+cat .gitmodules
+# Should show: url = https://github.com/dubpixel/coachella_set_schedule.git
+```
 
-# Stop the container
-docker stop set-schedule-test
+```bash
+cd services/set-schedule
+git status  # Should be on a commit (detached HEAD or main)
+cd ../..
+```
 
-# Restart the container
-docker restart set-schedule-test
+### 2. Configure Production Environment
+
+The production service reads configuration from the stack's `.env` file.
+
+**Edit** `DPX_SHOWSITE_OPS/.env` (copy from `.env.example` if needed):
+
+```bash
+cp .env.example .env  # If .env doesn't exist
+nano .env
+```
+
+**Add set-schedule variables**:
+```bash
+# Set-Schedule Service Configuration
+SCHEDULE_PORT=8000
+STAGE_NAME="Main Stage"
+USE_GOOGLE_SHEETS=false
+TIMEZONE=America/Los_Angeles
+
+# Optional: Google Sheets integration
+# GOOGLE_SHEETS_ID=your-spreadsheet-id
+# GOOGLE_SHEET_TAB=Schedule
+# GOOGLE_SERVICE_ACCOUNT_FILE=/app/secret/set-schedule-service-account.json
+
+# Optional: Art-Net DMX
+# ARTNET_ENABLED=false
+```
+
+### 3. Configure Shared Secrets Folder
+
+Google Sheets credentials (if used) are shared between production and dev via a centralized secret folder:
+
+```bash
+mkdir -p secret
+# Place your service account JSON here:
+# secret/set-schedule-service-account.json
+# This folder is gitignored
+```
+
+### 4. Configure Development Instance
+
+The standalone folder is your development workspace.
+
+```bash
+cd ../COACHELLA_SET_SCHEDULE
+cp .env.example .env
+nano .env
+```
+
+**Important**: Set `PORT=8001` for dev instance:
+```bash
+HOST=0.0.0.0
+PORT=8001
+STAGE_NAME="Dev Stage"
+USE_GOOGLE_SHEETS=false
+TIMEZONE=America/Los_Angeles
+GOOGLE_SERVICE_ACCOUNT_FILE=/app/secret/set-schedule-service-account.json
+```
+
+### 5. Start Production Instance
+
+```bash
+cd DPX_SHOWSITE_OPS
+./scripts/manage.sh schedule-rebuild
+./scripts/manage.sh schedule-status
+```
+
+Access at: **http://localhost:8000**
+
+### 6. Test Development Instance
+
+```bash
+./scripts/manage.sh schedule-dev-rebuild
+```
+
+Access at: **http://localhost:8001**
+
+Both instances should run simultaneously without port conflicts.
+
+---
+
+## Daily Development Workflow
+
+### Making Changes to the Application
+
+**Always work in the standalone folder**, never in the submodule:
+
+```bash
+cd COACHELLA_SET_SCHEDULE
+
+# Create a feature branch
+git checkout -b feature/new-countdown-timer
+
+# Make your changes
+nano app/models.py
+
+# Test locally in dev instance (port 8001)
+cd ../DPX_SHOWSITE_OPS
+./scripts/manage.sh schedule-dev-rebuild
+./scripts/manage.sh schedule-dev-logs
+
+# Verify at http://localhost:8001
+```
+
+### Committing and Merging Changes
+
+```bash
+cd COACHELLA_SET_SCHEDULE
+
+# Commit your changes
+git add .
+git commit -m "Add new countdown timer feature"
+git push origin feature/new-countdown-timer
+
+# Merge to main (when ready)
+git checkout main
+git merge feature/new-countdown-timer
+git push origin main
+```
+
+### Promoting Changes to Production
+
+After merging to `main` in your standalone repo, update the production submodule pointer:
+
+```bash
+cd DPX_SHOWSITE_OPS/services/set-schedule
+
+# Fetch latest from YOUR fork
+git fetch origin
+git checkout main
+git pull origin main
+
+# Go back to stack root
+cd ../..
+
+# Commit the new submodule pointer
+git add services/set-schedule
+git commit -m "Update set-schedule: Add countdown timer feature"
+git push
+
+# Rebuild production
+./scripts/manage.sh schedule-rebuild
+```
+
+**What just happened?**
+- The submodule pointer now references the latest commit hash from `dubpixel/coachella_set_schedule`
+- Production rebuilds using that new commit
+- Anyone cloning `DPX_SHOWSITE_OPS` will get that exact version
+
+---
+
+## Production Management Commands
+
+All production commands use `docker-compose` and the `iot` wrapper script:
+
+```bash
+# Start production service
+iot schedule-up
+
+# Stop production service  
+iot schedule-down
+
+# Restart production
+iot schedule-restart
 
 # Check status
-docker ps              # Running containers only
-docker ps -a           # All containers (running + stopped)
+iot schedule-status
 
-# View logs
-docker logs set-schedule-test
-docker logs -f set-schedule-test  # Follow logs
+# View logs (last 30 lines)
+iot schedule-logs
+
+# View logs (last 100 lines)
+iot schedule-logs 100
+
+# Follow logs in real-time
+iot schedule-follow
+
+# Rebuild after updating submodule
+iot schedule-rebuild
+
+# Open shell in production container
+iot schedule-shell
 ```
 
-**Complete Rebuild** (when you need to recreate):
-```bash
-# Stop and remove old container
-docker stop set-schedule-test
-docker rm set-schedule-test
+**Production URL**: `http://localhost:8000` (or `http://VM-IP:8000` from LAN)
 
-# Rebuild image (if code changed)
-docker build -t set-schedule:test .
+---
 
-# Create new container
-docker run -d \
-  --name set-schedule-test \
-  -p 8000:8000 \
-  --env-file .env \
-  set-schedule:test
-```
+## Development Instance Commands
 
-**Access**:
-- View: http://192.168.1.100:8000
-- Edit: http://192.168.1.100:8000/edit
-
-### Environment (`.env`)
-```
-USE_GOOGLE_SHEETS=false
-STAGE_NAME=Main Stage
-TIMEZONE=America/Los_Angeles
-HOST=0.0.0.0
-PORT=8000
-ARTNET_ENABLED=false
-```
-
-## Remote Access
-
-**Cloudflare Tunnel** (running in screen 36203):
-```bash
-# Tunnel for port 8000 is already running
-screen -r 36203  # Attach to see both tunnels
-# Ctrl+A, N to switch between windows
-```
-
-## Git Workflow
-
-### Git Configuration
-```bash
-# Set vim as default editor
-git config --global core.editor "vim"
-```
-
-### Remotes
-```bash
-origin    # Your fork (dubpixel/coachella_set_schedule)
-upstream  # Sean's repo (macswg/coachella_set_schedule)
-```
-
-### Proper Workflow for New Features
-
-**ALWAYS start fresh from Sean's latest code:**
+Dev commands use direct Docker commands with the standalone folder:
 
 ```bash
-# 1. Fetch Sean's latest changes
-git fetch upstream
+# Build dev image
+iot schedule-dev-build
 
-# 2. Update your local main
+# Start dev service (port 8001)
+iot schedule-dev-up
+
+# Stop dev service
+iot schedule-dev-down
+
+# Restart dev service
+iot schedule-dev-restart
+
+# View dev logs
+iot schedule-dev-logs
+
+# Follow dev logs
+iot schedule-dev-follow
+
+# Build and start in one command
+iot schedule-dev-rebuild
+
+# Open shell in dev container
+iot schedule-dev-shell
+```
+
+**Dev URL**: `http://localhost:8001`
+
+---
+
+## Show-Time Emergency Development
+
+**Scenario**: You need to add a feature urgently during a live show.
+
+**Critical Rule**: Never touch production while the show is running!
+
+### Emergency Workflow
+
+1. **Develop in standalone folder**:
+   ```bash
+   cd COACHELLA_SET_SCHEDULE
+   git checkout -b hotfix/urgent-fix
+   # Make changes
+   git add . && git commit -m "Emergency: Fix critical bug"
+   ```
+
+2. **Test in dev instance** (port 8001):
+   ```bash
+   cd ../DPX_SHOWSITE_OPS
+   iot schedule-dev-rebuild
+   # Test at http://localhost:8001 with operators
+   ```
+
+3. **If approved, hot-swap to production**:
+   ```bash
+   # Push changes
+   cd ../COACHELLA_SET_SCHEDULE
+   git push origin hotfix/urgent-fix
+   git checkout main
+   git merge hotfix/urgent-fix
+   git push origin main
+   
+   # Update production submodule
+   cd ../DPX_SHOWSITE_OPS
+   iot schedule-down  # Stop prod briefly
+   
+   cd services/set-schedule
+   git fetch origin && git checkout main && git pull origin main
+   cd ../..
+   
+   git add services/set-schedule
+   git commit -m "HOTFIX: Update set-schedule to fix urgent bug"
+   
+   iot schedule-rebuild  # Back online with fix
+   ```
+
+4. **Rollback if needed**:
+   ```bash
+   cd services/set-schedule
+   git checkout <previous-commit-hash>
+   cd ../..
+   git add services/set-schedule
+   git commit -m "Rollback set-schedule to stable version"
+   iot schedule-rebuild
+   ```
+
+---
+
+## Troubleshooting
+
+### Port Conflicts
+
+**Problem**: `Error: address already in use`
+
+**Solution**: Check which instance is using the port:
+```bash
+lsof -i :8000  # Check port 8000
+lsof -i :8001  # Check port 8001
+
+# Stop conflicting instance
+iot schedule-down         # Production
+iot schedule-dev-down     # Dev
+```
+
+### Submodule Out of Sync
+
+**Problem**: Submodule shows modified files or wrong commit
+
+**Solution**:
+```bash
+cd DPX_SHOWSITE_OPS/services/set-schedule
+git status
+git reset --hard HEAD  # Discard any local changes
 git checkout main
-git pull upstream main
-
-# 3. Push updated main to your fork
-git push origin main
-
-# 4. Create new feature branch from updated main
-git checkout -b feature-name
-
-# 5. Make changes, test locally
-
-# 6. Commit with clear message
-git add <files>
-git commit -m "Clear description of changes"
-
-# 7. Push to YOUR fork
-git push origin feature-name
-
-# 8. Create PR from your fork to Sean's repo
-# Go to GitHub and create PR from dubpixel:feature-name to macswg:main
+git pull origin main
+cd ../..
+git add services/set-schedule
 ```
 
+### Google Sheets Authentication Fails
 
-## Project Structure
+**Problem**: `Error: service account file not found`
 
-**Key Files**:
-- `main.py` - FastAPI backend, includes `/api/reset` endpoint
-- `templates/index.html` - Main UI template
-- `static/styles.css` - All CSS styling
-- `Dockerfile` - Container configuration
-- `.env` - Environment variables (not committed to git)
+**Solution**:
+1. Verify file exists: `ls -la secret/set-schedule-service-account.json`
+2. Check .env path matches volume mount: `/app/secret/...`
+3. Verify volume mount in docker-compose.yml: `./secret:/app/secret:ro`
 
-## Lessons Learned
+### Dev and Prod Running Different Code (Expected)
 
-1. **Always pull from upstream first** before creating a new branch
-2. **One feature per branch** - keep commits clean and focused
-3. **Docker lifecycle**: `run` creates, then just `start`/`stop` after that
-4. **Git hygiene**: Don't mix multiple features in one commit
-5. **Test locally** before pushing - use the Docker container to verify
+This is **normal behavior**! Production runs the commit referenced by the submodule, dev runs whatever's in your working directory.
 
-## Next Session Checklist
+**Check production version**:
+```bash
+cd services/set-schedule
+git log -1  # Shows current commit
+```
 
-- [ ] Check if Sean merged the button PR
-- [ ] If making more changes, pull from upstream first!
-- [ ] Document any new features discussed with Sean as GitHub issues
-- [ ] Remember to rebuild Docker image after code changes
+**Check dev version**:
+```bash
+cd ../COACHELLA_SET_SCHEDULE
+git log -1
+```
+
+### Container Won't Start
+
+**Check logs**:
+```bash
+iot schedule-logs 100      # Production
+iot schedule-dev-logs 100  # Dev
+```
+
+**Common issues**:
+- Missing `.env` file
+- Invalid environment variable syntax
+- Port already in use
+- Dockerfile syntax error (check after edits)
+
+---
+
+## Environment Variable Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SCHEDULE_PORT` | 8000 | Production port (host) |
+| `PORT` | 8000 | Container internal port |
+| `HOST` | 0.0.0.0 | Bind address |
+| `USE_GOOGLE_SHEETS` | false | Enable Google Sheets sync |
+| `STAGE_NAME` | Main Stage | Display name for stage |
+| `TIMEZONE` | America/Los_Angeles | Timezone for schedule |
+| `GOOGLE_SHEETS_ID` | - | Spreadsheet ID from URL |
+| `GOOGLE_SHEET_TAB` | Schedule | Tab/worksheet name |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | - | Path to service account JSON |
+| `ARTNET_ENABLED` | false | Enable Art-Net DMX brightness control |
+| `ARTNET_PORT` | 6454 | Art-Net UDP port |
+| `ARTNET_UNIVERSE` | 0 | DMX universe number |
+
+---
+
+## File Paths Reference
+
+| Path | Purpose |
+|------|---------|
+| `DPX_SHOWSITE_OPS/services/set-schedule/` | Production submodule (DO NOT EDIT) |
+| `DPX_SHOWSITE_OPS/secret/` | Shared secrets folder (gitignored) |
+| `DPX_SHOWSITE_OPS/.env` | Production environment config |
+| `DPX_SHOWSITE_OPS/docker-compose.yml` | Stack definition with set-schedule service |
+| `COACHELLA_SET_SCHEDULE/` | Development workspace (EDIT HERE) |
+| `COACHELLA_SET_SCHEDULE/.env` | Dev environment config (PORT=8001) |
+
+---
+
+## Command Quick Reference
+
+| Task | Command |
+|------|---------|
+| Start production | `iot schedule-up` |
+| Stop production | `iot schedule-down` |
+| Rebuild production | `iot schedule-rebuild` |
+| View prod logs | `iot schedule-logs` |
+| Start dev | `iot schedule-dev-up` |
+| Stop dev | `iot schedule-dev-down` |
+| Rebuild dev | `iot schedule-dev-rebuild` |
+| View dev logs | `iot schedule-dev-logs` |
+| Update submodule | `cd services/set-schedule && git pull` |
+| Both instances status | `docker ps \| grep schedule` |
+
+---
+
+## Operational Principles
+
+1. **Never edit in the submodule** - always use the standalone folder
+2. **Always pull from upstream first** before creating a new branch
+3. **One feature per branch** - keep commits clean and focused
+4. **Test in dev instance** before promoting to production
+5. **Keep git hygiene** - don't mix multiple features in one commit
+6. **Submodule is a pointer** - it references a commit, not a workspace
