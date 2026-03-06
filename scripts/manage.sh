@@ -122,7 +122,7 @@ case "$1" in
     docker compose run --rm netgear-backup find /backups -name "*.cfg" -exec ls -lh {} \; | awk "{print \$9, \$5, \$6, \$7, \$8}" | column -t
     ;;
   
-  m4300-clean-empty)
+  m4300-clean)
     echo "Cleaning up empty backup folders (failed attempts)..."
     docker compose run --rm netgear-backup sh -c '
       for dir in /backups/202*; do
@@ -558,7 +558,7 @@ case "$1" in
     echo "    m4300-log-view <file>  Display full backup log file"
     echo "    m4300-list [n]         List recent backups with config files (default: 10)"
     echo "    m4300-list-all         List all backup files across all dates"
-    echo "    m4300-clean-empty      Remove empty backup folders (failed attempts)"
+    echo "    m4300-clean            Remove empty backup folders (failed attempts)"
     echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
     echo "    m4300-build            Rebuild netgear-backup container image"
     echo "    m4300-list-switches    Show parsed switch inventory from switches.conf"
