@@ -138,7 +138,7 @@ services:
     image: pghalliday/tftp:latest
     container_name: tftp-server
     restart: unless-stopped
-    command: ["-c", "-u", "nobody", "-vvv", "/var/tftpboot"]  # -c allows creation, -u nobody for security, -vvv verbose logging
+    command: ["-c", "-vvv", "/var/tftpboot"]  # -c allows file creation, -vvv verbose logging
     ports:
       - "69:69/udp"
     volumes:
