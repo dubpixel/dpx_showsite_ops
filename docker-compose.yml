@@ -138,7 +138,7 @@ services:
     image: pghalliday/tftp:latest
     container_name: tftp-server
     restart: unless-stopped
-    command: ["-L", "-c", "/var/tftpboot"]  # -L logging, -c allows file creation
+    command: ["-L", "-s", "-c", "/var/tftpboot"]  # -L logging, -s secure/chroot, -c allows file creation
     network_mode: host  # Required for TFTP dynamic port allocation
     volumes:
       - tftp-data:/var/tftpboot
