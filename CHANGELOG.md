@@ -16,6 +16,38 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [2.0.0] - 2026-03-05
+
+### Changed
+- **LICENSE CHANGE**: Transitioned from CC BY-SA 4.0 to GPL-3.0
+  - All versions 2.0.0 and later are licensed under GNU General Public License v3.0
+  - Versions prior to 2.0.0 remain under their original licenses (see License History below)
+  - Updated README.md license section with GPL-3.0 terms
+  - Replaced CC_BY-SA_40.txt with LICENSE.txt (GPL-3.0 full text)
+  - Added license history documentation for transparency
+
+### License History
+For complete transparency about this project's licensing evolution:
+
+- **v1.0 (commit f9a0428, 2026-02-05)**: MIT License
+  - Initial release referenced MIT in README
+  - No LICENSE file was committed to repository
+  
+- **v1.0.1 - v1.4.2 (commit 1a415f0 onwards, 2026-02-05)**: CC BY-SA 4.0
+  - Changed to Creative Commons Attribution-ShareAlike 4.0
+  - Added commercial restriction (no unmodified resale)
+  - CC_BY-SA_40.txt file added to repository
+  
+- **v2.0.0+ (2026-03-05)**: GPL-3.0
+  - Transitioned to GNU General Public License v3.0
+  - More appropriate for software projects
+  - Ensures code remains open source forever
+  - CC BY-SA 4.0 is one-way compatible with GPL-3.0
+
+**Note**: As the sole copyright holder, the author has the right to relicense the codebase. Previous versions remain available under their original licenses for anyone who obtained them during those periods.
+
+---
+
 ## [1.4.2] - 2026-02-27
 
 ### Documentation
