@@ -73,6 +73,98 @@ case "$1" in
     echo "Geist measurements deleted. Restart Telegraf to recreate with correct schema."
     echo "Run: iot restart telegraf"
     ;;
+  
+  # M4300 Netgear Backup Commands
+  m4300-backup)
+    echo "Running M4300 config backup..."
+    docker compose run --rm netgear-backup
+    echo "✓ Backup complete. Check logs with: iot m4300-logs"
+    ;;
+  
+  m4300-backup-mock)
+    echo "Running M4300 backup in MOCK mode (no real switches)..."
+    docker compose run --rm netgear-backup python3 netgear_system_backup_TFTP-v0d1.py --mock
+    echo "✓ Mock backup complete"
+    ;;
+  
+  m4300-logs)
+    echo "M4300 Backup Logs:"
+    echo "=================="
+    docker compose run --rm netgear-backup ls -lth /backups/logs 2>/dev/null | head -${2:-10}
+    echo ""
+    echo "View full log: iot m4300-log-view <filename>"
+    ;;
+  
+  m4300-log-view)
+    if [ -z "$2" ]; then
+      echo "Usage: iot m4300-log-view <filename>"
+      echo "List logs with: iot m4300-logs"
+    else
+      docker compose run --rm netgear-backup cat /backups/logs/$2
+    fi
+    ;;
+  
+  m4300-list)
+    echo "Recent M4300 backups:"
+    echo "====================="
+    docker compose run --rm netgear-backup sh -c '
+      for dir in $(ls -dt /backups/202* 2>/dev/null | head -'${2:-10}'); do
+        echo ""
+        echo "📁 $(basename $dir)"
+        ls -lh $dir/*.cfg 2>/dev/null | awk "{printf \"  %-25s %5s  %s %s %s\n\", \$9, \$5, \$6, \$7, \$8}" | sed "s|.*/||"
+      done
+    '
+    ;;
+  
+  m4300-list-all)
+    echo "All M4300 backup files:"
+    echo "======================="
+    docker compose run --rm netgear-backup find /backups -name "*.cfg" -exec ls -lh {} \; | awk "{print \$9, \$5, \$6, \$7, \$8}" | column -t
+    ;;
+  
+  m4300-clean)
+    echo "Cleaning up empty backup folders (failed attempts)..."
+    docker compose run --rm netgear-backup sh -c '
+      for dir in /backups/202*; do
+        if [ -d "$dir" ] && [ -z "$(ls -A $dir/*.cfg 2>/dev/null)" ]; then
+          echo "Removing empty: $(basename $dir)"
+          rm -rf "$dir"
+        fi
+      done
+    '
+    echo "✓ Cleanup complete. Use 'iot m4300-list' to see remaining backups."
+    ;;
+  
+  m4300-network-fix)
+    "$REPO_ROOT/scripts/setup-m4300-network.sh"
+    ;;
+  
+  m4300-rebuild)
+    echo "Rebuilding netgear-backup container image..."
+    docker compose build netgear-backup
+    echo "✓ Image rebuilt"
+    ;;
+  
+  m4300-list-switches)
+    echo "Configured switches (from switches.conf):"
+    echo "========================================="
+    docker compose run --rm netgear-backup python3 netgear_system_backup_TFTP-v0d1.py --list-switches
+    ;;
+  
+  tftp-rebuild)
+    echo "Recreating TFTP server with updated configuration..."
+    docker stop tftp-server && docker rm tftp-server && docker compose up -d tftp-server
+    echo "✓ TFTP server recreated"
+    docker inspect tftp-server --format '{{.Args}}' | grep -q '\-c' && echo "✓ File creation enabled" || echo "⚠️  File creation NOT enabled"
+    ;;
+  
+  tftp-rebuild)
+    echo "Recreating TFTP server with updated configuration..."
+    docker stop tftp-server && docker rm tftp-server && docker compose up -d tftp-server
+    echo "✓ TFTP server recreated"
+    docker inspect tftp-server --format '{{.Args}}' | grep -q '\-c' && echo "✓ File creation enabled" || echo "⚠️  File creation NOT enabled"
+    ;;
+  
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
   tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
   tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
@@ -458,6 +550,18 @@ case "$1" in
     echo "                           examples: iot mqtt / iot mqtt gv2mqtt/# 10"
     echo "    nuke                   DELETE all data in govee bucket (no undo!)"
     echo "    nuke-geist             DELETE all Geist measurement data (fixes schema issues)"
+    echo ""
+    echo "  M4300 NETGEAR BACKUP"
+    echo "    m4300-backup           Run M4300 config backup now (containerized)"
+    echo "    m4300-backup-mock      Run backup in MOCK mode (no real switches)"
+    echo "    m4300-logs [n]         View recent backup logs (default: 10)"
+    echo "    m4300-log-view <file>  Display full backup log file"
+    echo "    m4300-list [n]         List recent backups with config files (default: 10)"
+    echo "    m4300-list-all         List all backup files across all dates"
+    echo "    m4300-clean            Remove empty backup folders (failed attempts)"
+    echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
+    echo "    m4300-build            Rebuild netgear-backup container image"
+    echo "    m4300-list-switches    Show parsed switch inventory from switches.conf"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"

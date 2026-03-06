@@ -134,6 +134,45 @@ services:
     networks:
       - iot
 
+  tftp-server:
+    image: pghalliday/tftp:latest
+    container_name: tftp-server
+    restart: unless-stopped
+    command: ["-L", "-s", "-c", "/var/tftpboot"]  # -L logging, -s secure/chroot, -c allows file creation
+    network_mode: host  # Required for TFTP dynamic port allocation
+    volumes:
+      - tftp-data:/var/tftpboot
+    environment:
+      # TFTP listens on all interfaces - switches reach via host IP
+      - BIND_ADDRESS=0.0.0.0
+
+  netgear-backup:
+    build:
+      context: ./services/netgear-backup
+      dockerfile: Dockerfile
+    container_name: netgear-backup
+    restart: "no"  # Manual/cron triggered, not always-on
+    environment:
+      - M4300_USERNAME=${M4300_USERNAME}
+      - M4300_PASSWORD_M4300=${M4300_PASSWORD_M4300}
+      - M4300_PASSWORD_OTHER=${M4300_PASSWORD_OTHER}
+      - M4300_TFTP_SERVER=${M4300_TFTP_SERVER:-tftp-server}
+      - M4300_BACKUP_DIR=/backups
+      - TZ=${TZ:-America/New_York}
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-home}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-sensors}
+    volumes:
+      - netgear-backups:/backups
+      - tftp-data:/tftp:ro  # Read-only access to TFTP files for retrieval
+      - ./config/switches.conf:/config/switches.conf:ro
+    networks:
+      - iot
+    depends_on:
+      - tftp-server
+      - influxdb
+
 networks:
   iot:
     driver: bridge
@@ -142,3 +181,5 @@ volumes:
   govee2mqtt-data:
   influxdb-data:
   grafana-data:
+  tftp-data:
+  netgear-backups:
