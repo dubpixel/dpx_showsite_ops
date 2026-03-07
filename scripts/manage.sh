@@ -6,6 +6,90 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
+# Helper function to run cloudflared tunnel in background
+run_tunnel_background() {
+  local NAME="$1"
+  local PORT="$2"
+  local TUNNEL_DIR="$HOME/logs/tunnel"
+  local PID_FILE="$TUNNEL_DIR/$NAME.pid"
+  local URL_FILE="$TUNNEL_DIR/$NAME.url"
+  local LOG_FILE="$TUNNEL_DIR/$NAME.log"
+  
+  # Check if cloudflared is installed
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "✗ cloudflared not found. Install it with:"
+    echo "  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb"
+    echo "  sudo dpkg -i cloudflared.deb"
+    return 1
+  fi
+  
+  # Create tunnel directory
+  mkdir -p "$TUNNEL_DIR" || {
+    echo "✗ Failed to create tunnel directory: $TUNNEL_DIR"
+    return 1
+  }
+  
+  # Check for existing tunnel on this port
+  EXISTING_PID=$(pgrep -f "cloudflared tunnel --url.*:$PORT\b")
+  if [ -n "$EXISTING_PID" ]; then
+    echo "⚠️  $NAME tunnel already running (PID: $EXISTING_PID)"
+    if [ -f "$URL_FILE" ]; then
+      echo "   Current URL: $(cat "$URL_FILE")"
+    fi
+    echo ""
+    read -t 10 -n 1 -r -p "[K]ill existing and restart, or [E]xit? (default: E) " REPLY
+    echo ""
+    
+    if [[ $REPLY =~ ^[Kk]$ ]]; then
+      echo "Stopping existing tunnel..."
+      kill $EXISTING_PID 2>/dev/null
+      sleep 2
+      if ps -p $EXISTING_PID >/dev/null 2>&1; then
+        kill -9 $EXISTING_PID 2>/dev/null
+      fi
+      rm -f "$PID_FILE" "$URL_FILE"
+      echo "✓ Existing tunnel stopped"
+    else
+      echo "Keeping existing tunnel running"
+      return 0
+    fi
+  fi
+  
+  # Clear log file
+  > "$LOG_FILE"
+  
+  # Start tunnel in background
+  nohup cloudflared tunnel --url http://localhost:$PORT >"$LOG_FILE" 2>&1 &
+  TUNNEL_PID=$!
+  echo $TUNNEL_PID > "$PID_FILE"
+  
+  # Wait briefly for process to initialize
+  sleep 0.5
+  
+  # Verify process didn't crash
+  if ! ps -p $TUNNEL_PID >/dev/null 2>&1; then
+    echo "✗ Tunnel failed to start. Last 20 lines of log:"
+    tail -20 "$LOG_FILE"
+    return 1
+  fi
+  
+  # Wait for URL to appear in log (up to 10 seconds)
+  echo "Starting $NAME tunnel (PID: $TUNNEL_PID), waiting for URL..."
+  for i in {1..20}; do
+    sleep 0.5
+    TUNNEL_URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' "$LOG_FILE" | head -n1)
+    if [ -n "$TUNNEL_URL" ]; then
+      echo "$TUNNEL_URL" > "$URL_FILE"
+      echo "✓ $NAME tunnel ready: $TUNNEL_URL"
+      return 0
+    fi
+  done
+  
+  # Timeout - tunnel is running but URL not detected yet
+  echo "⚠️  Tunnel started but URL not detected yet"
+  echo "   Check logs with: iot tunnel-logs $NAME"
+  return 0
+}
 
 case "$1" in
   up)       docker compose up -d ;;
@@ -166,10 +250,162 @@ case "$1" in
     ;;
   
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
-  tunnel)   cloudflared tunnel --url http://localhost:3000 ;;
-  tunnel-grafana)   cloudflared tunnel --url http://localhost:3000 ;;
-  tunnel-influxdb)   cloudflared tunnel --url http://localhost:8086 ;;
-  tunnel-schedule)   cloudflared tunnel --url http://localhost:8000 ;;
+  tunnel)   run_tunnel_background "grafana" 3000 ;;
+  tunnel-grafana)   run_tunnel_background "grafana" 3000 ;;
+  tunnel-influxdb)   run_tunnel_background "influxdb" 8086 ;;
+  tunnel-schedule)   run_tunnel_background "schedule" 8000 ;;
+  
+  tunnel-stop)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    if [ ! -d "$TUNNEL_DIR" ] || [ -z "$(ls -A "$TUNNEL_DIR"/*.pid 2>/dev/null)" ]; then
+      echo "No tunnel PID files found in $TUNNEL_DIR"
+      exit 0
+    fi
+    echo "Stopping all tunnels..."
+    for pid_file in "$TUNNEL_DIR"/*.pid; do
+      [ -f "$pid_file" ] || continue
+      PID=$(cat "$pid_file" 2>/dev/null)
+      NAME=$(basename "$pid_file" .pid)
+      if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+        echo "  Stopping $NAME tunnel (PID: $PID)..."
+        kill $PID 2>/dev/null
+        sleep 1
+        if ps -p $PID >/dev/null 2>&1; then
+          kill -9 $PID 2>/dev/null
+        fi
+      fi
+      rm -f "$pid_file" "$TUNNEL_DIR/$NAME.url"
+    done
+    echo "✓ All tunnels stopped"
+    ;;
+  
+  tunnel-stop-grafana)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    PID_FILE="$TUNNEL_DIR/grafana.pid"
+    if [ ! -f "$PID_FILE" ]; then
+      echo "No grafana tunnel PID file found"
+      exit 0
+    fi
+    PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+      echo "Stopping grafana tunnel (PID: $PID)..."
+      kill $PID 2>/dev/null
+      sleep 1
+      if ps -p $PID >/dev/null 2>&1; then
+        kill -9 $PID 2>/dev/null
+      fi
+      echo "✓ Grafana tunnel stopped"
+    else
+      echo "Grafana tunnel not running"
+    fi
+    rm -f "$PID_FILE" "$TUNNEL_DIR/grafana.url"
+    ;;
+  
+  tunnel-stop-influxdb)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    PID_FILE="$TUNNEL_DIR/influxdb.pid"
+    if [ ! -f "$PID_FILE" ]; then
+      echo "No influxdb tunnel PID file found"
+      exit 0
+    fi
+    PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+      echo "Stopping influxdb tunnel (PID: $PID)..."
+      kill $PID 2>/dev/null
+      sleep 1
+      if ps -p $PID >/dev/null 2>&1; then
+        kill -9 $PID 2>/dev/null
+      fi
+      echo "✓ InfluxDB tunnel stopped"
+    else
+      echo "InfluxDB tunnel not running"
+    fi
+    rm -f "$PID_FILE" "$TUNNEL_DIR/influxdb.url"
+    ;;
+  
+  tunnel-stop-schedule)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    PID_FILE="$TUNNEL_DIR/schedule.pid"
+    if [ ! -f "$PID_FILE" ]; then
+      echo "No schedule tunnel PID file found"
+      exit 0
+    fi
+    PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+      echo "Stopping schedule tunnel (PID: $PID)..."
+      kill $PID 2>/dev/null
+      sleep 1
+      if ps -p $PID >/dev/null 2>&1; then
+        kill -9 $PID 2>/dev/null
+      fi
+      echo "✓ Schedule tunnel stopped"
+    else
+      echo "Schedule tunnel not running"
+    fi
+    rm -f "$PID_FILE" "$TUNNEL_DIR/schedule.url"
+    ;;
+  
+  tunnel-status)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    if [ ! -d "$TUNNEL_DIR" ] || [ -z "$(ls -A "$TUNNEL_DIR"/*.pid 2>/dev/null)" ]; then
+      echo "No tunnels configured (no PID files in $TUNNEL_DIR)"
+      exit 0
+    fi
+    echo "Tunnel Status:"
+    echo "=============================================="
+    printf "%-15s %-10s %-8s %s\n" "NAME" "STATUS" "PID" "URL"
+    echo "----------------------------------------------"
+    for pid_file in "$TUNNEL_DIR"/*.pid; do
+      [ -f "$pid_file" ] || continue
+      NAME=$(basename "$pid_file" .pid)
+      PID=$(cat "$pid_file" 2>/dev/null)
+      URL_FILE="$TUNNEL_DIR/$NAME.url"
+      
+      if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+        STATUS="running"
+        URL=$(cat "$URL_FILE" 2>/dev/null || echo "(pending)")
+      else
+        STATUS="stopped"
+        URL="(not running)"
+        # Clean up stale PID file
+        rm -f "$pid_file" "$URL_FILE"
+      fi
+      printf "%-15s %-10s %-8s %s\n" "$NAME" "$STATUS" "$PID" "$URL"
+    done
+    ;;
+  
+  tunnel-logs)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    NAME="$2"
+    LINES="${3:-30}"
+    
+    if [ -z "$NAME" ]; then
+      # Show all tunnel logs
+      if [ ! -d "$TUNNEL_DIR" ] || [ -z "$(ls -A "$TUNNEL_DIR"/*.log 2>/dev/null)" ]; then
+        echo "No tunnel logs found in $TUNNEL_DIR"
+        exit 0
+      fi
+      for log_file in "$TUNNEL_DIR"/*.log; do
+        [ -f "$log_file" ] || continue
+        TUNNEL_NAME=$(basename "$log_file" .log)
+        echo "=== $TUNNEL_NAME tunnel logs (last $LINES lines) ==="
+        tail -$LINES "$log_file"
+        echo ""
+      done
+    else
+      # Show specific tunnel log
+      LOG_FILE="$TUNNEL_DIR/$NAME.log"
+      if [ ! -f "$LOG_FILE" ]; then
+        echo "Log file not found: $LOG_FILE"
+        echo -n "Available tunnels: "
+        ls "$TUNNEL_DIR"/*.log 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/.log$//' | tr '\n' ' ' || echo "(none)"
+        echo ""
+        exit 1
+      fi
+      tail -$LINES "$LOG_FILE"
+    fi
+    ;;
+  
   update)   "$REPO_ROOT/scripts/update-device-map.sh" ;;
   list-devices)
     python3 "$REPO_ROOT/scripts/manage-devices.py" list
@@ -578,7 +814,14 @@ case "$1" in
     echo "  NETWORK"
     echo "    ip                     Show VM IP address"
     echo "    web                    Show all service URLs"
-    echo "    tunnel                 Start Cloudflare tunnel to Grafana"
+    echo "    tunnel                 Start Cloudflare tunnel to Grafana (background)"
+    echo "    tunnel-grafana         Start tunnel to Grafana (port 3000)"
+    echo "    tunnel-influxdb        Start tunnel to InfluxDB (port 8086)"
+    echo "    tunnel-schedule        Start tunnel to set-schedule (port 8000)"
+    echo "    tunnel-stop            Stop all running tunnels"
+    echo "    tunnel-stop-<name>     Stop specific tunnel (grafana/influxdb/schedule)"
+    echo "    tunnel-status          Show all tunnels with status and URLs"
+    echo "    tunnel-logs [name] [n] View tunnel logs (default: all, 30 lines)"
     echo ""
     echo "  GRAFANA DASHBOARDS"
     echo "    backup-dashboards      Fetch all dashboards via API → ~/backups/grafana/dashboards/YYYY-MM-DD-HHMMSS/"
