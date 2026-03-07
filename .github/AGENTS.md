@@ -327,7 +327,9 @@ All code files must include a comprehensive header comment section:
 # Purpose: [what this file does]
 # Dependencies: [key dependencies if any]
 #
-#
+# CHANGE LOG: (if needed but should really be in the changelog for the git)
+# 
+# 2026-03-06: Complete rewrite - Interactive wizard (v2.1.0)
 #
 # ================================================================================
 ```
@@ -429,6 +431,7 @@ Every project should have a `CONTEXT.md` file in the root directory. This is the
 - README.md must be updated and maintaned when appropriate as per these guidelines
 - CONTEXT.md must be updated and maintaned when appropriate as per these guidelines
 - a comprehensive CHANGELOG.md must be kept updated and maintaned when appropriate as per these guidelines
+- you can maintain a small changelog in the header if you wish but main changelog should be in the MD
 
 ---
 

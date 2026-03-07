@@ -46,20 +46,23 @@
 
 ## About The Project
 
-Operations stack for DPX show sites. Get Govee sensor data flowing into InfluxDB with Grafana dashboards in minutes. Includes MQTT pub/sub messaging, time-series storage, and remote access via Tailscale or Cloudflare Tunnel.
+Operations stack for DPX show sites. Unified platform for IoT monitoring, environmental sensors, network infrastructure management, and live event operations. Get sensor data flowing into InfluxDB with Grafana dashboards in minutes. Includes MQTT pub/sub messaging, time-series storage, real-time schedule tracking, and remote access via Tailscale or Cloudflare Tunnel.
 
-**Current Deployment:** Govee IoT monitoring via cloud API + ESP32 BLE gateways (OpenMQTTGateway) + Geist Watchdog SNMP monitoring
-**Future:** Network device backups, additional sensor types, automation workflows
+**Current Deployment:** IoT monitoring via cloud API + ESP32 BLE gateways, SNMP monitoring (Geist Watchdog, ControlByWeb, d3 SMC), network device backups (Netgear M4300), and live festival schedule tracking
+**Future:** Additional sensor types, metrics-driven automation workflows, consumables tracking, LTC monitoring — see roadmap for details
 
 **Key features:**
-- **Govee IoT Stack**: Temperature/humidity monitoring via Govee H5051 sensors
+- **Govee IoT Stack**: Temperature/humidity monitoring via Govee sensors (cloud API + BLE)
 - **ESP32 BLE Gateways**: Real-time BLE data collection (<5 sec latency)
-- **Geist Watchdog**: SNMP-based environmental monitoring for infrastructure
+- **SNMP Monitoring**: Environmental and system monitoring (Geist Watchdog, ControlByWeb X-410, D3 SMC)
+- **Network Backups**: Automated Netgear M4300 switch configuration backups via TFTP
+- **Set Schedule**: Real-time festival schedule tracking with slip calculations and WebSocket sync (by Sean Green)
 - **MQTT Broker**: Eclipse Mosquitto for sensor data pub/sub
 - **Time Series DB**: InfluxDB 2.x for storing sensor readings
 - **Visualization**: Grafana dashboards with public sharing
 - **Data Pipeline**: Telegraf for MQTT→InfluxDB routing with tag enrichment
-- **Live Demo**: [HERE](https://calling-penalties-slides-timothy.trycloudflare.com/public-dashboards/21f922f1bbcb4bba81b1a7fed502d1c3)
+- **Grafana Live Demo**: [HERE](https://symantec-granny-attorneys-brokers.trycloudflare.com)
+- **Set Schedule Live Demo**; [HERE]( https://trades-pools-handled-adaptive.trycloudflare.com)
 
 ### Hardware: ESP32 BLE Gateways
 
@@ -96,7 +99,10 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
 * **Data Sources**: 
   * govee2mqtt (AWS IoT bridge for cloud data)
   * ble-decoder (Python service for real-time BLE data)
-  * Geist Watchdog (SNMP environmental monitoring)
+  * SNMP devices (Geist Watchdog, ControlByWeb X-410, D3 SMC)
+  * Netgear M4300 switches (configuration backups)
+* **Applications**:
+  * Set Schedule (festival schedule tracker by Sean Green)
 * **Hardware Gateways**: ESP32 with OpenMQTTGateway firmware
 * **Infrastructure**: Docker, systemd, cron
 * **Remote Access**: Tailscale, Cloudflare Tunnel (optional)
@@ -109,6 +115,34 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
 
 > **🆕 First time?** See the [Complete Setup Guide](https://github.com/dubpixel/dpx_showsite_ops/blob/master/docs/SETUP_GUIDE_COMPLETE.md) — covers everything from creating the VM to Cloudflare tunnels, step by step.
 
+### Quick Install (Recommended)
+
+Deploy the entire stack in minutes with our interactive wizard. Perfect for fresh Ubuntu/Debian systems:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dubpixel/dpx_showsite_ops/master/install.sh | bash
+```
+
+**What the wizard does:**
+- ✅ Installs Docker automatically (if needed)
+- ✅ Guides you through Govee credentials setup (no vim/vi required!)
+- ✅ Validates email and API key format
+- ✅ Auto-detects timezone and system settings
+- ✅ Optional system optimizations (IPv6 disable, avahi, Tailscale)
+- ✅ Deploys all services via Docker Compose
+- ✅ Installs `iot` management command system-wide
+- ✅ Shows you exactly how to access Grafana
+
+**Time to deploy:** 5-10 minutes on a fresh VM
+
+**Tested on:**  _wizard not currently tested_. - dev system runs on ubuntu 24.04 LTS
+
+---
+
+### Manual Installation
+
+For advanced users or custom setups:
+
 ### Prerequisites
 
 - **OS**: Ubuntu 22.04+ (tested on Ubuntu Server 24.04)
@@ -116,7 +150,7 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
 - **Network**: Static IP recommended (set your `<server-ip>`)
 - **Optional**: Tailscale for remote access, Cloudflare Tunnel for public dashboards
 
-### Installation
+### Manual Installation Steps
 
 1. **Clone the repository**
    ```bash
@@ -124,31 +158,20 @@ For real-time BLE data collection (<5 sec latency), deploy ESP32 hardware gatewa
    cd dpx_showsite_ops
    ```
 
-2. **Run setup**
+2. **Run interactive setup wizard**
    ```bash
    ./setup.sh
    ```
-   This will:
-   - Check for Docker/Compose
-   - Create directory structure
-   - Copy `.env.example` to `.env` and prompt you to edit it
+   The wizard will:
+   - Check for Docker/Compose (installs if needed)
+   - Guide you through credential entry (email, password, API key)
+   - Validate inputs before proceeding
+   - Configure timezone and display preferences
+   - Offer system optimizations (IPv6, avahi, Tailscale)
    - Set up the `iot` management command
+   - Optionally deploy the stack immediately
 
-3. **Configure credentials**
-   ```bash
-   vim .env
-   ```
-   Fill in your:
-   - Govee account credentials (email/password)
-   - Govee API key (from https://developer.govee.com)
-   - Timezone (e.g., `America/New_York`)
-
-4. **Start the stack**
-   ```bash
-   iot up
-   ```
-
-5. **Access services**
+3. **Access services**
    - **Grafana**: http://<server-ip>:3000 (admin/grafanapass123)
    - **InfluxDB**: http://<server-ip>:8086 (admin/influxpass123)
    - **MQTT**: <server-ip>:1883 (anonymous)
@@ -178,12 +201,17 @@ iot la [n]          # all logs
 iot ble-up          # Start BLE decoder
 iot ble-down        # Stop BLE decoder
 iot ble-restart     # Restart BLE decoder
+iot ble-rebuild     # Rebuild container image
 iot ble-status      # Show status
 iot ble-logs [n]    # View logs (alias: iot lb)
+iot ble-follow      # Stream logs in real-time
+iot ble-decode      # Run manually in foreground (debugging)
 
 # Data & Monitoring
-iot query [range] [rows]  # Query InfluxDB directly
-iot mqtt [topic] [count]  # Subscribe to MQTT topics
+iot query [range] [rows]      # Query InfluxDB directly
+iot query-tags [range] [rows] # Query with device metadata columns
+iot mqtt [topic] [count]      # Subscribe to MQTT topics
+iot watch-gv2                 # Subscribe to Govee sensor topics
 
 # Maintenance
 iot backup          # Backup Grafana + InfluxDB volumes
@@ -194,10 +222,39 @@ iot cron-off        # Disable cron job
 # Utilities
 iot ip              # Show VM IP addresses
 iot web             # Show all service URLs
-iot tunnel          # Start Cloudflare tunnel (requires cloudflared)
 iot env             # Show current .env config
 iot conf            # Show telegraf config
 iot help            # Show all commands
+
+# Remote Access & Tunneling
+# Cloudflare tunnels run in background, provide public HTTPS URLs
+# Tunnel state tracked in ~/logs/tunnel/ (PID, URL, logs)
+iot tunnel                # Start Grafana tunnel (default)
+iot tunnel-grafana        # Start Grafana tunnel (port 3000)
+iot tunnel-influxdb       # Start InfluxDB tunnel (port 8086)
+iot tunnel-schedule       # Start set-schedule tunnel (port 8000)
+iot tunnel-stop           # Stop all running tunnels
+iot tunnel-stop-grafana   # Stop Grafana tunnel only
+iot tunnel-stop-influxdb  # Stop InfluxDB tunnel only
+iot tunnel-stop-schedule  # Stop schedule tunnel only
+iot tunnel-status         # Show status of all tunnels (PID, URL)
+iot tunnel-logs [name] [n]  # View tunnel logs (name: grafana/influxdb/schedule)
+```
+
+**Tunnel usage example:**
+```bash
+# Start a tunnel to share Grafana dashboard publicly
+iot tunnel-grafana
+# ✓ grafana tunnel ready: https://abc-xyz-123.trycloudflare.com
+
+# Check all tunnels
+iot tunnel-status
+# NAME            STATUS     PID      URL
+# grafana         running    12345    https://abc-xyz-123.trycloudflare.com
+
+# Stop when done
+iot tunnel-stop-grafana
+# ✓ Grafana tunnel stopped
 ```
 
 ### Adding Devices
@@ -262,6 +319,68 @@ Restart services to apply changes? [Y/n] y
 ✓ Services restarted
 ```
 
+### Set-Schedule Management
+
+Manage the festival schedule tracking application (Phase 6):
+
+**Production commands (port 8000):**
+```bash
+iot schedule-up         # Start production service
+iot schedule-down       # Stop production service
+iot schedule-restart    # Restart production service
+iot schedule-rebuild    # Rebuild and redeploy production
+iot schedule-status     # Show container status
+iot schedule-logs [n]   # View logs (last n lines)
+iot schedule-follow     # Stream logs in real-time
+iot schedule-shell      # Open shell in container
+```
+
+**Development commands (port 8001):**
+```bash
+iot schedule-dev-build   # Build dev image from ../COACHELLA_SET_SCHEDULE
+iot schedule-dev-up      # Start dev service
+iot schedule-dev-down    # Stop dev service
+iot schedule-dev-restart # Restart dev service
+iot schedule-dev-rebuild # Build and start dev service
+iot schedule-dev-logs [n]   # View dev logs
+iot schedule-dev-follow  # Stream dev logs in real-time
+iot schedule-dev-shell   # Open shell in dev container
+```
+
+**Access:**
+- Production: http://<server-ip>:8000
+- Development: http://<server-ip>:8001
+- View-only mode: append `/` to URL
+- Operator mode: append `/edit` to URL
+
+### M4300 Network Backup Management
+
+Automate Netgear M4300 switch configuration backups via TFTP (Phase 5):
+
+```bash
+# Backup Operations
+iot m4300-backup        # Run config backup for all switches
+iot m4300-backup-mock   # Run in mock mode (testing, no real switches)
+
+# View Logs & Results
+iot m4300-logs [n]      # View backup logs (last n entries)
+iot m4300-log-view <file>  # Display specific log file
+iot m4300-list [n]      # List recent backups (last n)
+iot m4300-list-all      # List all backup files
+
+# Maintenance
+iot m4300-clean         # Remove empty backup folders
+iot m4300-list-switches # Show parsed switch inventory
+iot m4300-rebuild       # Rebuild netgear-backup container
+iot tftp-rebuild        # Recreate TFTP server container
+```
+
+**Configuration:**
+- Edit `config/switches.conf` to define switch inventory
+- Set credentials in `.env`: `M4300_USERNAME`, `M4300_PASSWORD_M4300`, `M4300_PASSWORD_OTHER`
+- TFTP server runs on port 69 (UDP)
+- Backups stored in Docker volume: `netgear-backups:/backups`
+
 ### Dashboard Backup & Provisioning
 
 Automate Grafana dashboard backups and convert them to provisioning format for version control:
@@ -309,12 +428,60 @@ iot setup-dashboard-cron    # Install 2am daily backup job
 iot remove-dashboard-cron   # Remove cron job
 ```
 
+**Restore dashboard from backup:**
+```bash
+iot restore-dashboard [file]  # Restore dashboard via Grafana API
+```
+
 **Workflow:**
 1. Make dashboard changes in Grafana UI
 2. Run `iot backup-dashboards` to export
 3. Run `iot provision-dashboard` to convert (interactive picker)
 4. Git commit the provisioned file for version control
 5. Run `iot deprovision-dashboard` to remove old versions (optional)
+
+### Advanced Usage
+
+Power-user commands for advanced data management and system control.
+
+#### ESP32 BLE Gateway Configuration
+
+Configure ESP32 hardware gateways for optimal BLE scanning:
+
+```bash
+iot esp32-enable    # Enable ESP32 BLE gateway decoder mode
+iot esp32-verbose   # Configure for maximum scan frequency
+```
+
+These commands adjust BLE decoder settings to work with ESP32 OpenMQTTGateway hardware.
+
+#### MQTT Utilities
+
+```bash
+iot clear-retained [topic]  # Clear retained MQTT messages
+                            # Useful for removing stale sensor data
+```
+
+#### Data Deletion (⚠️ DANGEROUS)
+
+**WARNING:** These commands permanently delete data. Use with extreme caution.
+
+```bash
+iot delete-device-data   # Interactive deletion wizard
+                         # Options: old data, current device, or all data
+
+iot nuke                 # Delete ALL data in sensors bucket
+                         # Cannot be undone
+
+iot nuke-geist           # Delete all Geist measurements
+                         # Useful for schema changes
+```
+
+**Safe workflow for schema changes:**
+1. Backup data first: `iot backup`
+2. Run `iot nuke-geist` to clear old measurements
+3. Restart Telegraf: `iot restart telegraf`
+4. Verify new data flows correctly
 
 ### Troubleshooting
 
@@ -393,23 +560,24 @@ docker compose logs [service-name]
 - **Management commands**: ble-up/down/restart/rebuild/status/logs/follow
 - **Grafana dashboards** showing both data sources
 
-### � Phase 5: Network Device Backups (In Progress)
-- **TFTP server deployment** (from dpx-netgear-backup repo work)
-- **dpx-netgear-backup integration** as submodule with iot CLI commands
-- **M4300 connectivity** (192.168.0.x subnet access from VM)
-- **M4300 SNMP monitoring** (port status, VLANs, errors, uptime)
-- **Automated daily backups** with InfluxDB tracking and Grafana dashboards
+### ✅🚧 Phase 5: Network Device Backups (Core Complete, SNMP Monitoring Pending)
+- ✅ **TFTP server deployed** in docker-compose with persistent storage
+- ✅ **dpx-netgear-backup integrated** as submodule with 11 CLI commands
+- ✅ **M4300 backup automation** via TFTP protocol
+- ✅ **Switch inventory management** via config/switches.conf
+- 🚧 **M4300 SNMP monitoring** (port status, VLANs, errors, uptime) — pending implementation
+- 🚧 **Grafana dashboards** for backup status — pending implementation
 
-### 🚧 Phase 6: Set Schedule Integration (Art-Net Testing Incomplete)
-- **Git submodule** integration (services/set-schedule)
-- **Docker service** deployment on port 8000 (production) + 8001 (dev)
-- **Real-time WebSocket sync** across all connected clients
-- **Operator + view-only modes** for schedule tracking
-- **Google Sheets integration** for schedule data persistence
-- **Art-Net DMX implementation** complete (app/artnet.py, test_artnet.py)
-- **Outstanding**: Art-Net testing with hardware, blocked by Phase 11 VLAN config
-- **16 management commands** for production and development workflows
-- **Slip tracking** and downstream impact projections
+### ✅🚧 Phase 6: Set Schedule Integration (Software Complete, Hardware Testing Blocked)
+- ✅ **Git submodule integrated** (services/set-schedule)
+- ✅ **Docker services deployed** on port 8000 (production) + 8001 (dev)
+- ✅ **16 management commands** implemented (8 production + 8 dev)
+- ✅ **Real-time WebSocket sync** across all connected clients
+- ✅ **Operator + view-only modes** for schedule tracking
+- ✅ **Google Sheets integration** for schedule data persistence
+- ✅ **Art-Net DMX implementation** complete (app/artnet.py, test_artnet.py)
+- ✅ **Slip tracking** and downstream impact projections
+- 🚧 **Art-Net hardware testing** blocked by Phase 11 VLAN configuration
 
 ### 📋 Phase 7: Metrics-Driven Device Control (Planned)
 - **Govee + Hue API** integration for lighting control

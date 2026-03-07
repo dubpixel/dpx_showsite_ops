@@ -1,5 +1,5 @@
 # dpx-showsite-ops - System Reference
-# Last updated: 2026-02-16
+# Last updated: 2026-03-06
 # Upload this file for system context (network, sensors, configs, stack operations)
 # **For tasks/roadmap**: See [ROADMAP.md](../ROADMAP.md)
 # **For set-schedule app development**: See [set-schedule-development.md](set-schedule-development.md)
@@ -26,6 +26,7 @@
 - **.68**: Windows NUC (Hyper-V host, Theengs Gateway)
 - **.100**: dpx-showsite-ops VM (main stack)
 - **.213**: ESP32 BLE Gateway (OMG_ESP32_FTH_BLE)
+- **.214**: Geist Watchdog 100 (dpx-geist.local) — Environmental monitoring
 - **.220**: User's Mac
 
 ### Installed Services
@@ -34,7 +35,7 @@
 |---------|--------|---------|
 | SSH | enabled | Remote access |
 | avahi-daemon | enabled | mDNS (*.local hostnames) |
-| cloudflared | installed | Cloudflare tunnels (manual start) |
+| cloudflared | installed | Cloudflare tunnels (manual start, auto-installed by setup.sh) |
 | tailscale | enabled | Mesh VPN |
 | Docker | enabled | Container runtime |
 
@@ -163,6 +164,199 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
 | **H5075** | ✅ Excellent | ✅ Yes | **Best for future purchases** |
 | H5101/H5102 | ✅ Good | ✅ Yes | Good alternative |
 
+### M4300 Network Switches
+
+**Phase 5 - Network Device Backups** (Core Complete)
+
+#### Overview
+
+- **Purpose**: Automated configuration backups for Netgear M4300 managed switches
+- **Method**: TFTP-based backup via SSH-triggered commands
+- **Integration**: Git submodule at `services/netgear-backup`
+- **Status**: ✅ Backup automation working, Grafana dashboards pending
+
+#### Switch Configuration Requirements
+
+**CRITICAL**: Both RSA AND DSA SSH host keys must be generated and activated on each switch:
+
+```
+(M4300) # configure
+(M4300) (config)# crypto key generate rsa
+(M4300) (config)# crypto key activate rsa
+(M4300) (config)# crypto key generate dsa
+(M4300) (config)# crypto key activate dsa
+(M4300) (config)# exit
+(M4300) # write memory
+```
+
+**Verify keys exist:**
+```
+(M4300) # show crypto key mypubkey rsa
+(M4300) # show crypto key mypubkey dsa
+```
+
+#### Known Issues & Gotchas
+
+- **Password compatibility**: Some switches reject newer passwords — multiple password environment variables available (`M4300_PASSWORD_M4300`, `M4300_PASSWORD_OTHER`) to accommodate different switch behaviors
+- **TFTP server config**: Took significant troubleshooting to get working correctly (see TFTP Server section below)
+- **No TFTP logs**: TFTP server runs as user `nobody` with minimal logging — troubleshooting is difficult
+- **Secure vs unsecure mode**: TFTP configuration requires specific flags for file uploads to work
+
+#### Management
+
+**Configuration:**
+- Switch inventory: `config/switches.conf` (IP, hostname, model)
+- Credentials: `.env` file (`M4300_USERNAME`, passwords)
+- Backup storage: Docker volume `netgear-backups`
+
+**Commands:**
+```bash
+iot m4300-backup          # Run backup for all switches
+iot m4300-backup-mock     # Test mode (no real switches)
+iot m4300-logs [n]        # View backup logs
+iot m4300-list [n]        # List recent backups
+iot m4300-list-switches   # Show switch inventory
+iot m4300-clean           # Remove empty backup folders
+```
+
+**See also**: [services/netgear-backup/README.md](../../services/netgear-backup/README.md) for detailed switch configuration steps.
+
+### Geist Watchdog Environmental Monitoring
+
+**Phase 4.5 - Infrastructure Monitoring** (✅ Complete)
+
+#### Overview
+
+- **Device**: Geist Watchdog 100 @ dpx-geist.local (192.168.1.214)
+- **Purpose**: Server room and infrastructure climate monitoring with wired SNMP reliability
+- **Integration**: Telegraf SNMP input polling every 30 seconds
+- **Status**: ✅ Deployed and operational, data flowing to InfluxDB
+
+#### Monitored Sensors
+
+**Internal Sensors:**
+- Temperature
+- Humidity  
+- Dewpoint
+
+**Remote Sensors:**
+- 3x temperature probes (external wired sensors)
+- 2x airflow sensors
+
+#### Configuration
+
+- **Config file**: `telegraf/conf.d/geist-watchdog.conf` (197 lines)
+- **Protocol**: SNMP v2c
+- **Polling interval**: 30 seconds
+- **InfluxDB measurements**: 
+  - `geist_internal` — Internal temp/humidity/dewpoint
+  - `geist_temp_remote` — External temperature probes
+  - `geist_airflow_remote` — Airflow sensors
+
+#### Hostname Resolution
+
+The Geist device uses hostname `dpx-geist.local` via mDNS. Docker containers need explicit hostname mapping in `docker-compose.yml`:
+
+```yaml
+telefraf:
+  extra_hosts:
+    - "dpx-geist.local:192.168.1.214"
+```
+
+If device IP changes, update both `docker-compose.yml` and `telegraf/conf.d/geist-watchdog.conf`.
+
+#### Management
+
+**Data verification:**
+```bash
+iot query "1h" 10 | grep geist
+```
+
+**Schema cleanup** (if needed after sensor changes):
+```bash
+iot nuke-geist  # Deletes all Geist measurements from InfluxDB
+```
+
+**Grafana**: Data is available in InfluxDB. Dashboards pending design.
+
+### Set-Schedule Festival App
+
+**Phase 6 - Real-Time Schedule Tracking** (✅ Deployed, Art-Net Testing Pending)
+
+#### Overview
+
+- **Purpose**: Real-time festival schedule tracking with slip monitoring and downstream impact projections
+- **Repository**: https://github.com/macswg/coachella_set_schedule (Sean's repo)
+- **Integration**: Git submodule at `services/set-schedule`
+- **Ports**: 8000 (production), 8001 (development)
+- **Status**: ✅ Deployed and operational, Art-Net hardware testing blocked by Phase 11 VLAN config
+
+#### Key Features
+
+- **Real-time WebSocket sync**: All connected clients see updates instantly
+- **Operator mode** (`/edit`): Record actual start/end times for each act
+- **View-only mode** (`/`): Dashboard display for stage crew
+- **Slip tracking**: Calculates accumulated lateness vs published schedule
+- **Downstream projections**: Shows impact of current slip on future acts
+- **Break time calculations**: Early finishes extend breaks, late finishes compress them
+- **Google Sheets integration**: Optional schedule data persistence
+- **Art-Net DMX support**: React to lighting console brightness changes (hardware testing pending)
+
+#### Docker Services
+
+**Production** (port 8000):
+- Container: `set-schedule`
+- Auto-starts with stack
+- Management: `iot schedule-up/down/restart/rebuild/status/logs/follow/shell`
+
+**Development** (port 8001):
+- Builds from `../COACHELLA_SET_SCHEDULE` directory
+- For testing and contributing PRs  
+- Management: `iot schedule-dev-build/up/down/restart/rebuild/logs/follow/shell`
+
+#### Configuration
+
+**Environment variables** (in `.env`):
+- `SCHEDULE_PORT`: Port for production service (default 8000)
+- `STAGE_NAME`: Display name (e.g., "Main Stage")
+- `TIMEZONE`: Local timezone (e.g., "America/Los_Angeles")
+- `USE_GOOGLE_SHEETS`: Enable Google Sheets integration (true/false)
+- `GOOGLE_SHEETS_ID`: Spreadsheet ID
+- `GOOGLE_SHEET_TAB`: Tab name (default "Schedule")
+- `GOOGLE_SERVICE_ACCOUNT_FILE`: Path to credentials file in `secret/` directory
+- `ARTNET_*` variables: Art-Net DMX configuration (listener IP, port, universe, channels)
+
+#### Access URLs
+
+- **Production view-only**: http://192.168.1.100:8000
+- **Production operator**: http://192.168.1.100:8000/edit
+- **Development**: http://192.168.1.100:8001 (when dev service running)
+
+#### Management Commands
+
+**Production:**
+```bash
+iot schedule-up           # Start production service
+iot schedule-down         # Stop production service
+iot schedule-restart      # Restart production service
+iot schedule-rebuild      # Rebuild and redeploy
+iot schedule-status       # Show container status
+iot schedule-logs [n]     # View logs (last n lines)
+iot schedule-follow       # Stream logs in real-time
+iot schedule-shell        # Open shell in container
+```
+
+**Development:**
+```bash
+iot schedule-dev-build    # Build dev image from ../COACHELLA_SET_SCHEDULE
+iot schedule-dev-up       # Start dev service
+iot schedule-dev-restart  # Restart dev service
+iot schedule-dev-rebuild  # Build and start dev service
+iot schedule-dev-logs [n] # View dev logs
+```
+
+**See also**: [set-schedule-development.md](set-schedule-development.md) for detailed development workflow.
+
 ---
 
 ## DOCKER STACK
@@ -173,19 +367,26 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
 ~/dpx_govee_stack/              (local directory)
 ├── README.md                   ← Quick start guide
 ├── CHANGELOG.md                ← Version history
-├── VERSION                     ← Current version number
+├── VERSION                     ← Current version number (2.1.0)
 ├── docker-compose.yml          ← Main stack definition
 ├── Dockerfile.ble-decoder      ← BLE decoder container build
 ├── requirements-ble-decoder.txt ← Python dependencies for BLE decoder
 ├── .env                        ← Secrets (gitignored)
 ├── .env.example                ← Template for users
 ├── .gitignore                  ← Excludes secrets, logs, backups
-├── setup.sh                    ← Initial deployment script
+├── install.sh                  ← One-liner installer (clones repo + runs wizard)
+├── setup.sh                    ← Interactive setup wizard (v2.1.0: no vim/vi required!)
+├── config/
+│   └── switches.conf.example   ← M4300 switch inventory template
 ├── mosquitto/
 │   └── config/
 │       └── mosquitto.conf
 ├── telegraf/
-│   ├── telegraf.conf           ← Auto-generated by update-device-map.sh
+│   ├── telegraf.conf           ← Static base config
+│   ├── conf.d/
+│   │   ├── device-mappings.conf    ← Dynamic device mappings (auto-generated)
+│   │   ├── geist-watchdog.conf     ← Geist SNMP monitoring (197 lines)
+│   │   └── device-overrides.json.example ← Device rename template
 │   └── backups/                ← Last 10 config backups
 ├── scripts/
 │   ├── manage.sh               ← Main management CLI
@@ -204,11 +405,22 @@ Device map updates logged to: `~/dpx_govee_stack/scripts/update-device-map.log`
     └── dubpixel_identicon.png  ← Identity icon
 ```
 
-**Phase 6 Integration (🚧 In Progress)**:
+**Phase 5 Integration (✅ Core Complete)**:
+```
+└── services/
+    └── netgear-backup/         ← Netgear M4300 backup automation (git submodule)
+        ├── netgear_system_backup_TFTP-v0d1.py
+        ├── switches.conf       ← Switch inventory (symlinked to ../../config/)
+        └── Dockerfile          ← Integrated in docker-compose stack
+```
+
+**Phase 6 Integration (✅ Deployed)**:
 ```
 └── services/
     └── set-schedule/           ← Sean's repo as git submodule
-        ├── (festival schedule app)
+        ├── main.py             ← FastAPI application
+        ├── app/                ← Server-side modules (models, sheets, artnet)
+        ├── templates/          ← Jinja2 templates + Alpine.js
         └── Dockerfile          ← Integrated in docker-compose stack
 ```
 
@@ -238,6 +450,7 @@ Docker volumes are prefixed with directory name:
 - Full recreate needed for .env changes: `docker compose down && docker compose up -d`
 - Restart sufficient for telegraf.conf changes: `docker compose restart telegraf`
 - **Logs are lost on container recreate** (down/up cycle) - use `iot restart` when possible
+- **VERSION file**: Tracks current release (2.1.0 as of 2026-03-06)
 
 ---
 
@@ -250,8 +463,10 @@ Docker volumes are prefixed with directory name:
 Split into modular structure:
 - `telegraf.conf`: Static base config (agent, outputs, inputs, BLE processors)
 - `conf.d/device-mappings.conf`: Dynamic enum mappings (regenerated by update-device-map.sh)
+- `conf.d/geist-watchdog.conf`: Geist Watchdog SNMP monitoring (197 lines)
+- `conf.d/device-overrides.json`: Local device name overrides (optional, gitignored)
 
-Docker container loads both files via --config-directory flag.
+Docker container loads all conf.d files via --config-directory flag.
 
 #### Key Configuration Details
 
@@ -310,6 +525,90 @@ iot restart mosquitto
 ```bash
 iot nuke  # DELETE all data in sensors bucket
 ```
+
+### TFTP Server
+
+**Purpose**: Receives configuration files from M4300 switches during automated backups.
+
+**Image**: `pghalliday/tftp:latest`
+
+**Critical Configuration**:
+```yaml
+command: ["-L", "-s", "-c", "/var/tftpboot"]
+```
+
+**Flags explained**:
+- `-L`: Enable logging
+- `-s`: Secure mode (chroot to directory)
+- `-c`: **CRITICAL** — Allow file creation (required for switch uploads)
+
+**Gotchas**:
+- **Took significant troubleshooting** to get working — issue was secure vs unsecure mode
+- `-c` flag is non-obvious but essential for receiving config files from switches
+- Runs as user `nobody` — minimal permissions
+- **No useful logs** — makes troubleshooting difficult
+- Requires `network_mode: host` for TFTP's dynamic port allocation
+
+**Network**: Host mode (port 69/UDP)
+
+**Volume**: `tftp-data` (persistent storage for uploaded configs)
+
+**Access**: Switch-triggered only, no manual interaction needed
+
+### netgear-backup
+
+**Purpose**: Automated M4300 switch configuration backups via TFTP.
+
+**Integration**: Git submodule at `services/netgear-backup/`
+
+**Restart policy**: `"no"` — Manual or cron-triggered, not always-on
+
+**Configuration**:
+- **Switch inventory**: `config/switches.conf` (IP, hostname, model)
+- **Credentials**: Environment variables from `.env`:
+  - `M4300_USERNAME` — Switch SSH username
+  - `M4300_PASSWORD_M4300` — Password for M4300 models
+  - `M4300_PASSWORD_OTHER` — Password for other models (some switches reject newer passwords)
+  - `M4300_TFTP_SERVER` — TFTP server hostname (default: tftp-server)
+
+**Process**:
+1. SSH to each switch (requires RSA + DSA host keys activated)
+2. Execute `copy nvram:startup-config tftp://...` command
+3. Switch uploads config to TFTP server
+4. netgear-backup validates file size and content
+5. Publishes backup metrics to InfluxDB
+
+**Storage**:
+- **Backups**: Docker volume `netgear-backups:/backups`
+- **TFTP files**: Read-only access to `tftp-data` volume for retrieval
+
+**InfluxDB Integration**: Publishes backup success/failure metrics with switch name, IP, duration, result.
+
+**Management**: See M4300 Network Switches section above for commands.
+
+### set-schedule
+
+**Purpose**: Festival schedule tracking application with real-time slip monitoring.
+
+**Integration**: Git submodule at `services/set-schedule/`
+
+**Ports**:
+- Production: 8000 (`SCHEDULE_PORT` env var)
+- Development: 8001 (when dev service running)
+
+**Configuration**: See Set-Schedule Festival App section above for full details.
+
+**Environment** (from `.env`):
+- Stage name, timezone
+- Google Sheets integration (optional)
+- Art-Net DMX listener config
+- Service account credentials (in `secret/` directory)
+
+**Volume**: `./secret:/app/secret:ro` — Read-only mount for Google service account credentials
+
+**Network**: Bridge (iot network)
+
+**Management**: 16 commands — see Set-Schedule Festival App section above.
 
 ### Grafana
 
@@ -438,7 +737,19 @@ demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/battery      �
 
 Symlinked: /usr/local/bin/iot → wrapper script → ~/dpx_govee_stack/scripts/manage.sh
 
-**Installation**: Automatically installed by [setup.sh](../../setup.sh) with auto-detected path.
+**Installation**: Automatically installed by [setup.sh](../../setup.sh) interactive wizard with auto-detected path.
+
+**Quick Deploy**: Use the one-liner installer:
+```bash
+curl -fsSL https://raw.githubusercontent.com/dubpixel/dpx_showsite_ops/master/install.sh | bash
+```
+
+The wizard (v2.1.0+) handles everything interactively:
+- Docker auto-install if missing
+- Email/password/API key prompts with validation
+- Timezone auto-detection
+- System optimizations (IPv6, avahi, Tailscale, cloudflared)
+- No vim/vi required!
 
 <details>
 <summary>Manual installation (if needed)</summary>
@@ -485,23 +796,73 @@ iot ble-logs [n]                # View logs (same as iot lb)
 iot ble-follow                  # Follow logs in real-time
 iot ble-decode                  # Run manually (debug mode, requires python3-paho-mqtt)
 
-# Data
+# Data & Monitoring
 iot query [range] [rows]        # Query InfluxDB (default: 30m, 5 rows)
+iot query-tags [range] [rows]   # Query InfluxDB with device metadata columns
 iot mqtt [topic] [count]        # Subscribe to MQTT topics
-iot nuke                        # DELETE all data in sensors bucket
+iot watch-gv2                   # Subscribe to Govee cloud sensor topics
 
-# Config
+# M4300 Network Backup Management
+iot m4300-backup                # Run config backup for all switches
+iot m4300-backup-mock           # Run in mock mode (testing, no real switches)
+iot m4300-logs [n]              # View backup logs (last n entries)
+iot m4300-log-view <file>       # Display specific log file
+iot m4300-list [n]              # List recent backups (last n)
+iot m4300-list-all              # List all backup files
+iot m4300-clean                 # Remove empty backup folders
+iot m4300-list-switches         # Show parsed switch inventory
+iot m4300-rebuild               # Rebuild netgear-backup container
+iot tftp-rebuild                # Recreate TFTP server container
+
+# Set-Schedule Management (Production - port 8000)
+iot schedule-up                 # Start production service
+iot schedule-down               # Stop production service
+iot schedule-restart            # Restart production service
+iot schedule-rebuild            # Rebuild and redeploy production
+iot schedule-status             # Show container status
+iot schedule-logs [n]           # View logs (last n lines)
+iot schedule-follow             # Stream logs in real-time
+iot schedule-shell              # Open shell in container
+
+# Set-Schedule Development (port 8001)
+iot schedule-dev-build          # Build dev image from ../COACHELLA_SET_SCHEDULE
+iot schedule-dev-up             # Start dev service
+iot schedule-dev-down           # Stop dev service
+iot schedule-dev-restart        # Restart dev service
+iot schedule-dev-rebuild        # Build and start dev service
+iot schedule-dev-logs [n]       # View dev logs
+iot schedule-dev-follow         # Stream dev logs in real-time
+iot schedule-dev-shell          # Open shell in dev container
+
+# Config & Device Management
 iot env                         # Show .env file
 iot conf                        # Show telegraf config
 iot edit [file]                 # Edit a file (default: .env)
 iot update                      # Refresh device name mappings
+iot list-devices                # Show all devices with metadata
+iot rename-device               # Interactive device renaming
+iot set-room                    # Set room for a device
+iot clear-override              # Remove device override
 iot cron-on                     # Enable hourly device map updates
 iot cron-off                    # Disable cron job
 
-# Network
+# Network & Tunnels
 iot ip                          # Show VM IP address
 iot web                         # Show all service URLs
-iot tunnel                      # Start Cloudflare tunnel
+iot tunnel                      # Start Cloudflare tunnel (general)
+iot tunnel-grafana              # Tunnel specifically to Grafana
+iot tunnel-influxdb             # Tunnel specifically to InfluxDB
+iot tunnel-schedule             # Tunnel specifically to set-schedule
+
+# ESP32 BLE Gateway Configuration
+iot esp32-enable                # Enable ESP32 BLE gateway external decoder mode
+iot esp32-verbose               # Configure ESP32 for maximum scan frequency
+
+# Data Deletion (⚠️ DANGEROUS)
+iot clear-retained [topic]      # Clear retained MQTT messages (fixes ghost data)
+iot delete-device-data          # Interactive deletion wizard (old/current/all modes)
+iot nuke                        # DELETE all data in sensors bucket
+iot nuke-geist                  # Delete all Geist measurements
 
 # Maintenance
 iot backup                      # Backup Grafana + InfluxDB volumes to ~/backups/
@@ -541,54 +902,64 @@ iot backup  # Backup Grafana + InfluxDB volumes to ~/backups/
 
 ## INTEGRATIONS
 
-### Phase 6 - Set Schedule Integration
+### Phase 6 - Set Schedule Integration (✅ Deployed)
 
 **Sean's Repo**: https://github.com/macswg/coachella_set_schedule
+
+**Status**: Phase 6 deployment complete. Software fully operational. Art-Net hardware testing blocked by Phase 11 VLAN configuration.
 
 ### What It Is
 - FastAPI/Uvicorn web app for real-time show schedule tracking
 - Records actual vs scheduled set times for festival stages
 - Tracks "slip" (accumulated lateness throughout show)
+- Projects downstream impacts of current slip
 - WebSocket sync across multiple clients
 - View-only and operator modes
-- Google Sheets integration for schedule data
+- Google Sheets integration for schedule data persistence
+- Art-Net DMX listener (reacts to lighting console brightness changes)
 
 ### Integration Method
 - Added as **git submodule** at `services/set-schedule/`
 - Keeps Sean's repo separate (easy to pull updates)
 - Runs as Docker service in compose stack
 - Managed with `iot` commands like other services
+- 16 management commands (8 production + 8 development)
 
-### Docker Service Config
-Added to `docker-compose.yml`:
+### Docker Services
+
+**Production** (port 8000):
 ```yaml
 set-schedule:
   build:
     context: ./services/set-schedule
-    dockerfile: Dockerfile.showsite
+    dockerfile: Dockerfile
   container_name: set-schedule
   restart: unless-stopped
   ports:
-    - "8000:8000"
+    - "${SCHEDULE_PORT:-8000}:8000"
   environment:
-    # Add any required env vars
+    - STAGE_NAME=${STAGE_NAME:-Main Stage}
+    - TIMEZONE=${TIMEZONE:-America/Los_Angeles}
+    - USE_GOOGLE_SHEETS=${USE_GOOGLE_SHEETS:-false}
+    # ... additional env vars ...
   volumes:
-    - ./services/set-schedule/data:/app/data
+    - ./secret:/app/secret:ro
 ```
+
+**Development** (port 8001): Builds from `../COACHELLA_SET_SCHEDULE` for local testing.
 
 ### Usage
 - **Clone with submodules**: `git clone --recurse-submodules <repo-url>`
-- **View-only mode**: http://<server-ip>:8000
-- **Operator mode**: http://<server-ip>:8000/edit
+- **View-only mode**: http://192.168.1.100:8000
+- **Operator mode**: http://192.168.1.100:8000/edit
 - **Update Sean's code**: `git submodule update --remote services/set-schedule`
-- **Logs**: `iot ls` (set-schedule logs)
-- **Restart**: `iot restart set-schedule`
+- **Commands**: `iot schedule-up/down/restart/logs/shell` + 11 more (see Management section)
 
 ### Development Workflow
 **For local development, contributing PRs to Sean's repo, and testing**:  
 See [set-schedule-development.md](set-schedule-development.md)
 
-### Optional Enhancement
+### Future Enhancement
 Could log actual vs scheduled times to InfluxDB for historical slip analysis and Grafana dashboards showing per-stage timeliness trends.
 
 ---
@@ -723,7 +1094,9 @@ cat ~/dpx_govee_stack/scripts/update-device-map.log | tail -5
 
 Fix: `sudo systemctl restart docker`
 
-### MQTT Retained Message Ghost Data (ACTIVE ISSUE)
+### Known Issues
+
+#### MQTT Retained Message Ghost Data (ACTIVE ISSUE)
 
 **Problem**: After renaming a device (e.g., `studio_5051_down` → `5051_studio_down`), old data continues to appear in InfluxDB/Grafana.
 
@@ -740,7 +1113,12 @@ Telegraf regex processors extract `device_name` from topic path, creating two se
 
 **Why hourly**: `update-device-map.sh` cron job **unconditionally** restarts Telegraf every hour (no diff check), forcing resubscription and replay of all retained messages.
 
-**Immediate workaround**: Manually clear old retained messages:
+**Immediate workaround**: Use `iot clear-retained` command:
+```bash
+iot clear-retained "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/#"
+```
+
+Or manually:
 ```bash
 mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/temperature" -r -n
 mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodown/studio_5051_down/4381ECA1010A/humidity" -r -n
@@ -749,11 +1127,11 @@ mosquitto_pub -h localhost -t "demo_showsite/dpx_ops_decoder/dpx_ops_1/studiodow
 
 **Long-term fixes needed**:
 1. Add diff check to update-device-map.sh (only restart if config actually changed)
-2. Create cleanup script to detect and clear stale retained messages
+2. Create automated cleanup script to detect and clear stale retained messages
 3. Consider using MAC-based topics instead of device_name to avoid renames creating new topics
-4. Add `iot mqtt-cleanup` command to manage.sh
+4. Auto-cleanup on device rename operations
 
-See [ROADMAP.md](../ROADMAP.md) Phase 4 Outstanding Items and [plan-mqtt-cleanup.md](plan-mqtt-cleanup.md) for fix details.
+See [ROADMAP.md](../ROADMAP.md) Phase 4 Outstanding Items for fix details.
 
 ### Key Learnings & Gotchas
 

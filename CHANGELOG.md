@@ -6,13 +6,97 @@ All notable changes to dpx-showsite-ops.
 
 ## [Unreleased]
 
-### Phase 5 - Network Backups (Planned)  
-- TFTP server deployment
-- M4300 automated backup scripts
-- Monitoring integration
+### Phase 6 - Enhanced Device Control (Planned)
+- Direct device control from Grafana
+- WebSocket-based real-time updates
+- Touch-friendly mobile UI
 
 ### Future Phases
-- See ROADMAP.md for Phases 7-14 (device control, consumables tracking, etc.)
+- See ROADMAP.md for Phases 7-14 (automation, consumables tracking, etc.)
+
+---
+
+## [2.1.0] - 2026-03-06
+
+### Added
+- **Phase 5 - Network Backups Implementation** (✅ Complete):
+  - **TFTP Server Deployment** (commits c3b7649 through 8bbafe8, 2026-03-05):
+    - Containerized TFTP server with host network mode for M4300 backups
+    - Environment variable configuration via `M4300_TFTP_SERVER` in .env
+    - Secure chroot mode with file creation enabled
+    - Volume mount at `/tftp` for backup storage
+    - New management commands: `iot tftp-up`, `tftp-down`, `tftp-restart`, `tftp-logs`, `tftp-rebuild`
+  - **Netgear-Backup Service Integration** (commits 10110a1 through fb49ef5, 2026-03-05 to 2026-03-06):
+    - Added netgear-backup as git submodule in `services/netgear-backup/`
+    - Comprehensive README and setup documentation (commit fbf3760)
+    - Switches.conf configuration system for multi-switch management (commit 10110a1)
+    - Real-time backup output and logging enhancements (commits 576942b, 8cb4baf)
+    - Timezone support for accurate backup timestamps (commit c05bdd2)
+    - Empty folder cleanup functionality (commit 0e9a8cc)
+    - Docker Compose integration with TFTP volume mount (commit 62550e8)
+    - New management commands: `iot m4300-backup`, `m4300-backup-list`, `m4300-backup-logs`, `m4300-backup-clean`, `m4300-rebuild`
+    - Merged via PR #35 (commit a75c67d)
+- **Cloudflared Tunnel Management** (commits 6197d0a, a41376d):
+  - New `iot tunnel-up`, `tunnel-down`, `tunnel-restart`, `tunnel-status` commands
+  - Management commands for cloudflared tunnel processes
+  - Merged via PR #36
+- **Interactive Setup Wizard**: Complete rewrite of setup.sh for user-friendly deployment
+  - No more vim/vi required - fully interactive credential prompts
+  - Email validation with regex pattern matching
+  - API key validation (length checks)
+  - Timezone auto-detection with manual override option
+  - Hidden password input for security (`read -s`)
+  - Colored progress indicators (7-step wizard flow)
+  - Docker auto-install if missing (via get.docker.com)
+  - System optimization prompts:
+    - IPv6 disable (fixes govee2mqtt connectivity issues)
+    - avahi-daemon installation (.local hostname support)  
+    - Tailscale VPN installation (secure remote access)
+    - cloudflared installation (tunnel support)
+  - Auto-deploys stack after configuration
+  - Better error messages and validation throughout
+- **One-Liner Install**: New install.sh for `curl | bash` deployment
+  - Clones repository and runs setup wizard automatically
+  - Enables fast deployment on fresh VMs/Pis/Linux boxes
+  - Branch selection support (master default, others available)
+  - Handles existing installations (backup/upgrade options)
+  - Internet connectivity and prerequisite checks
+  - Works on Ubuntu 22.04+, Debian 11+, Raspberry Pi OS
+
+### Changed
+- **Configuration Refactoring** (commit ecca023, 2026-03-05):
+  - Centralized configuration files to `config/` directory
+  - Created `config/switches.conf.example` for netgear-backup configuration
+  - Improved config organization and documentation
+- **Set-Schedule Service Integration** (commit 7ca88ea, 2026-03-06):
+  - Consolidated set-schedule service integration documentation
+  - Updated submodule to include favicon (commit 40a7c33)
+  - Updated workspace configuration (commit f7d1cbe)
+- **setup.sh**: Complete rewrite from 312 to 723 lines
+  - New color scheme with helper functions (print_header, print_step, print_success, print_error)
+  - Added validation functions (validate_email, validate_api_key)
+  - Improved system check functions
+  - Interactive .env generation (no manual editing required)
+  - Streamlined dependency installation
+  - Better user experience with clear progress indicators
+- **README.md**: Added prominent "Quick Install" section
+  - Shows one-liner install command at top of Getting Started
+  - Reorganized installation instructions (Quick Install vs Manual)
+  - Updated manual installation steps to reflect new wizard behavior
+  - Added feature checklist for wizard capabilities
+
+### Improved
+- **User Experience**: Deployment now accessible to non-technical users
+  - "Hit a few buttons and boom it goes" achieved
+  - Zero vim/vi knowledge required
+  - Validates inputs before proceeding
+  - Auto-fixes common issues (IPv6, docker group, etc.)
+  - Clear next steps shown after completion
+
+### Documentation
+- **ROADMAP Updates** (commit d7bb674, 2026-03-06):
+  - Updated Phase 5 status to reflect TFTP and netgear-backup implementation completion
+  - Refined future phase planning
 
 ---
 

@@ -5,7 +5,11 @@
 **Time Required**: 2-3 hours for initial setup  
 **Skill Level**: Beginner (we assume nothing)
 
-**testing a/o 2.16.26**
+**Guide Version**: 2.1 (Updated for dpx-showsite-ops v2.1.0)  
+**Last Updated**: March 6, 2026  
+**License**: This project is licensed under [GNU GPL-3.0](../LICENSE.txt) as of v2.0.0
+
+**🆕 v2.1.0**: Interactive setup wizard added - no more vim/vi editing required!
 
 ---
 
@@ -24,8 +28,12 @@
 11. [Part 9: Theengs Gateway for BLE (Optional)](#part-9-theengs-gateway-for-ble-optional)
 12. [Part 10: ESP32 BLE Gateway Setup (Recommended)](#part-10-esp32-ble-gateway-setup-recommended)
 13. [Part 11: Geist Watchdog Environmental Monitor (SNMP)](#part-11-geist-watchdog-environmental-monitor-snmp)
-14. [Troubleshooting](#troubleshooting)
-15. [Daily Operations](#daily-operations)
+14. [Part 12: M4300 Network Switch Backups](#part-12-m4300-network-switch-backups)
+15. [Troubleshooting](#troubleshooting)
+16. [Daily Operations](#daily-operations)
+17. [What's Next?](#whats-next)
+18. [Appendix A: Grafana Quick Reference](#appendix-a-grafana-quick-reference)
+19. [Appendix B: Complete iot Command Reference](#appendix-b-complete-iot-command-reference)
 
 ---
 
@@ -563,7 +571,11 @@ Keep this handy for future access:
 
 ## Part 4: Install Docker
 
-**Note**: Docker installation is manual (not part of setup.sh). Complete this section before proceeding to Part 5.
+**🆕 v2.1.0**: The interactive setup wizard (Part 5) can now auto-install Docker for you!
+
+**You can either:**
+- **Option A**: Skip this section and let the wizard install Docker (recommended for beginners)
+- **Option B**: Follow these steps to install Docker manually first
 
 Docker runs all our services in containers (like tiny virtual machines).
 
@@ -608,7 +620,37 @@ Should show: `Docker Compose version v2.x.x`
 
 ## Part 5: Deploy the Stack
 
-### 5.1: Clone the Repository
+**🆕 Two ways to deploy** - Choose the one that sounds easier:
+
+- **Option A: One-Liner Install** (Recommended for beginners - fully automated!)
+- **Option B: Manual Clone + Interactive Wizard** (More control over install location)
+
+Both methods use the same interactive wizard - Option A just clones the repo first.
+
+---
+
+### Option A: One-Liner Install (Recommended)
+
+**This is the fastest way** - one command does everything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dubpixel/dpx_showsite_ops/master/install.sh | bash
+```
+
+What happens:
+1. Checks prerequisites (curl, git, internet)
+2. Clones repository to `~/dpx_showsite_ops`
+3. Runs interactive setup wizard (see Step 5.2 below for what to expect)
+
+**Skip to Section 5.2** to see what the wizard will ask you.
+
+---
+
+### Option B: Manual Clone + Interactive Wizard
+
+If you prefer to clone manually or choose a different directory:
+
+**5.1: Clone the Repository**
 
 ```bash
 cd ~
@@ -616,61 +658,103 @@ git clone https://github.com/dubpixel/dpx_showsite_ops.git
 cd dpx_showsite_ops
 ```
 
-### 5.2: Run Setup Script
+**5.2: Run Interactive Setup Wizard**
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The script will:
-- Check if Docker is installed ✓
-- Create directories
-- Create a `.env` file
-- Ask if you want to edit it now
+---
 
-**When it asks "Open .env in nano now?"**, press `Y` and Enter.
+### 5.2: Interactive Setup Wizard
 
-### 5.3: Configure .env File
+The wizard will guide you through 7 steps with colored progress indicators:
 
-You need a Govee API key. Let's get one:
+**What the wizard does** (no vim/vi required!):
 
-**On your phone**:
-1. Open Govee Home app
-2. Go to **My Account** (bottom right)
-3. Click **Apply for API Key**
-4. Follow the instructions
-5. You'll receive an email with your API key (looks like: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+**Step 1: Check Docker**
+- Detects if Docker is installed
+- **Offers to auto-install Docker** if missing (via get.docker.com)
+- Adds you to docker group automatically
 
-**Back in the terminal**, fill in:
+**Step 2: Check Configuration**
+- Looks for existing `.env` file
+- Offers to reconfigure if one exists
+
+**Step 3: Govee Credentials** (Interactive Prompts)
+- Prompts for your **Govee email** (validates format)
+- Prompts for your **Govee password** (hidden input for security)
+- Prompts for your **Govee API key** (validates length)
+
+> **Need an API key?** Get it from your phone:
+> 1. Open Govee Home app
+> 2. Go to **My Account** (bottom right)
+> 3. Click **Apply for API Key**
+> 4. You'll receive an email with your API key (looks like: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+
+**Step 4: Timezone & Display**
+- Auto-detects your timezone (asks to confirm or override)
+- Prompts for showsite name (defaults to hostname)
+- Asks for temperature scale preference (F or C)
+
+**Step 5: Grafana Setup**
+- Prompts for Grafana admin password (hidden input)
+
+**Step 6: System Optimizations** (Optional - you can skip any)
+- **Disable IPv6** (fixes govee2mqtt connectivity on some systems)
+- **Install avahi-daemon** (enables .local hostname like `http://dpx-stack.local:3000`)
+- **Install Tailscale** (secure VPN for remote access)
+- **Install cloudflared** (enables `iot tunnel` commands for public URLs)
+
+**Step 7: Install Dependencies**
+- Installs Python dependencies
+- Initializes git submodule (set-schedule)
+- Installs `iot` command system-wide
+- Offers to enable hourly device-map updates via cron
+
+**Final Step: Deploy Stack**
+- Asks if you want to deploy immediately
+- Runs `docker compose up -d` to start all 6 services
+
+**The wizard validates all inputs** so you can't accidentally enter a bad email or API key!
+
+---
+
+### 5.3: What Wizards Configure Automatically
+
+The interactive wizard creates your `.env` file with these settings:
 
 ```bash
+# Govee Credentials (from your prompts)
 GOVEE_API_KEY='your-api-key-here'
 GOVEE_EMAIL='your-govee-email@example.com'
 GOVEE_PASSWORD='your-govee-password'
 
-# Leave these as-is:
+# MQTT (auto-configured)
 GOVEE_MQTT_HOST=127.0.0.1
 GOVEE_MQTT_PORT=1883
 
-# Set your timezone (find yours at: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+# Timezone (auto-detected or your choice)
 TZ=America/New_York
 
-# Showsite name - must match MQTT Base Topic setting on ESP32 gateways
-# This is used by BLE decoder to subscribe to the correct MQTT topics
+# Display (your choice)
+GOVEE_TEMPERATURE_SCALE=F
+
+# Showsite name (your choice or hostname)
 SHOWSITE_NAME=my_venue
 
-# Leave these as-is:
+# Auto-configured defaults
 RUST_LOG=govee=info
-GOVEE_TEMPERATURE_SCALE=F
 ```
 
-**Save**:
-- Press `Ctrl + O`
-- Press `Enter`
-- Press `Ctrl + X`
+**To edit later**: Just run `nano ~/dpx_showsite_ops/.env` or use the wizard again: `./setup.sh`
 
-### 5.4: Start the Stack
+---
+
+### 5.4: Verify Stack is Running
+
+If you said "yes" to deploying in the wizard, the stack is already running! If not:
 
 ```bash
 iot up
@@ -680,19 +764,30 @@ You'll see a bunch of "Pulling" messages as it downloads images (takes 2-5 minut
 
 When it's done, you'll see:
 ```
-✔ Container influxdb     Started
-✔ Container grafana      Started
-✔ Container mosquitto    Started
-✔ Container telegraf     Started
-✔ Container govee2mqtt   Started
+✔ Container influxdb      Started
+✔ Container grafana       Started
+✔ Container mosquitto     Started
+✔ Container telegraf      Started
+✔ Container govee2mqtt    Started
+✔ Container ble-decoder   Started
 ```
+
+**What just started:**
+- **influxdb**: Time-series database for sensor data
+- **grafana**: Dashboard and visualization
+- **mosquitto**: MQTT message broker
+- **telegraf**: Data pipeline (MQTT → InfluxDB)
+- **govee2mqtt**: Cloud API polling (10-20 min latency)
+- **ble-decoder**: BLE data decoder (auto-processes ESP32 gateway data)
 
 **Verify everything is running**:
 ```bash
 iot status
 ```
 
-You should see 5 containers all "Up".
+You should see 6 containers all "Up".
+
+**Note**: The BLE decoder is now containerized and starts automatically. It will process BLE data from ESP32 gateways once you set them up in Part 10. No manual Python script needed!
 
 ### 5.5: Update Device Mappings
 
@@ -1392,13 +1487,29 @@ For larger venues or multiple rooms where a single ESP32 can't reach all sensors
 
 With ESP32 gateway(s) deployed:
 
-1. **BLE decoder already running**: Automatically started with `iot up`
-2. **Check decoder logs**: `iot lb` or `iot ble-status`
-3. **Telegraf**: Already configured to collect both cloud + BLE data
-4. **Grafana**: Dashboards show both sources with source tags
-5. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
+1. **BLE decoder already running**: Automatically started with `iot up` (containerized as of v2.0.0)
+2. **Check decoder status**: 
+   ```bash
+   iot ble-status    # Check if container is running
+   iot lb            # View last 30 lines of BLE decoder logs
+   iot ble-follow    # Follow logs in real-time (Ctrl+C to exit)
+   ```
+3. **BLE decoder management commands**:
+   - `iot ble-restart` — Restart the BLE decoder container
+   - `iot ble-rebuild` — Rebuild and restart (for code updates)
+   - `iot ble-up` / `iot ble-down` — Start/stop just the BLE decoder
+4. **Telegraf**: Already configured to collect both cloud + BLE data
+5. **Grafana**: Dashboards show both sources with `source` tags (filter by `dpx_ops_decoder` for BLE data)
+6. **Monitor latency**: BLE should be <5 sec, cloud 10-20 min
 
-**Windows Theengs Gateway**: Available as fallback option (see Part 10)
+**BLE Decoder Features** (v2.0.0+):
+- Auto-processes BLE advertisements from ESP32 gateways
+- Enriches data with Govee API metadata (device names, rooms)
+- Supports device override system for persistent renaming (see Daily Operations)
+- Handles multiple gateways automatically
+- Runs in Docker container (no manual Python script)
+
+**Windows Theengs Gateway**: Available as fallback option (see Part 9 or Appendix)
 
 ---
 
@@ -1770,6 +1881,302 @@ With Geist Watchdog integrated:
 
 ---
 
+## Part 12: M4300 Network Switch Backups
+
+**For network infrastructure management**: Automate configuration backups of Netgear M4300 managed switches via TFTP.
+
+### What is M4300 Backup?
+
+The M4300 backup service automates configuration snapshots of Netgear M4300 series managed switches. This protects against configuration loss from hardware failure, accidental changes, or network incidents.
+
+**Key Features**:
+- **Automated TFTP backups**: Pushes configuration files from switches to VM storage
+- **Multiple switches**: Backup entire network infrastructure in one command
+- **Timestamped archives**: Each backup run creates a dated folder
+- **InfluxDB metrics**: Track backup success/failure rates and timing
+- **Mock mode**: Test configuration without real switches
+- **Containerized**: Runs in Docker with isolated TFTP server
+
+### 12.1: M4300 Service Already Deployed
+
+The M4300 backup integration is included in the docker-compose stack:
+
+**Services**:
+- `netgear-backup` — Python automation script (on-demand execution)
+- `tftp-server` — Lightweight TFTP server for receiving config files
+
+**Files**:
+- `services/netgear-backup/` — Service code and configuration
+- `config/switches.conf.example` — Switch inventory template
+- `docker-compose.yml` — Service definitions
+
+**What it does**:
+- Connects to each switch via SSH
+- Triggers TFTP upload from switch to server
+- Stores configs in timestamped folders
+- Writes metrics to InfluxDB for monitoring
+- Handles network routing for Hyper-V VM environments
+
+### 12.2: Configure Your Switches
+
+**Create switch inventory**:
+
+```bash
+cd ~/dpx_showsite_ops
+cp config/switches.conf.example config/switches.conf
+nano config/switches.conf
+```
+
+**Format** (one switch per line):
+```
+# Format: IP_ADDRESS,SWITCH_NAME,SSH_USERNAME,SSH_PASSWORD
+192.168.1.200,core-switch-01,admin,password123
+192.168.1.201,access-switch-02,admin,password123
+192.168.1.202,distribution-switch-03,admin,password123
+```
+
+**Important**:
+- Use actual switch management IPs (must be reachable from VM)
+- SSH must be enabled on switches (Netgear M4300 default port 22)
+- Passwords stored in plain text (keep `config/` excluded from git)
+- Comment lines with `#` are ignored
+
+**Save**:
+- Press `Ctrl + O`, `Enter`, `Ctrl + X`
+
+### 12.3: TFTP Server Setup
+
+The TFTP server is already configured in `docker-compose.yml` and starts automatically with `iot up`.
+
+**How it works**:
+1. TFTP server listens on port 69 (UDP)
+2. Backup script SSHes into switch
+3. Switch sends config file to TFTP server
+4. Files stored in `/app/backups/` (mapped to `services/netgear-backup/backups/`)
+
+**Verify TFTP server is running**:
+
+```bash
+docker ps | grep tftp-server
+```
+
+Should show container as "Up".
+
+**TFTP Configuration**:
+- Port: `69/udp` (standard TFTP port)
+- Directory: `/tftpboot` (container) → `services/netgear-backup/backups` (host)
+- File creation: Enabled (`-c` flag)
+- Logging: Verbose mode for debugging
+
+**If TFTP server isn't running**:
+
+```bash
+docker compose up -d tftp-server
+```
+
+### 12.4: Network Routing for Hyper-V VMs
+
+**Important**: If running on a Hyper-V VM, switches may not be able to route to the TFTP server's Docker network. A helper service automatically configures host routes.
+
+**Check if network fix is active**:
+
+```bash
+sudo systemctl status network-route-fix.service
+```
+
+Should show "active (running)".
+
+**If route fix isn't installed**, run the setup script:
+
+```bash
+~/dpx_showsite_ops/scripts/setup-m4300-network.sh
+```
+
+This creates a systemd service that:
+- Runs on boot
+- Adds routes from VM's physical interface to Docker's TFTP container
+- Enables switches to reach TFTP server at VM's IP address
+
+**Manual route verification** (troubleshooting):
+
+```bash
+ip route | grep 172.25
+```
+
+Should show routes to Docker bridge network.
+
+### 12.5: Run Your First Backup
+
+**Test with mock mode** (no real switches required):
+
+```bash
+iot m4300-backup-mock
+```
+
+This simulates a backup run and creates mock files in `services/netgear-backup/backups/mock_backups/`.
+
+**Run real backup**:
+
+```bash
+iot m4300-backup
+```
+
+You'll see output like:
+```
+Starting Netgear M4300 backup...
+[2026-03-06 14:30:15] Connecting to 192.168.1.200 (core-switch-01)...
+[2026-03-06 14:30:18] Config saved: /backups/2026-03-06T14-30-15/core-switch-01.cfg
+[2026-03-06 14:30:20] Connecting to 192.168.1.201 (access-switch-02)...
+[2026-03-06 14:30:23] Config saved: /backups/2026-03-06T14-30-15/access-switch-02.cfg
+✓ Backup complete
+```
+
+**View backup files**:
+
+```bash
+iot m4300-list
+```
+
+Shows recent backups with timestamps and file sizes.
+
+### 12.6: M4300 Management Commands
+
+**Backup operations**:
+- `iot m4300-backup` — Run full backup of all switches
+- `iot m4300-backup-mock` — Test run with mock data (no real switches)
+- `iot m4300-list` — Show recent backups (last 10 folders)
+- `iot m4300-list-all` — Show all backup files across all timestamps
+- `iot m4300-clean` — Remove empty backup folders (failed attempts)
+
+**Logs and debugging**:
+- `iot m4300-logs` — View recent log files (last 10)
+- `iot m4300-log-view <filename>` — Display full log file contents
+- `iot m4300-list-switches` — Show configured switches from switches.conf
+
+**Maintenance**:
+- `iot m4300-rebuild` — Rebuild netgear-backup Docker image (for code updates)
+- `iot m4300-network-fix` — Reinstall network routing fix (if routes break)
+- `iot tftp-rebuild` — Recreate TFTP server container
+
+**Examples**:
+
+```bash
+# Weekly backup
+iot m4300-backup
+
+# Check if backups succeeded
+iot m4300-logs
+
+# View specific log
+iot m4300-log-view backup_log_2026-03-06.txt
+
+# List all switches in inventory
+iot m4300-list-switches
+
+# Clean up failed backup attempts
+iot m4300-clean
+```
+
+### 12.7: Automate with Cron
+
+**Set up weekly backups** (every Sunday at 2 AM):
+
+```bash
+crontab -e
+```
+
+Add this line:
+```cron
+0 2 * * 0 cd ~/dpx_showsite_ops && ./scripts/manage.sh m4300-backup >> ~/logs/m4300-cron.log 2>&1
+```
+
+**Daily backups** (every day at 3 AM):
+```cron
+0 3 * * * cd ~/dpx_showsite_ops && ./scripts/manage.sh m4300-backup >> ~/logs/m4300-cron.log 2>&1
+```
+
+**Verify cron job**:
+```bash
+crontab -l
+```
+
+**Check cron log**:
+```bash
+tail -50 ~/logs/m4300-cron.log
+```
+
+### 12.8: Backup Storage and Retention
+
+**Backup location**:
+```
+~/dpx_showsite_ops/services/netgear-backup/backups/
+  ├── 2026-03-01T14-30-00/
+  │   ├── core-switch-01.cfg
+  │   ├── access-switch-02.cfg
+  │   └── distribution-switch-03.cfg
+  ├── 2026-03-08T14-30-00/
+  │   ├── core-switch-01.cfg
+  │   └── access-switch-02.cfg
+  └── logs/
+      ├── backup_log_2026-03-01.txt
+      └── backup_log_2026-03-08.txt
+```
+
+**Space management**:
+
+Each config file is typically 50-200 KB. Weekly backups = ~2 MB/year per switch.
+
+**Manual cleanup** (remove backups older than 90 days):
+```bash
+find ~/dpx_showsite_ops/services/netgear-backup/backups/ -maxdepth 1 -type d -mtime +90 -exec rm -rf {} \;
+```
+
+**Git tracking**: `backups/` folder is excluded via `.gitignore` (local-only storage).
+
+### 12.9: Troubleshooting M4300 Backups
+
+**"Connection refused" or "Connection timed out"**:
+- Verify switch IP is reachable: `ping 192.168.1.200`
+- Check SSH is enabled on switch (Web UI → Maintenance → Remote Management)
+- Verify SSH port (default 22): `nc -zv 192.168.1.200 22`
+- Check firewall: `sudo ufw status`
+
+**"TFTP timeout" or "TFTP transfer failed"**:
+- Verify TFTP server running: `docker ps | grep tftp-server`
+- Check network routing: `ip route | grep 172.25`
+- Run network fix: `iot m4300-network-fix`
+- Test TFTP manually from switch CLI: `copy running-config tftp://<VM_IP>/test.cfg`
+
+**"Authentication failed"**:
+- Double-check username/password in `config/switches.conf`
+- Try SSH manually from VM: `ssh admin@192.168.1.200`
+- Verify switch hasn't changed credentials
+
+**Empty backup folders created**:
+- Indicates connection succeeded but TFTP transfer failed
+- Run `iot m4300-clean` to remove empty folders
+- Check `iot m4300-log-view` for detailed error messages
+
+**Permissions errors**:
+- Ensure `services/netgear-backup/backups/` is writable by docker user
+- Fix: `sudo chown -R $USER:$USER ~/dpx_showsite_ops/services/netgear-backup/backups/`
+
+### 12.10: Next Steps
+
+With M4300 backups configured:
+
+1. **Test restore procedure**: Verify you can load a .cfg file to a switch (manual process via Web UI)
+2. **Schedule regular backups**: Use cron for automated weekly snapshots
+3. **Monitor in Grafana**: Create dashboard using InfluxDB metrics (backup success rate, duration)
+4. **Expand to other devices**: Adapt scripts for different switch models or routers
+5. **Off-site storage**: Copy backups to external NAS or cloud storage for disaster recovery
+
+**Documentation**:
+- Full README: `services/netgear-backup/README.md`
+- Standalone deployment: [dpx-netgear-backup GitHub repo](https://github.com/dubpixel/dpx-netgear-backup)
+
+---
+
 ## Troubleshooting
 
 ### govee2mqtt Shows Timeout Errors
@@ -1924,6 +2331,58 @@ To copy backups to your Windows host, use WinSCP or similar file transfer tool.
 5. Check: `iot mqtt "gv2mqtt/#" 20`
 6. New sensor should appear in the messages
 
+### Rename Devices and Rooms
+
+If Govee auto-generates bad device names (e.g., `h5075_5a9`) or you want to override room assignments, use the device override system:
+
+**Interactive device renaming**:
+```bash
+iot rename-device
+```
+
+This opens an interactive menu showing all devices. Select the device you want to rename, enter a new friendly name, and the system updates both BLE decoder and Telegraf automatically.
+
+**Interactive room assignment**:
+```bash
+iot set-room
+```
+
+Select a device and assign it to a different room. Useful for correcting Govee app mistakes or organizing devices differently.
+
+**Clear an override** (revert to Govee API data):
+```bash
+iot clear-override
+```
+
+Select a device to remove its override, restoring the original name/room from Govee Cloud API.
+
+**How it works**:
+- Overrides stored in `device-overrides.json` (local file, not tracked in git)
+- Both BLE decoder and Telegraf read overrides on startup
+- Changes survive `iot update` and service restarts
+- Works offline if Govee Cloud API is unavailable
+
+**Manual override file editing** (advanced):
+
+```bash
+nano ~/dpx_showsite_ops/device-overrides.json
+```
+
+Format:
+```json
+{
+  "A4:C1:38:AB:CD:EF": {
+    "device_name": "Studio Main Sensor",
+    "room": "Recording Studio"
+  }
+}
+```
+
+After editing, restart services:
+```bash
+iot restart ble-decoder telegraf
+```
+
 ### Restart After Power Outage
 
 The stack will auto-start. Just verify:
@@ -1958,16 +2417,36 @@ You now have a working IoT monitoring system! Here are some ideas for what to do
 - Add more panels (min/max, averages, alerts)
 - Change time ranges (24 hours, 7 days, etc.)
 - Set up email alerts when temperature goes above/below thresholds
+- Backup dashboards with `iot backup-dashboards`
+- Set up automated dashboard backups with `iot setup-dashboard-cron`
 
 **Add More Sensors**:
 - Buy more Govee sensors for different rooms
 - They automatically get discovered
+- H5075 recommended (BLE-only, excellent reliability)
+- Avoid H5074 (poor BLE performance)
 
-**Phase 4 - BLE Gateway** ✅ Complete:
-- Local BLE reading deployed and operational (<5 second latency)
-- ble-decoder service runs automatically with the stack
-- Manage with: `iot ble-status`, `iot lb`, `iot ble-restart`
-- See ROADMAP.md for details
+**Completed Features** (v2.0.2):
+- ✅ **Phase 4 - BLE Gateway**: Local BLE reading deployed and operational (<5 second latency)
+  - BLE decoder service runs automatically with the stack
+  - Manage with: `iot ble-status`, `iot lb`, `iot ble-restart`
+  - ESP32 OpenMQTTGateway as primary hardware platform
+- ✅ **Phase 4.5 - Geist Watchdog**: SNMP-based environmental monitoring for infrastructure
+  - Automatic sensor discovery and SNMP polling
+  - Temperature, humidity, and dew point tracking
+- ✅ **Phase 2.8 - Device Override System**: Persistent local device renaming
+  - Interactive rename commands: `iot rename-device`, `iot set-room`
+  - Works offline, survives Govee API outages
+- ✅ **M4300 Network Backups**: Automated switch configuration backups via TFTP
+  - Schedule with cron for weekly/daily snapshots
+  - Manage with `iot m4300-*` commands
+
+**Upcoming Features** (see ROADMAP.md):
+- **Phase 6**: Art-Net DMX monitoring integration (in progress)
+- **Phase 8**: Meat probe/food temperature monitoring (H5194 proof-of-concept)
+- **Phase 9**: Industrial temperature probe evaluation (feasibility test)
+- **Phase 10**: LTC timecode monitoring (production priority, awaiting repo access)
+- **Phase 11**: VLAN isolation for production Art-Net networks
 
 **Phase 5 - Network Backups**:
 - Automate backups of your network switches and routers
@@ -2116,6 +2595,303 @@ iot backup
 
 ---
 
-**Last Updated**: 2025-02-05  
-**Guide Version**: 1.0  
-**For**: dpx-showsite-ops v1.0.1
+**Last Updated**: March 6, 2026  
+**Guide Version**: 2.0  
+**For**: dpx-showsite-ops v2.0.2
+
+---
+
+## Appendix B: Complete iot Command Reference
+
+Comprehensive reference for all `iot` management commands.
+
+### Stack Management
+
+| Command | Description |
+|---------|-------------|
+| `iot up` | Start all containers in the stack |
+| `iot down` | Stop all containers |
+| `iot restart [service]` | Restart all containers or specific service |
+| `iot status` | Show container status (running/stopped) |
+
+**Examples**:
+```bash
+iot up                    # Start entire stack
+iot restart telegraf      # Restart just Telegraf
+iot down                  # Stop everything
+```
+
+---
+
+### BLE Decoder Management (v2.0.0+)
+
+| Command | Description |
+|---------|-------------|
+| `iot ble-status` | Show BLE decoder container status |
+| `iot ble-logs [N]` | Show last N lines of logs (default: 30) |
+| `iot ble-follow` | Follow logs in real-time (Ctrl+C to exit) |
+| `iot ble-restart` | Restart BLE decoder container |
+| `iot ble-rebuild` | Rebuild and restart (for code updates) |
+| `iot ble-up` | Start BLE decoder only |
+| `iot ble-down` | Stop BLE decoder only |
+| `iot lb [N]` | Shorthand for `iot ble-logs` |
+
+**Examples**:
+```bash
+iot ble-status           # Check if running
+iot lb 50                # Last 50 lines of logs
+iot ble-follow           # Watch logs live
+iot ble-restart          # Restart after config change
+```
+
+---
+
+### Service Logs
+
+| Command | Description |
+|---------|-------------|
+| `iot lg [N]` | govee2mqtt logs (last N lines, default: 30) |
+| `iot lt [N]` | Telegraf logs |
+| `iot lm [N]` | Mosquitto (MQTT broker) logs |
+| `iot li [N]` | InfluxDB logs |
+| `iot lf [N]` | Grafana logs |
+| `iot lb [N]` | BLE decoder logs |
+| `iot la [N]` | All services logs (last N lines per service) |
+
+**Examples**:
+```bash
+iot lg                   # Last 30 lines of govee2mqtt
+iot la 50                # Last 50 lines from ALL services
+iot lt 100               # Last 100 lines of Telegraf
+```
+
+---
+
+### Data Queries
+
+| Command | Description |
+|---------|-------------|
+| `iot query [time] [limit]` | Query recent data from InfluxDB |
+| `iot query-tags [time] [limit]` | Query with full tag visibility |
+| `iot mqtt [topic] [count]` | Subscribe to MQTT topic (count messages) |
+| `iot watch-gv2 [count]` | Watch govee2mqtt sensor state messages |
+
+**Examples**:
+```bash
+iot query 1h 10          # Last hour, 10 rows
+iot query 30m 5          # Last 30 min, 5 rows
+iot mqtt "gv2mqtt/#" 20  # 20 messages from govee2mqtt
+iot watch-gv2            # Monitor cloud sensor updates
+```
+
+---
+
+### Device Management
+
+| Command | Description |
+|---------|-------------|
+| `iot update` | Refresh device mappings from Govee API |
+| `iot list-devices` | Show all discovered devices |
+| `iot rename-device` | Interactive device renaming (override system) |
+| `iot set-room` | Interactive room assignment (override system) |
+| `iot clear-override` | Remove device override (revert to API data) |
+| `iot delete-device-data` | Delete specific device data from InfluxDB |
+
+**Examples**:
+```bash
+iot update               # Sync with Govee Cloud API
+iot list-devices         # Show all sensors
+iot rename-device        # Opens interactive menu
+iot set-room             # Assign device to different room
+```
+
+---
+
+### M4300 Network Backups
+
+| Command | Description |
+|---------|-------------|
+| `iot m4300-backup` | Run full backup of all configured switches |
+| `iot m4300-backup-mock` | Test backup with mock data (no real switches) |
+| `iot m4300-list` | Show recent backups (last 10 folders) |
+| `iot m4300-list-all` | Show all backup files across all timestamps |
+| `iot m4300-logs` | View recent log files |
+| `iot m4300-log-view <file>` | Display full log file contents |
+| `iot m4300-clean` | Remove empty backup folders (failed attempts) |
+| `iot m4300-list-switches` | Show configured switches from switches.conf |
+| `iot m4300-rebuild` | Rebuild netgear-backup Docker image |
+| `iot m4300-network-fix` | Reinstall network routing fix |
+| `iot tftp-rebuild` | Recreate TFTP server container |
+
+**Examples**:
+```bash
+iot m4300-backup                        # Weekly backup
+iot m4300-list                          # Check recent backups
+iot m4300-log-view backup_log_2026.txt  # View specific log
+iot m4300-clean                         # Clean up failed attempts
+```
+
+---
+
+### Backup & Restore
+
+| Command | Description |
+|---------|-------------|
+| `iot backup` | Backup Grafana and InfluxDB volumes to ~/backups/ |
+| `iot backup-dashboards` | Export all Grafana dashboards via API |
+| `iot provision-dashboard [file]` | Convert dashboard for provisioning (read-only) |
+| `iot deprovision-dashboard [uid]` | Remove provisioned dashboard |
+| `iot restore-dashboard [file]` | Restore backed-up dashboard as editable |
+| `iot setup-dashboard-cron` | Enable daily automated dashboard backups |
+| `iot remove-dashboard-cron` | Disable automated dashboard backups |
+
+**Examples**:
+```bash
+iot backup                              # Full backup
+iot backup-dashboards                   # Export all dashboards
+iot provision-dashboard my-dash.json    # Make read-only
+iot restore-dashboard my-dash.json      # Restore as editable
+```
+
+---
+
+### Cloudflare Tunnels (Public Access)
+
+| Command | Description |
+|---------|-------------|
+| `iot tunnel` | Start Grafana tunnel (port 3000) |
+| `iot tunnel-grafana` | Start Grafana tunnel |
+| `iot tunnel-influxdb` | Start InfluxDB tunnel (port 8086) |
+| `iot tunnel-schedule` | Start Set-Schedule tunnel (port 8000) |
+| `iot tunnel-stop` | Stop all tunnels |
+| `iot tunnel-stop-grafana` | Stop Grafana tunnel only |
+| `iot tunnel-stop-influxdb` | Stop InfluxDB tunnel only |
+| `iot tunnel-stop-schedule` | Stop Set-Schedule tunnel only |
+| `iot tunnel-status` | Show running tunnels and their URLs |
+| `iot tunnel-logs <service>` | View tunnel logs |
+
+**Examples**:
+```bash
+iot tunnel               # Start Grafana public access
+iot tunnel-status        # Check active tunnels
+iot tunnel-stop          # Stop all tunnels
+```
+
+---
+
+### Set-Schedule Service (Production)
+
+| Command | Description |
+|---------|-------------|
+| `iot schedule-up` | Start Set-Schedule container |
+| `iot schedule-down` | Stop Set-Schedule container |
+| `iot schedule-restart` | Restart Set-Schedule container |
+| `iot schedule-status` | Show container status |
+| `iot schedule-logs [N]` | View logs (last N lines) |
+| `iot schedule-follow` | Follow logs in real-time |
+| `iot schedule-rebuild` | Rebuild and restart |
+| `iot schedule-shell` | Open bash shell in container |
+
+**Examples**:
+```bash
+iot schedule-up          # Start schedule app
+iot schedule-logs 50     # Check logs
+iot schedule-follow      # Watch live requests
+```
+
+---
+
+### Development Set-Schedule (Standalone)
+
+| Command | Description |
+|---------|-------------|
+| `iot schedule-dev-up` | Start dev server (standalone folder) |
+| `iot schedule-dev-down` | Stop dev server |
+| `iot schedule-dev-restart` | Restart dev server |
+| `iot schedule-dev-logs` | View dev logs |
+| `iot schedule-dev-rebuild` | Rebuild dev image |
+
+---
+
+### Cron Management
+
+| Command | Description |
+|---------|-------------|
+| `iot cron-on` | Enable hourly device mapping updates |
+| `iot cron-off` | Disable automatic updates |
+
+---
+
+### Utilities
+
+| Command | Description |
+|---------|-------------|
+| `iot ip` | Show VM's IP address |
+| `iot env` | Display .env file contents |
+| `iot conf` | Display telegraf.conf |
+| `iot edit [file]` | Edit .env or specified file with vim |
+| `iot web` | Show URLs for all web services |
+| `iot fixnet` | Restart network route fix service |
+| `iot nuke` | **DANGEROUS**: Delete ALL data from InfluxDB sensors bucket |
+| `iot nuke-geist` | Delete Geist measurements only (for schema resets) |
+| `iot clear-retained` | Clear retained MQTT messages (troubleshooting) |
+
+**Examples**:
+```bash
+iot ip                   # Get VM IP for browser access
+iot web                  # Show all service URLs
+iot env                  # Check configuration
+iot edit .env            # Edit config file
+```
+
+---
+
+### ESP32 Configuration (Advanced)
+
+| Command | Description |
+|---------|-------------|
+| `iot esp32-enable` | Enable ESP32-specific debugging |
+| `iot esp32-verbose` | Enable verbose ESP32 logging |
+
+---
+
+### Command Help
+
+```bash
+iot                      # Show all available commands
+iot [command] --help     # Some commands have detailed help
+```
+
+---
+
+**Tips**:
+- Most commands support optional arguments (check command reference above)
+- Log commands default to 30 lines, but you can specify more: `iot lg 100`
+- Use `iot la 50` for troubleshooting (shows recent logs from all services)
+- Commands output is designed for both human reading and script parsing
+
+**Common Workflows**:
+
+**Daily health check**:
+```bash
+iot status && iot query 1h 5
+```
+
+**Troubleshooting**:
+```bash
+iot la 50                # Check all recent logs
+iot status               # Verify containers running
+iot mqtt "gv2mqtt/#" 10  # Verify MQTT messages
+```
+
+**After config changes**:
+```bash
+iot edit .env            # Modify config
+iot restart              # Apply changes
+iot lg                   # Verify restart successful
+```
+
+---
+
+**Last Updated**: March 6, 2026  
+**dpx-showsite-ops**: v2.0.2
