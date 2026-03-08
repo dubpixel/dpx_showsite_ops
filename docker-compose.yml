@@ -63,7 +63,7 @@ services:
       - ./images/fav_icon.png:/usr/share/grafana/public/img/fav32.png:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=grafanapass123
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     networks:
       - iot
   telegraf:
