@@ -129,7 +129,8 @@ case "$1" in
   li)       docker logs influxdb 2>&1 | tail -${2:-30} ;;
   lf)       docker logs grafana 2>&1 | tail -${2:-30} ;;
   lb)       docker logs ble-decoder 2>&1 | tail -${2:-30} ;;
-  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana ble-decoder; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
+  lp)       docker logs physical-control 2>&1 | tail -${2:-30} ;;
+  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana ble-decoder physical-control; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
   query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
   query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} | ts '[%H:%M:%S]' ;;
@@ -247,6 +248,176 @@ case "$1" in
     docker stop tftp-server && docker rm tftp-server && docker compose up -d tftp-server
     echo "✓ TFTP server recreated"
     docker inspect tftp-server --format '{{.Args}}' | grep -q '\-c' && echo "✓ File creation enabled" || echo "⚠️  File creation NOT enabled"
+    ;;
+  
+  # Physical Control Service Management (Phase 7+8)
+  physical-control-logs | pc-logs)
+    docker compose logs -f physical-control
+    ;;
+  
+  physical-control-status | pc-status)
+    echo "=== Physical Control Service Status ==="
+    docker compose ps physical-control
+    echo ""
+    echo "=== Health Check ==="
+    if curl -sf http://localhost:5000/health >/dev/null 2>&1; then
+      echo "✓ Service is healthy"
+      curl -s http://localhost:5000/ | python3 -m json.tool
+    else
+      echo "✗ Service is not responding"
+      exit 1
+    fi
+    ;;
+  
+  physical-control-test | pc-test)
+    echo "Testing webhook endpoint..."
+    echo "Sending test alert: Temperature Test (state: alerting)"
+    curl -X POST http://localhost:5000/webhook \
+      -H "Content-Type: application/json" \
+      -d '{
+        "ruleName": "High Temperature Alert",
+        "state": "alerting",
+        "message": "Test alert from manage.sh",
+        "labels": {"room": "test"},
+        "value": 95,
+        "threshold": 85
+      }' | python3 -m json.tool
+    echo ""
+    echo "Check logs with: iot physical-control-logs"
+    ;;
+  
+  physical-control-config | pc-config)
+    ${EDITOR:-nano} "$REPO_ROOT/services/physical-control/alert_actions.yaml"
+    echo ""
+    read -p "Restart physical-control service to apply changes? (y/n) " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      docker compose restart physical-control
+      echo "✓ Service restarted"
+    fi
+    ;;
+  
+  physical-control-restart | pc-restart)
+    docker compose restart physical-control
+    echo "✓ physical-control service restarted"
+    ;;
+  
+  physical-control-rebuild | pc-rebuild)
+    echo "Rebuilding physical-control container..."
+    docker compose build physical-control
+    echo "✓ Image rebuilt"
+    echo ""
+    read -p "Restart service with new image? (y/n) " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      docker compose up -d physical-control
+      echo "✓ Service restarted"
+    fi
+    ;;
+  
+  # Physical Device Control (Phase 7+8)
+  geist-relay)
+    # Load .env for credentials
+    if [ -f "$REPO_ROOT/.env" ]; then
+      source "$REPO_ROOT/.env"
+    else
+      echo "✗ .env file not found. Copy .env.example to .env and configure GEIST_IP and GEIST_SNMP_RW_COMMUNITY"
+      exit 1
+    fi
+    
+    # Check required variables
+    if [ -z "$GEIST_IP" ] || [ -z "$GEIST_SNMP_RW_COMMUNITY" ]; then
+      echo "✗ Missing environment variables. Configure in .env:"
+      echo "  GEIST_IP=192.168.1.214"
+      echo "  GEIST_SNMP_RW_COMMUNITY=private"
+      exit 1
+    fi
+    
+    # Check relay action provided
+    if [ -z "$2" ]; then
+      echo "Usage: iot geist-relay <on|off|toggle>"
+      exit 1
+    fi
+    
+    # Execute control script
+    python3 "$SCRIPT_DIR/geist_control.py" \
+      --ip "$GEIST_IP" \
+      --community "$GEIST_SNMP_RW_COMMUNITY" \
+      --relay "$2"
+    ;;
+  
+  x410-relay)
+    # Load .env for credentials
+    if [ -f "$REPO_ROOT/.env" ]; then
+      source "$REPO_ROOT/.env"
+    else
+      echo "✗ .env file not found. Copy .env.example to .env and configure X410_IP and X410_SNMP_COMMUNITY"
+      exit 1
+    fi
+    
+    # Check required variables
+    if [ -z "$X410_IP" ]; then
+      echo "✗ Missing X410_IP environment variable. Configure in .env:"
+      echo "  X410_IP=192.168.1.XXX"
+      echo "  X410_SNMP_COMMUNITY=public"
+      exit 1
+    fi
+    
+    # Check relay number and action provided
+    if [ -z "$2" ] || [ -z "$3" ]; then
+      echo "Usage: iot x410-relay <1-4> <on|off|toggle>"
+      echo "       iot x410-relay <1-4> pulse <seconds>"
+      exit 1
+    fi
+    
+    # Handle pulse mode
+    if [ "$3" = "pulse" ]; then
+      if [ -z "$4" ]; then
+        echo "✗ Pulse duration required"
+        echo "Usage: iot x410-relay <1-4> pulse <seconds>"
+        exit 1
+      fi
+      python3 "$SCRIPT_DIR/x410_control.py" \
+        --ip "$X410_IP" \
+        --community "${X410_SNMP_COMMUNITY:-public}" \
+        --relay "$2" \
+        --pulse "$4"
+    else
+      # Regular on/off/toggle
+      python3 "$SCRIPT_DIR/x410_control.py" \
+        --ip "$X410_IP" \
+        --community "${X410_SNMP_COMMUNITY:-public}" \
+        --relay "$2" \
+        --state "$3"
+    fi
+    ;;
+  
+  govee-control)
+    # Pass all arguments to govee_control.py (shift removes 'govee-control' from args)
+    shift
+    python3 "$SCRIPT_DIR/govee_control.py" "$@"
+    ;;
+  
+  list-govee-devices | list-devices)
+    # Show all controllable devices
+    echo "=== Geist Watchdog ==="
+    if [ -f "$REPO_ROOT/.env" ]; then
+      source "$REPO_ROOT/.env"
+      echo "  Relay: ${GEIST_IP:-192.168.1.214} (SNMP)"
+    else
+      echo "  Relay: (configure .env)"
+    fi
+    echo ""
+    echo "=== X-410 Relay Controller ==="
+    if [ -f "$REPO_ROOT/.env" ]; then
+      source "$REPO_ROOT/.env"
+      echo "  Relay 1-4: ${X410_IP:-not configured} (SNMP)"
+    else
+      echo "  Relay 1-4: (configure .env)"
+    fi
+    echo ""
+    echo "=== Govee Devices ==="
+    python3 "$SCRIPT_DIR/govee_control.py" --list
     ;;
   
   ip)       ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 ;;
@@ -822,6 +993,7 @@ case "$1" in
     echo "    li [n]                 influxdb logs"
     echo "    lf [n]                 grafana logs"
     echo "    lb [n]                 ble-decoder logs"
+    echo "    lp [n]                 physical-control logs"
     echo "    la [n]                 ALL containers (default 10 each)"
     echo ""
     echo "  DATA"
@@ -845,6 +1017,28 @@ case "$1" in
     echo "    m4300-network-fix      Configure secondary IP for 192.168.0.x access"
     echo "    m4300-build            Rebuild netgear-backup container image"
     echo "    m4300-list-switches    Show parsed switch inventory from switches.conf"
+    echo ""
+    echo "  PHYSICAL CONTROL SERVICE (Phase 7+8)"
+    echo "    physical-control-status (pc-status)  Check service health and stats"
+    echo "    physical-control-logs (pc-logs)      View live logs"
+    echo "    physical-control-test (pc-test)      Send test webhook"
+    echo "    physical-control-config (pc-config)  Edit alert_actions.yaml"
+    echo "    physical-control-restart (pc-restart) Restart service"
+    echo "    physical-control-rebuild (pc-rebuild) Rebuild container image"
+    echo ""
+    echo "  PHYSICAL DEVICE CONTROL (Phase 7+8)"
+    echo "    geist-relay <action>   Control Geist Watchdog relay"
+    echo "                           actions: on, off, toggle"
+    echo "    x410-relay <n> <action> Control X-410 relay (1-4)"
+    echo "                           actions: on, off, toggle, pulse <seconds>"
+    echo "                           examples: iot x410-relay 1 on"
+    echo "                                     iot x410-relay 2 pulse 5"
+    echo "    govee-control [options] Control Govee lights/plugs"
+    echo "                           examples: iot govee-control --device stick --on"
+    echo "                                     iot govee-control --device \"stick\" --brightness 75"
+    echo "                                     iot govee-control --device strip --color red"
+    echo "    list-devices           Show all controllable devices (Geist, X410, Govee)"
+    echo "    list-govee-devices     Alias for list-devices"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"

@@ -52,8 +52,53 @@ ${NAME_MAPPINGS}
 ${ROOM_MAPPINGS}
 EOF
 
-docker compose -f "$REPO_ROOT/docker-compose.yml" restart telegraf ble-decoder
-echo "$(date) - Device mappings updated (with overrides):" >> "$LOG"
+echo ""
+echo "Device mappings configuration updated: $CONF"
+echo ""
+echo "Which services need to be restarted?"
+echo "  - telegraf: Needs reload for device-mappings.conf enum processors"
+echo "  - ble-decoder: Needs reload for device-overrides.json"
+echo "  - physical-control: Needs reload for device-overrides.json (if running)"
+echo ""
+
+RESTART_SERVICES=()
+
+# Prompt for telegraf
+read -p "Restart telegraf? (y/n) [n]: " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  RESTART_SERVICES+=("telegraf")
+fi
+
+# Prompt for ble-decoder
+read -p "Restart ble-decoder? (y/n) [n]: " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  RESTART_SERVICES+=("ble-decoder")
+fi
+
+# Prompt for physical-control (check if it exists first)
+if docker compose -f "$REPO_ROOT/docker-compose.yml" ps physical-control &>/dev/null; then
+  read -p "Restart physical-control? (y/n) [n]: " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    RESTART_SERVICES+=("physical-control")
+  fi
+fi
+
+# Restart selected services
+if [ ${#RESTART_SERVICES[@]} -gt 0 ]; then
+  echo ""
+  echo "Restarting: ${RESTART_SERVICES[*]}"
+  docker compose -f "$REPO_ROOT/docker-compose.yml" restart "${RESTART_SERVICES[@]}"
+  echo "✓ Services restarted"
+else
+  echo ""
+  echo "No services restarted. Changes will take effect on next container restart."
+fi
+
+# Log the update
+echo "$(date) - Device mappings updated (with overrides). Restarted: ${RESTART_SERVICES[*]:-none}" >> "$LOG"
 echo "$DEVICES" | python3 -c "
 import json, sys
 for d in json.load(sys.stdin):

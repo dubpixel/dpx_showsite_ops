@@ -80,8 +80,10 @@ services:
     command: --config /etc/telegraf/telegraf.conf --config-directory /etc/telegraf/telegraf.d
     environment:
       - TZ=${TZ}
+      - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY:-public}
     extra_hosts:
-      - "dpx-geist.local:192.168.1.214"
+      - "dpx-geist.local:${GEIST_IP:-192.168.1.214}"
+      - "dpx-x410.local:${X410_IP:-192.168.1.1}"
     networks:
       - iot
 
@@ -173,6 +175,32 @@ services:
       - tftp-server
       - influxdb
 
+  physical-control:
+    build:
+      context: ./services/physical-control
+      dockerfile: Dockerfile
+    container_name: physical-control
+    restart: unless-stopped
+    ports:
+      - "${PHYSICAL_CONTROL_PORT:-5000}:5000"
+    environment:
+      - TZ=${TZ:-America/New_York}
+      - GEIST_SNMP_RW_COMMUNITY=${GEIST_SNMP_RW_COMMUNITY:-private}
+      - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY:-public}
+      - GOVEE_API_URL=http://host.docker.internal:8056/api/devices
+      - WEBHOOK_AUTH_TOKEN=${WEBHOOK_AUTH_TOKEN}
+    volumes:
+      - ./scripts:/app/scripts:ro  # Mount control scripts
+      - ./config/relays.conf:/app/config/relays.conf:ro  # Relay device inventory
+      - ./telegraf/conf.d:/app/telegraf/conf.d:ro  # Device overrides
+      - physical-control-logs:/var/log/physical-control
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - iot
+    depends_on:
+      - govee2mqtt
+
 networks:
   iot:
     driver: bridge
@@ -183,3 +211,4 @@ volumes:
   grafana-data:
   tftp-data:
   netgear-backups:
+  physical-control-logs:

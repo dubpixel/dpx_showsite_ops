@@ -1,0 +1,74 @@
+# Alert Action Routing Configuration
+# Maps Grafana alert rules to physical device control actions
+#
+# Alert matching uses these fields from Grafana webhook payload:
+#   - alert_name: The name of the alert rule in Grafana
+#   - labels: Key-value pairs attached to the alert
+#   - state: "alerting" or "resolved"
+#
+# Actions are shell commands executed in the container with access to:
+#   - /app/scripts/*_control.py (mounted from host)
+#   - Environment variables from docker-compose
+#   - Placeholder substitution: {value}, {threshold}, {alert_name}, {labels.*}
+
+# Example alert action configurations
+alerts:
+  # Temperature alerts - flash Govee lights
+  - name: "High Temperature Alert"
+    match:
+      alert_name: "Temperature Above Threshold"
+    actions:
+      alerting:
+        - device: govee
+          command: "python3 /app/scripts/govee_control.py --device 'floor_lamp_upper' --on --color red --brightness 100"
+          description: "Flash red light for high temp"
+      resolved:
+        - device: govee
+          command: "python3 /app/scripts/govee_control.py --device 'floor_lamp_upper' --on --color green --brightness 50"
+          description: "Return to green for normal temp"
+
+  # Network device down - activate relay
+  - name: "Network Device Offline"
+    match:
+      alert_name: "Switch Unreachable"
+      labels:
+        device_type: "network_switch"
+    actions:
+      alerting:
+        - device: x410
+          command: "python3 /app/scripts/x410_control.py --relay 1 --pulse 5"
+          description: "Pulse relay 1 for 5 seconds (power cycle)"
+      resolved:
+        - device: govee
+          command: "python3 /app/scripts/govee_control.py --device 'status_light' --on --color blue"
+          description: "Indicate network restored"
+
+  # Critical environmental alert - activate Geist relay
+  - name: "Critical Environment"
+    match:
+      alert_name: "Environmental Critical"
+    actions:
+      alerting:
+        - device: geist
+          command: "python3 /app/scripts/geist_control.py --relay 1 --on"
+          description: "Activate Geist relay 1 (exhaust fan)"
+      resolved:
+        - device: geist
+          command: "python3 /app/scripts/geist_control.py --relay 1 --off"
+          description: "Deactivate exhaust fan"
+
+# Global settings
+settings:
+  # Log all actions to this file (mounted volume)
+  log_file: "/var/log/physical-control/actions.log"
+  
+  # Maximum time to wait for command execution (seconds)
+  command_timeout: 30
+  
+  # Retry failed commands (0 = no retry)
+  retry_attempts: 1
+  retry_delay: 5
+  
+  # Require authentication token in webhook requests
+  require_auth: false
+  auth_token_env: "WEBHOOK_AUTH_TOKEN"
