@@ -460,7 +460,13 @@ case "$1" in
   esp32-enable)
     echo "Enabling ESP32 external decoder mode..."
     mosquitto_pub -h localhost \
-      -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
+      -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":true}'
+    mosquitto_pub -h localhost \
+      -t "demo_showsite/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":true}'
+     mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true}'
     mosquitto_pub -h localhost \
       -t "demo_showsite/dpx_showsite_2/commands/MQTTtoBT/config" \
