@@ -514,6 +514,21 @@ case "$1" in
     echo "  - Lowest MQTT message volume"
     ;;
   
+  esp32-decode-verbose)
+    echo "Configuring ESP32 for maximum visibility + fast scanning..."
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    echo "✓ ESP32 configured: decode mode with maximum verbosity"
+    echo "  - pubadvdata=true, extDecoderEnable=false"
+    echo "  - BLE scan interval: 1000ms (every second)"
+    echo "  - ESP32 decodes ALL recognized BLE devices"
+    echo "  - Maximum update frequency + device visibility"
+    ;;
+  
   # Production Set-Schedule Commands (uses docker-compose service)
   schedule-up)
     echo "Starting set-schedule production service..."
@@ -875,6 +890,7 @@ case "$1" in
     echo "    esp32-enable           Python decodes only - raw manufacturerdata, Govee sensors only"
     echo "    esp32-verbose          Same as enable but scans every 1s (debugging)"
     echo "    esp32-decode           ESP32 decodes everything - sees ALL BLE devices (RECOMMENDED)"
+    echo "    esp32-decode-verbose   ESP32 decodes + 1s scanning - max visibility + speed"
     echo "    esp32-quiet            ESP32 decodes, no raw data, 5s scan interval (low traffic)"
     echo ""
     echo "  CREDENTIALS"
