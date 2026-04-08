@@ -462,20 +462,17 @@ case "$1" in
     mosquitto_pub -h localhost \
       -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true}'
-    mosquitto_pub -h localhost \
-      -t "demo_showsite/dpx_showsite_1/commands/MQTTtoBT/config" \
-      -m '{"pubadvdata":true,"extDecoderEnable":true}'
      mosquitto_pub -h localhost \
       -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
-      -m '{"pubadvdata":true,"extDecoderEnable":true}'
-    mosquitto_pub -h localhost \
-      -t "demo_showsite/dpx_showsite_2/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true}'
     echo "✓ ESP32 configured: pubadvdata=true, extDecoderEnable=true"
     ;;
   
   esp32-verbose)
-    echo "Configuring ESP32 for maximum verbosity..."
+    echo "Configuring E
+    
+    
+    SP32 for maximum verbosity..."
     mosquitto_pub -h localhost \
       -t "demo_showsite/dpx_ops_1/commands/MQTTtoBT/config" \
       -m '{"pubadvdata":true,"extDecoderEnable":true,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
@@ -486,6 +483,50 @@ case "$1" in
     echo "  - BLE scan interval: 1000ms (more frequent scans)"
     echo "  - Connection interval: 5000ms"
     echo "  - Scan before connect: enabled"
+    ;;
+  
+  esp32-decode)
+    echo "Enabling ESP32 internal decoder (Theengs library)..."
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false}'
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false}'
+    echo "✓ ESP32 configured: pubadvdata=true, extDecoderEnable=false"
+    echo "  - ESP32 decodes all recognized BLE devices (Govee, iBeacons, etc.)"
+    echo "  - More device visibility, ESP32 filters unrecognized devices"
+    echo "  - BLE decoder uses pre-decoded data from ESP32"
+    ;;
+  
+  esp32-quiet)
+    echo "Configuring ESP32 for minimal verbosity..."
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":false,"extDecoderEnable":false,"BLEinterval":5000}'
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":false,"extDecoderEnable":false,"BLEinterval":5000}'
+    echo "✓ ESP32 configured: minimal message mode"
+    echo "  - pubadvdata=false, extDecoderEnable=false"
+    echo "  - BLE scan interval: 5000ms (slower scanning)"
+    echo "  - ESP32 only publishes recognized/decoded devices"
+    echo "  - Lowest MQTT message volume"
+    ;;
+  
+  esp32-decode-verbose)
+    echo "Configuring ESP32 for maximum visibility + fast scanning..."
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_1/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    mosquitto_pub -h localhost \
+      -t "coachella_26/dpx_showsite_2/commands/MQTTtoBT/config" \
+      -m '{"pubadvdata":true,"extDecoderEnable":false,"BLEinterval":1000,"intervalcnct":5000,"scanbcnct":1}'
+    echo "✓ ESP32 configured: decode mode with maximum verbosity"
+    echo "  - pubadvdata=true, extDecoderEnable=false"
+    echo "  - BLE scan interval: 1000ms (every second)"
+    echo "  - ESP32 decodes ALL recognized BLE devices"
+    echo "  - Maximum update frequency + device visibility"
     ;;
   
   # Production Set-Schedule Commands (uses docker-compose service)
@@ -846,8 +887,11 @@ case "$1" in
     echo "                           examples: iot clear-retained / iot clear-retained 'gv2mqtt/#'"
     echo ""
     echo "  ESP32 CONFIG"
-    echo "    esp32-enable           Enable ESP32 BLE gateway external decoder mode"
-    echo "    esp32-verbose          Configure ESP32 for maximum scan frequency"
+    echo "    esp32-enable           Python decodes only - raw manufacturerdata, Govee sensors only"
+    echo "    esp32-verbose          Same as enable but scans every 1s (debugging)"
+    echo "    esp32-decode           ESP32 decodes everything - sees ALL BLE devices (RECOMMENDED)"
+    echo "    esp32-decode-verbose   ESP32 decodes + 1s scanning - max visibility + speed"
+    echo "    esp32-quiet            ESP32 decodes, no raw data, 5s scan interval (low traffic)"
     echo ""
     echo "  CREDENTIALS"
     echo "    Grafana:   admin / grafanapass123"

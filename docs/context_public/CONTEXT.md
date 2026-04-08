@@ -729,6 +729,33 @@ demo_showsite/dpx_ops_decoder/{source_node}/{room}/{device_name}/battery      â†
 - **Outbound** (decoder â†’ Telegraf): `{site}/dpx_ops_decoder/{source_node}/{room}/{device_name}/{MAC}/{metric}`
 - Room and device_name come from Govee API, source_node extracted from inbound topic
 
+#### Flux Query Patterns - Filtering Stray BLE Pickups
+
+BLE gateways occasionally pick up signals from devices in other rooms. To eliminate stray pickups and ensure each gateway only reports its designated location, add source/location filtering to Flux queries:
+
+```flux
+from(bucket: "sensors")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r.source == "dpx_ops_decoder" or r.source == "SNMP")
+  |> filter(fn: (r) => 
+      (r.source == "dpx_ops_decoder" and r.sensor_type == "temperature") or 
+      (r.source == "SNMP" and r._field == "temperature")
+  )
+  // Filter stray pickups: each gateway reports only its designated location
+  |> filter(fn: (r) => 
+      r.source != "dpx_ops_decoder" or
+      (r.source_node == "dpx_ops_1" and r.room == "tent") or
+      (r.source_node == "TheengsGateway" and r.room == "truck")
+  )
+  |> map(fn: (r) => ({r with _field: "|"+ r.device_name + "|"}))
+```
+
+**Key points:**
+- `source_node` identifies which gateway received the signal
+- `room` identifies the device's assigned location
+- Filter logic: keep non-BLE sources OR keep BLE only when source_node matches expected room
+- Adjust gateway/room mappings to match your deployment
+
 ---
 
 ## MANAGEMENT

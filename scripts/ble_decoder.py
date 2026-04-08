@@ -37,7 +37,7 @@ except:
 # Configuration
 BROKER = "localhost"
 PORT = 1883
-API = "http://localhost:8056/api/devices"
+API = os.getenv("GOVEE_API_URL", "http://localhost:8056/api/devices")
 
 # Read showsite name from environment
 SHOWSITE = os.getenv("SHOWSITE_NAME", "demo_showsite")
