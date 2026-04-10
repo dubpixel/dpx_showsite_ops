@@ -936,11 +936,68 @@ case "$1" in
     echo "✓ Dashboard backup cron job removed"
     ;;
 
+  # Guest Alert Button System (Phase 7+8)
+  button-status|btn-status)
+    echo "=== Guest Alert Button System Status ==="
+    echo ""
+    if ! docker compose ps dpx-guest-alert-button | grep -q "running"; then
+      echo "✗ Service not running"
+      echo ""
+      echo "Start with: docker compose up -d dpx-guest-alert-button"
+      exit 1
+    fi
+    
+    echo "✓ Service running"
+    echo ""
+    curl -s http://localhost:8080/health | python3 -m json.tool || {
+      echo "✗ Health endpoint not responding"
+      exit 1
+    }
+    ;;
+  
+  button-logs|btn-logs)
+    docker logs -f dpx-guest-alert-button
+    ;;
+  
+  button-clear|btn-clear)
+    echo "Clearing all lamps..."
+    curl -s -X POST http://localhost:8080/clear | python3 -m json.tool
+    echo ""
+    ;;
+  
+  button-reset|btn-reset)
+    if [ -z "$2" ]; then
+      echo "Usage: iot button-reset <red|yellow|green|blue>"
+      echo ""
+      echo "Examples:"
+      echo "  iot button-reset red"
+      echo "  iot btn-reset yellow"
+      exit 1
+    fi
+    
+    COLOR="$2"
+    echo "Resetting $COLOR lamp..."
+    curl -s -X POST "http://localhost:8080/reset/$COLOR" | python3 -m json.tool
+    echo ""
+    ;;
+  
+  button-metrics|btn-metrics)
+    curl -s http://localhost:8080/metrics
+    ;;
+  
+  button-restart|btn-restart)
+    echo "Restarting guest alert button service..."
+    docker compose restart dpx-guest-alert-button
+    echo ""
+    echo "View logs with: iot button-logs"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
             echo "govee2mqtt: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8056"
             echo "Set-Schedule: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8000"
+            echo "Button Health: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8080/health"
             ;;
   *)
     # Read version from VERSION file
@@ -1039,6 +1096,16 @@ case "$1" in
     echo "                                     iot govee-control --device strip --color red"
     echo "    list-devices           Show all controllable devices (Geist, X410, Govee)"
     echo "    list-govee-devices     Alias for list-devices"
+    echo ""
+    echo "  GUEST ALERT BUTTON SYSTEM (Phase 7+8)"
+    echo "    button-status (btn-status)   Check service health and lamp states"
+    echo "    button-logs (btn-logs)       View live service logs"
+    echo "    button-clear (btn-clear)     Clear all lamps (turn OFF)"
+    echo "    button-reset <color>         Reset specific lamp"
+    echo "      (btn-reset)                colors: red, yellow, green, blue"
+    echo "                                 example: iot button-reset red"
+    echo "    button-metrics (btn-metrics) Show Prometheus metrics"
+    echo "    button-restart (btn-restart) Restart button controller service"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"
