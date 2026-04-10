@@ -27,7 +27,7 @@ Button Panel (192.168.105.112)     Lamp Controller (192.168.105.111)
 ## Architecture
 
 **Main Controller Loop** (`button_controller.py`):
-- Polls button states via SNMP every 100ms (10 polls/second)
+- Polls button states via SNMP every 75ms (13 polls/second)
 - Detects rising edges (button presses) and hold timers
 - Maintains lamp state dictionary (`{1: 'blink', 2: 'off', ...}`)
 - Runs blink timer that toggles relay physical states
@@ -81,9 +81,9 @@ devices:
 
 snmp:
   community: "public"
-  # SNMP timeout in seconds (0.5s = fast response, graceful degradation if slow)
-  timeout: 0.5
-  poll_interval_ms: 100  # 10 polls/second for responsive button detection
+  # SNMP timeout in seconds (0.3s = ultra-fast response, fail-fast if device slow)
+  timeout: 0.3
+  poll_interval_ms: 75  # 13 polls/second for ultra-responsive button detection
 
 blink:
   frequency_hz: 2.0  # 2 Hz = blink twice per second
@@ -274,16 +274,16 @@ Then create Grafana dashboard with:
 
 ### Why Polling Instead of SNMP Traps?
 
-X410 devices don't support SNMP traps for input state changes, so we poll every 100ms. This is fast enough to catch momentary button presses without excessive network traffic (~10 SNMP requests/second per device).
+X410 devices don't support SNMP traps for input state changes, so we poll every 75ms. This is fast enough to catch momentary button presses without excessive network traffic (~13 SNMP requests/second per device).
 
 ### Button Responsiveness
 
-**Expected response time**: < 600ms worst case
-- Polling interval: 100ms (checks button state 10 times per second)
-- SNMP timeout: 0.5s (500ms max wait if device is slow/unresponsive)
+**Expected response time**: < 375ms worst case (typically < 150ms)
+- Polling interval: 75ms (checks button state 13 times per second)
+- SNMP timeout: 0.3s (300ms max wait if device is slow/unresponsive)
 - Rising edge detection: Immediate trigger on OFF→ON transition
 
-**Design rationale**: Quick SNMP timeout (0.5s instead of 2s) ensures buttons feel responsive even if the network is congested or a device is temporarily slow. Users should not need to "hold" the button - a quick press is sufficient.
+**Design rationale**: Ultra-fast SNMP timeout (0.3s) and high poll rate (75ms) ensure buttons feel instant. Users should experience near-immediate lamp response to button presses - no holding required.
 
 ### Why Software Blink Timer?
 
