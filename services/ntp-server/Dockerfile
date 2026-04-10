@@ -5,8 +5,11 @@ FROM alpine:3.19
 # Install chrony NTP server
 RUN apk add --no-cache chrony tzdata
 
-# Create directory for chrony runtime files
-RUN mkdir -p /var/lib/chrony /run/chrony && \
+# Create directory for chrony runtime and config files
+# The default Alpine package creates /etc/chrony/ but we need to ensure
+# the config file exists for Docker volume mount to work
+RUN mkdir -p /var/lib/chrony /run/chrony /etc/chrony && \
+    touch /etc/chrony/chrony.conf && \
     chown -R chrony:chrony /var/lib/chrony /run/chrony
 
 # Expose NTP port (UDP 123)
