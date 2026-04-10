@@ -336,10 +336,19 @@ class ButtonController:
         last_blink_update = time.time()
         
         logging.info("Starting button controller loop...")
+        sys.stdout.flush()  # Force flush
         
         try:
+            loop_count = 0
             while self.running:
                 loop_start = time.time()
+                
+                # Log every 100th iteration to show we're alive
+                if loop_count % 100 == 0:
+                    logging.info(f"Controller loop iteration {loop_count}")
+                    sys.stdout.flush()
+                
+                loop_count += 1
                 
                 # Poll buttons at configured interval
                 self.poll_buttons()
@@ -358,6 +367,7 @@ class ButtonController:
             logging.info("Received shutdown signal")
         except Exception as e:
             logging.error(f"Fatal error in control loop: {e}", exc_info=True)
+            sys.stdout.flush()
         finally:
             self.shutdown()
     
@@ -564,44 +574,51 @@ def load_config() -> dict:
 
 def main():
     """Main entry point."""
-    # Setup logging
-    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format=LOG_FORMAT,
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
-    
-    logging.info("=== DPX Guest Alert Button Controller ===")
-    
-    # Load configuration
-    config = load_config()
-    logging.info("Configuration loaded successfully")
-    
-    # Initialize state
-    state = SystemState()
-    
-    # Create controller
-    controller = ButtonController(config, state)
-    
-    # Start health server in background thread
-    health_port = config['health']['port']
-    health_app = create_health_app(controller, state, config)
-    
-    def run_health_server():
-        try:
-            logging.info(f"Flask health server thread starting on 0.0.0.0:{health_port}")
-            health_app.run(host='0.0.0.0', port=health_port, debug=False, use_reloader=False, threaded=True)
-        except Exception as e:
-            logging.error(f"Health server failed to start: {e}", exc_info=True)
-    
-    health_thread = threading.Thread(target=run_health_server, daemon=True)
-    health_thread.start()
-    time.sleep(0.5)  # Give Flask time to bind
-    logging.info(f"Health server started on port {health_port}")
-    
-    # Run main controller (blocks until shutdown)
-    controller.run()
+    try:
+        # Setup logging
+        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format=LOG_FORMAT,
+            handlers=[logging.StreamHandler(sys.stdout)]
+        )
+        
+        logging.info("=== DPX Guest Alert Button Controller ===")
+        
+        # Load configuration
+        config = load_config()
+        logging.info("Configuration loaded successfully")
+        
+        # Initialize state
+        state = SystemState()
+        
+        # Create controller
+        controller = ButtonController(config, state)
+        
+        # Start health server in background thread
+        health_port = config['health']['port']
+        health_app = create_health_app(controller, state, config)
+        
+        def run_health_server():
+            try:
+                logging.info(f"Flask health server thread starting on 0.0.0.0:{health_port}")
+                health_app.run(host='0.0.0.0', port=health_port, debug=False, use_reloader=False, threaded=True)
+            except Exception as e:
+                logging.error(f"Health server failed to start: {e}", exc_info=True)
+        
+        health_thread = threading.Thread(target=run_health_server, daemon=True)
+        health_thread.start()
+        time.sleep(0.5)  # Give Flask time to bind
+        logging.info(f"Health server started on port {health_port}")
+        
+        # Run main controller (blocks until shutdown)
+        logging.info("About to start controller.run()...")
+        controller.run()
+        logging.info("Controller.run() exited normally")
+        
+    except Exception as e:
+        logging.error(f"FATAL ERROR in main(): {e}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
