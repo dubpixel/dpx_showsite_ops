@@ -115,7 +115,7 @@ class SystemState:
 # SNMP Helper Functions
 # ============================================================================
 
-def snmp_get_input(ip: str, community: str, input_num: int, timeout: int = 2) -> Optional[str]:
+def snmp_get_input(ip: str, community: str, input_num: int, timeout: int = 1) -> Optional[str]:
     """
     Read digital input state via SNMP GET.
     
@@ -123,7 +123,7 @@ def snmp_get_input(ip: str, community: str, input_num: int, timeout: int = 2) ->
         ip: Device IP address
         community: SNMP community string
         input_num: Input number (1-4)
-        timeout: SNMP timeout in seconds
+        timeout: SNMP timeout in seconds (default: 1s, overridden by config)
         
     Returns:
         "0" for inactive, "1" for active, None on error
@@ -155,7 +155,7 @@ def snmp_get_input(ip: str, community: str, input_num: int, timeout: int = 2) ->
         return None
 
 
-def snmp_set_relay(ip: str, community: str, relay_num: int, state: str, timeout: int = 2) -> bool:
+def snmp_set_relay(ip: str, community: str, relay_num: int, state: str, timeout: int = 1) -> bool:
     """
     Set relay state via SNMP SET.
     
@@ -210,6 +210,7 @@ class ButtonController:
         self.lamp_ip = config['devices']['lamp_controller']['ip']
         self.button_ip = config['devices']['button_panel']['ip']
         self.snmp_community = os.getenv('X410_SNMP_COMMUNITY', config['snmp']['community'])
+        self.snmp_timeout = config['snmp']['timeout']
         self.poll_interval = config['snmp']['poll_interval_ms'] / 1000.0  # Convert to seconds
         self.blink_frequency = float(os.getenv('BUTTON_BLINK_HZ', config['blink']['frequency_hz']))
         self.hold_threshold = config['button_hold']['reset_threshold_seconds']
@@ -223,6 +224,7 @@ class ButtonController:
         logging.info(f"ButtonController initialized")
         logging.info(f"  Lamp IP: {self.lamp_ip}")
         logging.info(f"  Button IP: {self.button_ip}")
+        logging.info(f"  SNMP timeout: {self.snmp_timeout}s")
         logging.info(f"  Poll interval: {self.poll_interval*1000:.0f}ms")
         logging.info(f"  Blink frequency: {self.blink_frequency}Hz ({self.blink_interval*1000:.0f}ms per toggle)")
         logging.info(f"  Hold reset threshold: {self.hold_threshold}s")
@@ -235,7 +237,7 @@ class ButtonController:
         
         # Poll colored buttons (1-4) on button panel
         for button_num in range(1, 5):
-            button_state = snmp_get_input(self.button_ip, self.snmp_community, button_num)
+            button_state = snmp_get_input(self.button_ip, self.snmp_community, button_num, self.snmp_timeout)
             
             if button_state is None:
                 # SNMP error - skip this button
@@ -276,7 +278,7 @@ class ButtonController:
                 self.state.prev_button_state[button_num] = button_state
         
         # Poll big red button (clear all) on lamp controller
-        clear_state = snmp_get_input(self.lamp_ip, self.snmp_community, 1)
+        clear_state = snmp_get_input(self.lamp_ip, self.snmp_community, 1, self.snmp_timeout)
         
         if clear_state is not None:
             logging.debug(f"  Clear button: {clear_state}")
@@ -311,7 +313,7 @@ class ButtonController:
                     
                     snmp_state = STATE_ON if new_state else STATE_OFF
                     logging.debug(f"  Lamp {relay_num}: BLINK → {snmp_state}")
-                    success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, snmp_state)
+                    success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, snmp_state, self.snmp_timeout)
                     
                     if not success:
                         logging.debug(f"  Lamp {relay_num}: SNMP SET FAILED")
@@ -322,7 +324,7 @@ class ButtonController:
                     if self.state.relay_physical_state[relay_num]:
                         self.state.relay_physical_state[relay_num] = False
                         logging.debug(f"  Lamp {relay_num}: OFF")
-                        success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, STATE_OFF)
+                        success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, STATE_OFF, self.snmp_timeout)
                         
                         if not success:
                             logging.debug(f"  Lamp {relay_num}: SNMP SET FAILED")
@@ -378,7 +380,7 @@ class ButtonController:
         
         # Turn off all relays
         for relay_num in range(1, 5):
-            snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, STATE_OFF)
+            snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, STATE_OFF, self.snmp_timeout)
         
         logging.info("Shutdown complete")
     

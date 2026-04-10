@@ -25,7 +25,8 @@ devices:
 snmp:
   # SNMP community string (override via X410_SNMP_COMMUNITY env var)
   community: "public"
-  timeout: 2
+  # SNMP timeout in seconds (0.5s = fast response, graceful degradation if slow)
+  timeout: 0.5
   # Poll interval in milliseconds for button state checking
   # 100ms = 10 polls/second (responsive without excessive network traffic)
   poll_interval_ms: 100

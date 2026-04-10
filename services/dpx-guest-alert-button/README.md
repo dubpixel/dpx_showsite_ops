@@ -81,6 +81,8 @@ devices:
 
 snmp:
   community: "public"
+  # SNMP timeout in seconds (0.5s = fast response, graceful degradation if slow)
+  timeout: 0.5
   poll_interval_ms: 100  # 10 polls/second for responsive button detection
 
 blink:
@@ -273,6 +275,15 @@ Then create Grafana dashboard with:
 ### Why Polling Instead of SNMP Traps?
 
 X410 devices don't support SNMP traps for input state changes, so we poll every 100ms. This is fast enough to catch momentary button presses without excessive network traffic (~10 SNMP requests/second per device).
+
+### Button Responsiveness
+
+**Expected response time**: < 600ms worst case
+- Polling interval: 100ms (checks button state 10 times per second)
+- SNMP timeout: 0.5s (500ms max wait if device is slow/unresponsive)
+- Rising edge detection: Immediate trigger on OFF→ON transition
+
+**Design rationale**: Quick SNMP timeout (0.5s instead of 2s) ensures buttons feel responsive even if the network is congested or a device is temporarily slow. Users should not need to "hold" the button - a quick press is sufficient.
 
 ### Why Software Blink Timer?
 
