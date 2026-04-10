@@ -27,7 +27,7 @@ Button Panel (192.168.105.112)     Lamp Controller (192.168.105.111)
 ## Architecture
 
 **Main Controller Loop** (`button_controller.py`):
-- Polls button states via SNMP every 150ms
+- Polls button states via SNMP every 100ms (10 polls/second)
 - Detects rising edges (button presses) and hold timers
 - Maintains lamp state dictionary (`{1: 'blink', 2: 'off', ...}`)
 - Runs blink timer that toggles relay physical states
@@ -37,6 +37,34 @@ Button Panel (192.168.105.112)     Lamp Controller (192.168.105.111)
 - `GET /metrics` - Prometheus-compatible metrics
 - `POST /clear` - Manually clear all lamps
 - `POST /reset/<color>` - Reset specific lamp
+
+## Prerequisites
+
+### X410 SNMP Configuration
+
+Both X410 devices **must** have SNMP properly configured:
+
+**Required Settings (Web UI → SNMP):**
+- Enable SNMP: ✅
+- SNMP Version: v2c
+- **Agent Read Community**: `public` (allows reading inputs and relay states)
+- **Agent Write Community**: `public` (allows controlling relays)
+- **Manager 1**: Set to Docker host IP (e.g., `192.168.1.100`) or `0.0.0.0` for any
+
+**Critical for Lamp Controller (192.168.105.111):**
+- Input 1 must be **enabled** for big red button functionality
+- If SNMP reads of inputs fail, the clear button won't work (check metrics for `snmp_errors_total`)
+
+**Verification:**
+```bash
+# Test reading input 1 from lamp controller (big red button)
+snmpget -v2c -c public 192.168.105.111 1.3.6.1.4.1.30586.46.0.1
+# Should return: STRING: "0" or "1"
+
+# Test reading button panel
+snmpget -v2c -c public 192.168.105.112 1.3.6.1.4.1.30586.46.0.1
+# Should return: STRING: "0" or "1"
+```
 
 ## Configuration
 
@@ -53,7 +81,7 @@ devices:
 
 snmp:
   community: "public"
-  poll_interval_ms: 150
+  poll_interval_ms: 100  # 10 polls/second for responsive button detection
 
 blink:
   frequency_hz: 2.0  # 2 Hz = blink twice per second
@@ -244,7 +272,7 @@ Then create Grafana dashboard with:
 
 ### Why Polling Instead of SNMP Traps?
 
-X410 devices don't support SNMP traps for input state changes, so we poll every 150ms. This is fast enough to catch momentary button presses without excessive network traffic (~7 SNMP requests/second per device).
+X410 devices don't support SNMP traps for input state changes, so we poll every 100ms. This is fast enough to catch momentary button presses without excessive network traffic (~10 SNMP requests/second per device).
 
 ### Why Software Blink Timer?
 

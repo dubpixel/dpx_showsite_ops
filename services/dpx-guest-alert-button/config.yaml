@@ -27,7 +27,8 @@ snmp:
   community: "public"
   timeout: 2
   # Poll interval in milliseconds for button state checking
-  poll_interval_ms: 150
+  # 100ms = 10 polls/second (responsive without excessive network traffic)
+  poll_interval_ms: 100
 
 blink:
   # Blink frequency in Hz (override via BUTTON_BLINK_HZ env var)
