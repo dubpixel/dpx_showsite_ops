@@ -201,6 +201,32 @@ services:
     depends_on:
       - govee2mqtt
 
+  dpx-guest-alert-button:
+    build:
+      context: ./services/dpx-guest-alert-button
+      dockerfile: Dockerfile
+    container_name: dpx-guest-alert-button
+    restart: unless-stopped
+    ports:
+      - "${BUTTON_HEALTH_PORT:-8080}:8080"
+    environment:
+      - TZ=${TZ:-America/New_York}
+      - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY:-public}
+      - BUTTON_BLINK_HZ=${BUTTON_BLINK_HZ:-2.0}
+      - LOG_LEVEL=${BUTTON_LOG_LEVEL:-INFO}
+    volumes:
+      - ./services/dpx-guest-alert-button/config.yaml:/app/config.yaml:ro
+      - button-logs:/var/log/button-controller
+    extra_hosts:
+      - "dpx-lamp.local:192.168.105.111"
+      - "dpx-buttons.local:192.168.105.112"
+    networks:
+      - iot
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   iot:
     driver: bridge
