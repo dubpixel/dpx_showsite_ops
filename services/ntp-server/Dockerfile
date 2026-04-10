@@ -5,9 +5,11 @@ FROM alpine:3.19
 # Install chrony NTP server
 RUN apk add --no-cache chrony tzdata
 
-# Create directory for chrony runtime files
+# Create directory for chrony runtime files with correct permissions
+# chronyd runs as the chrony user by default
 RUN mkdir -p /var/lib/chrony /run/chrony && \
-    chown -R chrony:chrony /var/lib/chrony /run/chrony
+    chown -R chrony:chrony /var/lib/chrony /run/chrony && \
+    chmod 750 /run/chrony
 
 # Expose NTP port (UDP 123)
 # Note: When using host networking mode, this is informational only
