@@ -218,8 +218,8 @@ services:
       - ./services/dpx-guest-alert-button/config.yaml:/app/config.yaml:ro
       - button-logs:/var/log/button-controller
     extra_hosts:
-      - "dpx-lamp.local:192.168.105.111"
-      - "dpx-buttons.local:192.168.105.112"
+      - "dpx-lamp.local:192.168.114.111"
+      - "dpx-buttons.local:192.168.114.112"
     networks:
       - iot
     logging:

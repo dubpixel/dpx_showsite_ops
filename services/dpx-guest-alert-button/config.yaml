@@ -3,7 +3,7 @@
 
 devices:
   lamp_controller:
-    ip: 192.168.105.111
+    ip: 192.168.114.111
     description: "LAMP PENDANT - Relays control colored lights"
     relays:
       1: "RED"
@@ -14,7 +14,7 @@ devices:
       1: "BIG RED BUTTON (clear all)"
       
   button_panel:
-    ip: 192.168.105.112
+    ip: 192.168.114.112
     description: "BUTTON PANEL - Colored button inputs"
     inputs:
       1: "RED BUTTON"
