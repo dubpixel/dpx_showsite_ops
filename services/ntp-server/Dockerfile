@@ -11,6 +11,10 @@ RUN mkdir -p /var/lib/chrony /run/chrony && \
     chown -R chrony:chrony /var/lib/chrony /run/chrony && \
     chmod 750 /run/chrony
 
+# Create empty config file for Docker volume mount
+# Without this, Docker creates /etc/chrony.conf as a directory
+RUN touch /etc/chrony.conf && chmod 644 /etc/chrony.conf
+
 # Expose NTP port (UDP 123)
 # Note: When using host networking mode, this is informational only
 EXPOSE 123/udp
