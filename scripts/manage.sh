@@ -1016,6 +1016,95 @@ case "$1" in
     echo "View logs with: iot button-logs"
     ;;
 
+  # NTP Server Management
+  ntp-start|ntp-up)
+    echo "Starting NTP server..."
+    docker compose up -d ntp-server
+    echo ""
+    echo "✓ NTP server started"
+    echo "Check sync status with: iot ntp-status"
+    ;;
+  
+  ntp-stop|ntp-down)
+    echo "Stopping NTP server..."
+    docker compose stop ntp-server
+    echo ""
+    echo "✓ NTP server stopped"
+    ;;
+  
+  ntp-restart)
+    echo "Restarting NTP server..."
+    docker compose restart ntp-server
+    echo ""
+    echo "✓ NTP server restarted"
+    echo "Check sync status with: iot ntp-status"
+    ;;
+  
+  ntp-status)
+    echo "=== NTP Server Status ==="
+    if ! docker compose ps ntp-server 2>/dev/null | grep -q "Up"; then
+      echo "✗ NTP server is not running"
+      echo ""
+      echo "Start with: iot ntp-start"
+      exit 1
+    fi
+    
+    echo "✓ NTP server is running"
+    echo ""
+    echo "=== Tracking Status ==="
+    docker compose exec ntp-server chronyc tracking 2>/dev/null || {
+      echo "✗ Unable to get tracking status"
+      echo "Container may still be starting up..."
+      exit 1
+    }
+    echo ""
+    echo "=== Time Sources ==="
+    docker compose exec ntp-server chronyc sources -v 2>/dev/null | head -20
+    ;;
+  
+  ntp-tracking)
+    echo "=== NTP Server Tracking ==="
+    docker compose exec ntp-server chronyc tracking
+    ;;
+  
+  ntp-sources)
+    echo "=== NTP Time Sources ==="
+    docker compose exec ntp-server chronyc sources -v
+    ;;
+  
+  ntp-sourcestats)
+    echo "=== NTP Source Statistics ==="
+    docker compose exec ntp-server chronyc sourcestats
+    ;;
+  
+  ntp-logs)
+    docker compose logs ${2:+-f} ntp-server
+    ;;
+  
+  ntp-rebuild)
+    echo "Rebuilding NTP server container..."
+    docker compose build ntp-server
+    echo ""
+    echo "✓ Build complete"
+    read -p "Restart NTP server with new image? (y/n) " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      docker compose up -d ntp-server
+      echo "✓ NTP server restarted"
+      sleep 2
+      echo ""
+      docker compose exec ntp-server chronyc tracking
+    fi
+    ;;
+  
+  ntp-clients)
+    echo "=== NTP Client Activity ==="
+    docker compose exec ntp-server chronyc clients
+    echo ""
+    echo "Note: Client tracking must be enabled in ntp.conf"
+    echo "Add 'clientlog' directive to enable detailed client logging"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
@@ -1133,6 +1222,18 @@ case "$1" in
     echo "      (btn-reset)                colors: red, yellow, green, blue"
     echo "                                 example: iot button-reset red"
     echo "    button-metrics (btn-metrics) Show Prometheus metrics"
+    echo ""
+    echo "  NTP TIME SERVER"
+    echo "    ntp-start (ntp-up)     Start NTP server (accessible on all network interfaces)"
+    echo "    ntp-stop (ntp-down)    Stop NTP server"
+    echo "    ntp-restart            Restart NTP server"
+    echo "    ntp-status             Show container status and time sync details"
+    echo "    ntp-tracking           Show chrony tracking status (offset, stratum)"
+    echo "    ntp-sources            Show configured time sources (NIST servers)"
+    echo "    ntp-sourcestats        Show detailed source statistics"
+    echo "    ntp-clients            Show recent NTP client activity"
+    echo "    ntp-logs               View NTP server logs (add -f to follow)"
+    echo "    ntp-rebuild            Rebuild NTP server container"
     echo ""
     echo "  CONFIG"
     echo "    env                    Show .env file"
