@@ -35,9 +35,15 @@ dumpdir /var/lib/chrony
 
 # Allow NTP client queries from RFC1918 private networks
 # Devices on these networks can sync time from this server
-allow 192.168.0.0/16  # Class C private networks (192.168.x.x)
-allow 10.0.0.0/8      # Class A private networks (10.x.x.x)
-allow 172.16.0.0/12   # Class B private networks (172.16-31.x.x)
+
+# Class C private networks (192.168.x.x)
+allow 192.168.0.0/16
+
+# Class A private networks (10.x.x.x)
+allow 10.0.0.0/8
+
+# Class B private networks (172.16-31.x.x)
+allow 172.16.0.0/12
 
 # Deny all other networks (public internet)
 deny all
