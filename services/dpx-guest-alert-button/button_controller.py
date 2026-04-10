@@ -34,12 +34,10 @@ import yaml
 from flask import Flask, jsonify, request
 
 try:
-    # pysnmp 4.4.x uses different import paths than 5.x+
     from pysnmp.hlapi import (
         getCmd, setCmd, SnmpEngine, CommunityData, UdpTransportTarget,
-        ContextData, ObjectType, ObjectIdentity
+        ContextData, ObjectType, ObjectIdentity, OctetString
     )
-    from pysnmp.proto.rfc1902 import OctetString
 except ImportError as e:
     print(f"Error: pysnmp library not found or import failed: {e}", file=sys.stderr)
     print("Install with: pip install pysnmp==4.4.12", file=sys.stderr)
