@@ -1,0 +1,821 @@
+Here's the content of /memories/session/plan.md with line numbers:
+     1  ## Plan: Physical Control & Alerting System (Merged Phase 7+8)
+     2
+     3  **Goal**: Enable metric-driven physical device control at show sites - SNMP relays (Geist, X410), Govee lights/plugs triggered by Grafana alert thresholds or manual CLI/web commands.
+     4
+     5  **Architecture**:
+     6  - **Control Layer**: Standalone Python CLIs for each device class (SNMP, HTTP API)
+     7  - **Automation Layer**: Flask webhook receiver parses Grafana alerts → calls control scripts
+     8  - **Interface Layer**: CLI wrappers (`iot` commands) + future web dashboard (Phase 7)
+     9  - **Monitoring Loop**: Telegraf polls device states → InfluxDB → Grafana dashboards → alerts → webhooks → device actions
+    10
+    11  **Implementation Priority**: Geist relay (simplest) → X410 (monitoring + control) → Govee (HTTP wrapper) → Webhook receiver → Alert rules → Web GUI (future)
+    12
+    13  ---
+    14
+    15  ## Steps
+    16
+    17  ### Phase 1: Geist Relay Control (Foundation)
+    18
+    19  **Prerequisites**: 
+    20  - User must configure Geist Watchdog with read-write SNMP community string (via web UI)
+    21  - Recommended: Create separate "control" community (e.g., "private") for write operations, keep "public" for Telegraf read-only monitoring
+    22
+    23  **Implementation Steps**:
+    24
+    25  1. **Update Geist SNMP credentials**
+    26     - Access Geist web interface at http://192.168.1.214 (dpx-geist.local)
+    27     - Navigate to SNMP settings
+    28     - Add read-write community string: "private" (or user's choice)
+    29     - Keep "public" read-only for Telegraf monitoring
+    30
+    31  2. **Create `scripts/geist_control.py`** - Standalone SNMP control CLI
+    32     ```python
+    33     # Dependencies: pysnmp (~1.0.0)
+    34     # OID: 1.3.6.1.4.1.21239.5.1.2.1.12 (relay_state)
+    35     # Values: 0=off, 1=on
+    36     ```
+    37     - CLI args: `--ip`, `--community`, `--relay on|off|toggle`, `--verbose`
+    38     - Read relay state before SNMP SET for confirmation
+    39     - Verify state change after SET operation (read-back)
+    40     - Return codes: 0=success, 1=connection failed, 2=SNMP error, 3=state verification failed
+    41     - Timeout: 5 seconds
+    42     - Output format: JSON (for scripting) or human-readable (default)
+    43
+    44  3. **Update `.env` file**
+    45     ```bash
+    46     # Add new variables
+    47     GEIST_IP=192.168.1.214
+    48     GEIST_SNMP_RW_COMMUNITY=private
+    49     ```
+    50
+    51  4. **Add CLI wrapper to `scripts/manage.sh`**
+    52     ```bash
+    53     geist-relay)
+    54         python3 scripts/geist_control.py \
+    55             --ip ${GEIST_IP:-dpx-geist.local} \
+    56             --community ${GEIST_SNMP_RW_COMMUNITY:-private} \
+    57             --relay "$2"
+    58     ```
+    59     - Reads credentials from .env
+    60     - Usage: `iot geist-relay on|off|toggle`
+    61
+    62  5. **Testing checklist**:
+    63     - [ ] Standalone script: `python scripts/geist_control.py --relay on --ip dpx-geist.local --community private`
+    64     - [ ] Verify relay audible click
+    65     - [ ] Check InfluxDB: `SELECT relay_state FROM geist_internal ORDER BY time DESC LIMIT 1`
+    66     - [ ] CLI wrapper: `iot geist-relay toggle`
+    67     - [ ] Error handling: test with wrong community string, unreachable IP, invalid state
+    68
+    69  ### Phase 2: X410 Integration - Monitoring + Control
+    70
+    71  **Prerequisites**:
+    72  - User provides X410 IP address (awaiting from user)
+    73  - X410 SNMP v2c enabled with community string (typically "public" for both read/write)
+    74
+    75  **Implementation Steps**:
+    76
+    77  1. **Create `telegraf/conf.d/x410.conf`** - SNMP monitoring
+    78     ```toml
+    79     [[inputs.snmp]]
+    80       agents = ["${X410_IP}:161"]
+    81       version = 2
+    82       community = "${X410_SNMP_COMMUNITY}"
+    83       interval = "30s"
+    84       timeout = "5s"
+    85       retries = 3
+    86       
+    87       # Digital Inputs (read-only)
+    88       [[inputs.snmp.field]]
+    89         name = "digital_input_1"
+    90         oid = "1.3.6.1.4.1.30586.46.0.1"
+    91       # ... inputs 2-4 (OIDs .0.2, .0.3, .0.4)
+    92       
+    93       # Relay Outputs (read/write via SNMP SET)
+    94       [[inputs.snmp.field]]
+    95         name = "relay_1"
+    96         oid = "1.3.6.1.4.1.30586.46.0.5"
+    97       # ... relays 2-4 (OIDs .0.6, .0.7, .0.8)
+    98       
+    99       # Vin (power supply voltage)
+   100       [[inputs.snmp.field]]
+   101         name = "vin"
+   102         oid = "1.3.6.1.4.1.30586.46.0.9"
+   103     ```
+   104     - InfluxDB measurement: `x410_io`
+   105     - Tags: source (device IP), host
+   106     - Fields: digital_input_1-4, relay_1-4, vin
+   107
+   108  2. **Update `.env` and docker-compose.yml**
+   109     ```bash
+   110     # .env
+   111     X410_IP=<user-provided-ip>
+   112     X410_SNMP_COMMUNITY=public
+   113     ```
+   114     ```yaml
+   115     # docker-compose.yml - telegraf service
+   116     extra_hosts:
+   117       - "dpx-x410.local:${X410_IP}"
+   118     ```
+   119
+   120  3. **Create `scripts/x410_control.py`** - Standalone control CLI
+   121     ```python
+   122     # OIDs: relay1=.46.0.5, relay2=.46.0.6, relay3=.46.0.7, relay4=.46.0.8
+   123     # Values: "0"=off, "1"=on (STRING type, not INTEGER)
+   124     # Note: X410 returns DisplayString per MIB definition
+   125     ```
+   126     - CLI args: `--ip`, `--community`, `--relay 1-4`, `--state on|off|toggle`, `--pulse <seconds>`
+   127     - Pulse mode: turn on, wait N seconds, turn off (for momentary activation)
+   128     - Batch mode: `--relay 1,3,4 --state on` (control multiple relays)
+   129     - Read-back verification after each SET operation
+   130     - Return codes: 0=success, 1=connection failed, 2=invalid relay (must be 1-4)
+   131
+   132  4. **Add CLI wrapper to `scripts/manage.sh`**
+   133     ```bash
+   134     x410-relay)
+   135         python3 scripts/x410_control.py \
+   136             --ip ${X410_IP} \
+   137             --community ${X410_SNMP_COMMUNITY:-public} \
+   138             --relay "$2" \
+   139             --state "$3"
+   140     ```
+   141     - Usage: `iot x410-relay 1 on`, `iot x410-relay 2 toggle`
+   142
+   143  5. **Restart Telegraf and verify**:
+   144     ```bash
+   145     iot restart-telegraf
+   146     # Wait 30 seconds for first poll
+   147     # Query InfluxDB
+   148     influx query 'SELECT * FROM x410_io WHERE time > now() - 5m'
+   149     ```
+   150
+   151  6. **Testing checklist**:
+   152     - [ ] Telegraf polling: verify x410_io measurement appears in InfluxDB
+   153     - [ ] Digital inputs: trigger input 1-4, verify state changes in InfluxDB
+   154     - [ ] Relay control (standalone): `python scripts/x410_control.py --relay 1 --state on --ip <x410-ip>`
+   155     - [ ] Relay control (wrapper): `iot x410-relay 2 toggle`
+   156     - [ ] Pulse mode: `python scripts/x410_control.py --relay 3 --pulse 5` (5 second pulse)
+   157     - [ ] Batch control: `python scripts/x410_control.py --relay 1,2,3 --state off`
+   158     - [ ] Verify state changes visible in Grafana dashboard within 30 seconds
+   159
+   160  ### Phase 3: Govee Control Wrapper
+   161
+   162  **Prerequisites**:
+   163  - govee2mqtt service already running (confirmed in docker-compose.yml)
+   164  - HTTP API enabled on port 8056
+   165
+   166  **Implementation Steps**:
+   167
+   168  1. **Discover Govee API capabilities**
+   169     ```bash
+   170     # Test API access
+   171     curl http://localhost:8056/api/devices | jq
+   172     # Expected: JSON array of devices with names, models, capabilities
+   173     ```
+   174
+   175  2. **Create `scripts/govee_control.py`** - HTTP API wrapper CLI
+   176     ```python
+   177     # API Base: http://govee2mqtt:8056/api
+   178     # Endpoints:
+   179     #   GET  /devices - list all devices
+   180     #   POST /devices/{device_id}/state - control device
+   181     # Payload example:
+   182     #   {"on": true, "brightness": 100, "color": {"r": 255, "g": 0, "b": 0}}
+   183     ```
+   184     - CLI args: 
+   185       - `--list` - show all controllable devices (name, model, state)
+   186       - `--device <name|mac|model>` - target device (fuzzy match by name)
+   187       - `--on | --off` - power state
+   188       - `--brightness <0-100>` - optional, only for lights
+   189       - `--color <red|blue|green|white|#RRGGBB>` - optional, only for RGB lights
+   190       - `--temperature <2000-9000>` - color temperature in Kelvin (optional)
+   191     - Device matching: try exact name → partial name → MAC address
+   192     - Return device state after command (confirmation)
+   193     - Dependencies: `requests` library
+   194
+   195  3. **Add device name aliases (optional)**
+   196     ```python
+   197     # In govee_control.py
+   198     DEVICE_ALIASES = {
+   199         "stick": "Govee H6159",
+   200         "studio_light": "Studio RGB Strip",
+   201         # ... user can customize
+   202     }
+   203     ```
+   204
+   205  4. **Add CLI wrapper to `scripts/manage.sh`**
+   206     ```bash
+   207     govee-control)
+   208         python3 scripts/govee_control.py "$@"
+   209     list-govee | list-devices)
+   210         python3 scripts/govee_control.py --list
+   211     ```
+   212     - Usage: `iot govee-control --device "stick light" --on --brightness 75`
+   213     - Usage: `iot list-devices` (show all Govee devices)
+   214
+   215  5. **Testing checklist**:
+   216     - [ ] List devices: `iot list-devices` → shows Govee stick light, other devices
+   217     - [ ] Power control: `iot govee-control --device "stick" --on`
+   218     - [ ] Brightness: `iot govee-control --device "stick" --brightness 50`
+   219     - [ ] Color (RGB): `iot govee-control --device "stick" --color red`
+   220     - [ ] Color (hex): `iot govee-control --device "stick" --color #FF8800`
+   221     - [ ] Smart plug control: `iot govee-control --device "plug 1" --off`
+   222     - [ ] Verify state changes visible immediately (API is synchronous)
+   223     - [ ] Error handling: invalid device name, API unreachable
+   224
+   225  ### Phase 4: Grafana Webhook Receiver (Automation Layer)
+   226
+   227  **Goal**: Receive Grafana alert webhooks and route to device control actions
+   228
+   229  **Implementation Steps**:
+   230
+   231  1. **Create `services/webhook-receiver/Dockerfile`**
+   232     ```dockerfile
+   233     FROM python:3.11-slim
+   234     WORKDIR /app
+   235     COPY requirements.txt .
+   236     RUN pip install --no-cache-dir -r requirements.txt
+   237     COPY app.py .
+   238     COPY config/ ./config/
+   239     EXPOSE 5001
+   240     CMD ["python", "app.py"]
+   241     ```
+   242
+   243  2. **Create `services/webhook-receiver/requirements.txt`**
+   244     ```
+   245     Flask==3.0.0
+   246     PyYAML==6.0.1
+   247     pysnmp==5.0.0
+   248     requests==2.31.0
+   249     influxdb-client==1.38.0
+   250     ```
+   251
+   252  3. **Create `services/webhook-receiver/app.py`** - Flask webhook endpoint
+   253     ```python
+   254     # Main components:
+   255     # - POST /webhook/grafana - receives alert JSON
+   256     # - POST /webhook/test - test endpoint with sample alert
+   257     # - GET /health - health check
+   258     # - GET /devices - list controllable devices
+   259     
+   260     # Alert JSON structure (Grafana v9+):
+   261     # {
+   262     #   "title": "Temperature High Studio",
+   263     #   "state": "alerting|ok",
+   264     #   "message": "Temperature is 87.5F",
+   265     #   "labels": {"alert": "temp_high_studio", "severity": "warning"}
+   266     # }
+   267     
+   268     # Flow:
+   269     # 1. Parse alert JSON
+   270     # 2. Match alert name to config/alert_actions.yaml
+   271     # 3. Execute actions sequentially
+   272     # 4. Log to InfluxDB (control_actions measurement)
+   273     # 5. Return 200 OK with executed actions
+   274     ```
+   275
+   276  4. **Create `services/webhook-receiver/config/alert_actions.yaml`**
+   277     ```yaml
+   278     # Alert routing configuration
+   279     settings:
+   280       max_actions_per_hour: 60  # rate limiting
+   281       dry_run: false  # set true for testing without actual control
+   282       log_to_influxdb: true
+   283     
+   284     alerts:
+   285       temp_high_studio:
+   286         description: "Studio temperature exceeds threshold"
+   287         actions:
+   288           - device: geist_relay
+   289             action: on
+   290             params: {}
+   291           - device: govee_stick_light
+   292             action: set_color
+   293             params:
+   294               color: red
+   295               brightness: 100
+   296         
+   297       temp_normal_studio:
+   298         description: "Studio temperature returns to normal"
+   299         actions:
+   300           - device: geist_relay
+   301             action: off
+   302           - device: govee_stick_light
+   303             action: off
+   304       
+   305       schedule_slip_warning:
+   306         description: "Show schedule running 10+ minutes late"
+   307         actions:
+   308           - device: x410_relay_1
+   309             action: pulse
+   310             params:
+   311               duration: 3  # seconds
+   312       
+   313       schedule_slip_critical:
+   314         description: "Show schedule running 15+ minutes late"
+   315         actions:
+   316           - device: x410_relay_1
+   317             action: on
+   318           - device: x410_relay_2
+   319             action: on
+   320           - device: govee_stick_light
+   321             action: set_color
+   322             params:
+   323               color: "#FF0000"
+   324               brightness: 100
+   325     ```
+   326
+   327  5. **Add webhook-receiver to `docker-compose.yml`**
+   328     ```yaml
+   329     webhook-receiver:
+   330       build: ./services/webhook-receiver
+   331       container_name: webhook-receiver
+   332       restart: unless-stopped
+   333       ports:
+   334         - "5001:5001"  # internal only, not exposed to LAN
+   335       volumes:
+   336         - ./services/webhook-receiver/config:/app/config
+   337         - ./scripts:/app/scripts:ro  # mount control scripts
+   338       environment:
+   339         - GEIST_IP=${GEIST_IP}
+   340         - GEIST_SNMP_RW_COMMUNITY=${GEIST_SNMP_RW_COMMUNITY}
+   341         - X410_IP=${X410_IP}
+   342         - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY}
+   343         - INFLUXDB_URL=http://influxdb:8086
+   344         - INFLUXDB_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+   345         - INFLUXDB_ORG=home
+   346         - INFLUXDB_BUCKET=sensors
+   347         - GOVEE_API_URL=http://govee2mqtt:8056
+   348       depends_on:
+   349         - influxdb
+   350         - telegraf
+   351         - govee2mqtt
+   352       networks:
+   353         - iot
+   354     ```
+   355
+   356  6. **Configure Grafana contact point**
+   357     - Navigate to Alerting → Contact points → New contact point
+   358     - Name: "Physical Control Webhook"
+   359     - Type: Webhook
+   360     - URL: `http://webhook-receiver:5001/webhook/grafana`
+   361     - HTTP Method: POST
+   362     - Optional: Add custom header `X-Webhook-Token: <secret>` for auth
+   363
+   364  7. **Testing checklist**:
+   365     - [ ] Build and start: `docker-compose up -d webhook-receiver`
+   366     - [ ] Health check: `curl http://localhost:5001/health` → 200 OK
+   367     - [ ] Test endpoint: `curl -X POST http://localhost:5001/webhook/test` → executes sample alert
+   368     - [ ] Manual webhook: `curl -X POST http://localhost:5001/webhook/grafana -d @test_alert.json`
+   369     - [ ] Verify device responds (Geist relay, Govee light, or X410)
+   370     - [ ] Check logs: `iot webhook-logs` → see parsed alert and actions executed
+   371     - [ ] Verify InfluxDB logging: `SELECT * FROM control_actions WHERE time > now() - 1h`
+   372
+   373  ### Phase 5: Grafana Alert Rules (Metric-Driven Automation)
+   374
+   375  **Goal**: Define threshold-based alerts that trigger physical device responses
+   376
+   377  **Implementation Steps**:
+   378
+   379  1. **Create alert rule: Temperature High**
+   380     - Grafana → Alerting → Alert rules → New alert rule
+   381     - Name: "Studio Temperature High"
+   382     - Query: 
+   383       ```
+   384       FROM geist_internal
+   385       WHERE sensor_name = 'Internal'
+   386       SELECT temperature / 10  # Scale from 0.1 degrees
+   387       ```
+   388     - Condition: `WHEN last() > 85`  # 85°F threshold
+   389     - Evaluation interval: Every 1m for 2m (reduce flapping)
+   390     - Labels: `alert=temp_high_studio`, `severity=warning`, `room=studio`
+   391     - Notification: "Physical Control Webhook" contact point
+   392
+   393  2. **Create alert rule: Temperature Normal (recovery)**
+   394     - Name: "Studio Temperature Normal"
+   395     - Same query as above
+   396     - Condition: `WHEN last() < 80`  # 5° hysteresis below threshold
+   397     - Labels: `alert=temp_normal_studio`
+   398     - Notification: "Physical Control Webhook"
+   399
+   400  3. **Create alert rule: Schedule Slip Warning** *(if set-schedule integrated)*
+   401     - Query: 
+   402       ```
+   403       # Custom metric from set-schedule app
+   404       FROM schedule_metrics
+   405       WHERE stage = 'main'
+   406       SELECT slip_seconds
+   407       ```
+   408     - Condition: `WHEN last() > 600`  # 10 minutes
+   409     - Labels: `alert=schedule_slip_warning`, `severity=info`
+   410     - Notification: "Physical Control Webhook"
+   411
+   412  4. **Create alert rule: Schedule Slip Critical**
+   413     - Same query
+   414     - Condition: `WHEN last() > 900`  # 15 minutes
+   415     - Labels: `alert=schedule_slip_critical`, `severity=critical`
+   416     - Notification: "Physical Control Webhook"
+   417
+   418  5. **Create alert rule: Sensor Offline** *(early warning)*
+   419     - Query:
+   420       ```
+   421       FROM govee_sensor
+   422       SELECT last(battery)
+   423       ```
+   424     - Condition: `WHEN last() < 10`  # 10% battery
+   425     - Labels: `alert=sensor_battery_low`
+   426     - Notification: Slack/Email (not physical control)
+   427
+   428  6. **Configure evaluation settings**
+   429     - Navigate to Alerting → Evaluation groups
+   430     - Create group: "Physical Control" 
+   431     - Evaluation interval: 1 minute
+   432     - Pending period: 2 minutes (avoid flapping)
+   433
+   434  7. **Testing checklist**:
+   435     - [ ] Manual trigger: Use Grafana "Test alert" button → verify webhook fires
+   436     - [ ] Real trigger: Adjust temperature threshold to current value → wait for alert
+   437     - [ ] Verify: Device responds (relay clicks, light changes)
+   438     - [ ] Check: Grafana alert history shows "Alerting" state
+   439     - [ ] Check: InfluxDB control_actions has logged entry
+   440     - [ ] Recovery: Threshold returns to normal → verify "OK" alert fires, device resets
+   441     - [ ] Silence test: Silence alert in Grafana → verify no webhook fires
+   442     - [ ] Rate limiting: Trigger same alert 3x in 1 minute → verify max_actions_per_hour enforced
+   443
+   444  ### Phase 6: CLI Integration & Documentation
+   445
+   446  **Goal**: Unified CLI commands for all device control + comprehensive help
+   447
+   448  **Implementation Steps**:
+   449
+   450  1. **Update `scripts/manage.sh`** - Add device control commands
+   451     ```bash
+   452     # Geist relay control
+   453     geist-relay)
+   454         check_env_var GEIST_IP GEIST_SNMP_RW_COMMUNITY
+   455         python3 scripts/geist_control.py \
+   456             --ip "$GEIST_IP" \
+   457             --community "$GEIST_SNMP_RW_COMMUNITY" \
+   458             --relay "$2"
+   459         ;;
+   460     
+   461     # X410 relay control
+   462     x410-relay)
+   463         check_env_var X410_IP X410_SNMP_COMMUNITY
+   464         if [ -z "$2" ] || [ -z "$3" ]; then
+   465             echo "Usage: iot x410-relay <1-4> <on|off|toggle|pulse>"
+   466             exit 1
+   467         fi
+   468         python3 scripts/x410_control.py \
+   469             --ip "$X410_IP" \
+   470             --community "$X410_SNMP_COMMUNITY" \
+   471             --relay "$2" \
+   472             --state "$3"
+   473         ;;
+   474     
+   475     # Govee device control
+   476     govee-control)
+   477         shift  # remove 'govee-control' from args
+   478         python3 scripts/govee_control.py "$@"
+   479         ;;
+   480     
+   481     # List all controllable devices
+   482     list-devices)
+   483         echo "=== Geist Watchdog ==="
+   484         echo "  Relay: $GEIST_IP (SNMP)"
+   485         echo ""
+   486         echo "=== X410 Relay Controller ==="
+   487         echo "  Relay 1-4: $X410_IP (SNMP)"
+   488         echo ""
+   489         echo "=== Govee Devices ==="
+   490         python3 scripts/govee_control.py --list
+   491         ;;
+   492     
+   493     # Webhook receiver lifecycle
+   494     webhook-up)
+   495         docker-compose up -d webhook-receiver
+   496         ;;
+   497     webhook-down)
+   498         docker-compose stop webhook-receiver
+   499         ;;
+   500     webhook-restart)
+   501         docker-compose restart webhook-receiver
+   502         ;;
+   503     webhook-logs)
+   504         docker-compose logs -f webhook-receiver
+   505         ;;
+   506     ```
+   507
+   508  2. **Add comprehensive help text**
+   509     ```bash
+   510     # In manage.sh help function
+   511     echo "Device Control Commands:"
+   512     echo "  iot geist-relay <on|off|toggle>         Control Geist Watchdog relay"
+   513     echo "  iot x410-relay <1-4> <on|off|toggle>    Control X410 relay (specify relay number)"
+   514     echo "  iot govee-control --device <name> [opts] Control Govee lights/plugs"
+   515     echo "  iot list-devices                         Show all controllable devices"
+   516     echo ""
+   517     echo "Webhook Receiver:"
+   518     echo "  iot webhook-up                           Start webhook receiver"
+   519     echo "  iot webhook-down                         Stop webhook receiver"
+   520     echo "  iot webhook-restart                      Restart webhook receiver"
+   521     echo "  iot webhook-logs                         View webhook receiver logs"
+   522     echo ""
+   523     echo "Examples:"
+   524     echo "  iot geist-relay on                       Turn on Geist relay"
+   525     echo "  iot x410-relay 1 toggle                  Toggle X410 relay 1"
+   526     echo "  iot govee-control --device stick --on --brightness 75"
+   527     echo "  iot list-devices                         Show all devices with status"
+   528     ```
+   529
+   530  3. **Update `.env.example`** - Document new variables
+   531     ```bash
+   532     # Physical Device Control (Phase 7+8)
+   533     # Geist Watchdog - Relay Control
+   534     GEIST_IP=192.168.1.214
+   535     GEIST_SNMP_RW_COMMUNITY=private  # Must be read-write, not "public"
+   536     
+   537     # ControlByWeb X-410 - 4 Relays + 4 Digital Inputs
+   538     X410_IP=192.168.1.XXX  # Provide your X410 IP address
+   539     X410_SNMP_COMMUNITY=public  # Default is usually "public" for R/W
+   540     
+   541     # Webhook Receiver Rate Limiting
+   542     WEBHOOK_MAX_ACTIONS_PER_HOUR=60
+   543     ```
+   544
+   545  4. **Update ROADMAP.md** (docs/ROADMAP.md)
+   546     - Merge Phase 7 & 8 sections into single "Physical Control & Alerting" section
+   547     - Mark completed subsections with ✅ checkboxes
+   548     - Update with X410, Govee, webhook receiver implementation details
+   549     - Add "Known Issues" subsection if any discovered during implementation
+   550
+   551  5. **Create quick reference card** - `docs/DEVICE_CONTROL_QUICK_REF.md`
+   552     ```markdown
+   553     # Device Control Quick Reference
+   554     
+   555     ## Geist Watchdog Relay
+   556     - IP: 192.168.1.214
+   557     - Control: `iot geist-relay on|off|toggle`
+   558     - Direct: `python scripts/geist_control.py --relay on --ip dpx-geist.local`
+   559     
+   560     ## X410 Relay Controller
+   561     - IP: [Your IP]
+   562     - 4 Relays: `iot x410-relay <1-4> on|off|toggle`
+   563     - Pulse: `python scripts/x410_control.py --relay 1 --pulse 5`
+   564     
+   565     ## Govee Devices
+   566     - List: `iot list-devices`
+   567     - Control: `iot govee-control --device "stick" --on --brightness 100`
+   568     - Colors: red, blue, green, white, or #RRGGBB hex
+   569     
+   570     ## Grafana Alerts → Physical Actions
+   571     - Configure: `services/webhook-receiver/config/alert_actions.yaml`
+   572     - Test: `curl -X POST http://localhost:5001/webhook/test`
+   573     - Logs: `iot webhook-logs`
+   574     ```
+   575
+   576  6. **Testing checklist**:
+   577     - [ ] Help text: `iot` (no args) → shows device control commands
+   578     - [ ] All commands executable: `iot geist-relay on`, `iot x410-relay 1 off`, `iot govee-control --list`
+   579     - [ ] Error handling: `iot x410-relay` (missing args) → shows usage
+   580     - [ ] Missing .env: `unset GEIST_IP; iot geist-relay on` → error message with guidance
+   581     - [ ] Documentation accuracy: verify all commands in quick ref work as documented
+   582
+   583  ### Phase 7: Web GUI Dashboard (Future Enhancement)
+   584
+   585  **Goal**: Browser-based control panel for all devices - visual status + click-to-control
+   586
+   587  **Scope**: Separate phase after CLI tools proven. Web GUI imports/calls same control scripts (no code duplication).
+   588
+   589  **Implementation Steps**:
+   590
+   591  1. **Create `services/control-dashboard/Dockerfile`**
+   592     ```dockerfile
+   593     FROM python:3.11-slim
+   594     WORKDIR /app
+   595     COPY requirements.txt .
+   596     RUN pip install --no-cache-dir -r requirements.txt
+   597     COPY . .
+   598     EXPOSE 5002
+   599     CMD ["python", "app.py"]
+   600     ```
+   601
+   602  2. **Create `services/control-dashboard/requirements.txt`**
+   603     ```
+   604     Flask==3.0.0
+   605     Flask-SocketIO==5.3.5
+   606     influxdb-client==1.38.0
+   607     pysnmp==5.0.0
+   608     requests==2.31.0
+   609     ```
+   610
+   611  3. **Create `services/control-dashboard/app.py`** - Flask web app
+   612     ```python
+   613     # Routes:
+   614     # GET  / - main dashboard HTML
+   615     # GET  /api/devices - JSON list of all devices with current states
+   616     # POST /api/geist/relay - control Geist relay
+   617     # POST /api/x410/relay/<id> - control X410 relay 1-4
+   618     # POST /api/govee/device/<name> - control Govee device
+   619     # WS   /socket.io - WebSocket for real-time state updates
+   620     
+   621     # State polling:
+   622     # - Query InfluxDB every 5 seconds for latest device states
+   623     # - Push updates to all connected WebSocket clients
+   624     # - Clients update UI without page refresh
+   625     
+   626     # Control flow:
+   627     # Frontend → POST /api/x410/relay/1 → import x410_control.py → call set_relay()
+   628     # → Return new state → WebSocket broadcast → All clients update
+   629     ```
+   630
+   631  4. **Create `services/control-dashboard/templates/index.html`** - Frontend UI
+   632     ```html
+   633     <!-- Bootstrap 5 grid layout -->
+   634     <!-- Device cards:
+   635          - Geist Watchdog: 1 relay toggle button
+   636          - X410: 4 relay toggle buttons (grid 2x2)
+   637          - Govee: Device list with power/brightness/color controls
+   638     -->
+   639     
+   640     <!-- Real-time updates via Socket.IO -->
+   641     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+   642     <script>
+   643       const socket = io();
+   644       socket.on('device_update', function(data) {
+   645         updateDeviceUI(data.device, data.state);
+   646       });
+   647     </script>
+   648     
+   649     <!-- Color coded states:
+   650          - Relay ON: green background
+   651          - Relay OFF: gray background
+   652          - Unreachable: red background + "Offline" badge
+   653     -->
+   654     ```
+   655
+   656  5. **Create `services/control-dashboard/static/styles.css`** - Dark theme
+   657     ```css
+   658     /* Inspiration: Grafana dark theme */
+   659     /* Device card: border, rounded corners, shadow */
+   660     /* Button states: Bootstrap .btn-success (ON), .btn-secondary (OFF) */
+   661     /* Responsive: mobile-friendly stacked layout */
+   662     ```
+   663
+   664  6. **Add control-dashboard to `docker-compose.yml`**
+   665     ```yaml
+   666     control-dashboard:
+   667       build: ./services/control-dashboard
+   668       container_name: control-dashboard
+   669       restart: unless-stopped
+   670       ports:
+   671         - "5002:5002"  # Exposed to LAN for browser access
+   672       volumes:
+   673         - ./scripts:/app/scripts:ro
+   674         - ./services/control-dashboard/templates:/app/templates
+   675         - ./services/control-dashboard/static:/app/static
+   676       environment:
+   677         - GEIST_IP=${GEIST_IP}
+   678         - GEIST_SNMP_RW_COMMUNITY=${GEIST_SNMP_RW_COMMUNITY}
+   679         - X410_IP=${X410_IP}
+   680         - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY}
+   681         - INFLUXDB_URL=http://influxdb:8086
+   682         - INFLUXDB_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+   683         - INFLUXDB_ORG=home
+   684         - INFLUXDB_BUCKET=sensors
+   685         - GOVEE_API_URL=http://govee2mqtt:8056
+   686       depends_on:
+   687         - influxdb
+   688         - telegraf
+   689         - govee2mqtt
+   690       networks:
+   691         - iot
+   692     ```
+   693
+   694  7. **Add dashboard CLI commands to `scripts/manage.sh`**
+   695     ```bash
+   696     dashboard-up)
+   697         docker-compose up -d control-dashboard
+   698         echo "Dashboard available at:"
+   699         echo "  http://localhost:5002"
+   700         echo "  http://dpx-showsite-ops.local:5002"
+   701         ;;
+   702     dashboard-down)
+   703         docker-compose stop control-dashboard
+   704         ;;
+   705     dashboard-restart)
+   706         docker-compose restart control-dashboard
+   707         ;;
+   708     dashboard-logs)
+   709         docker-compose logs -f control-dashboard
+   710         ;;
+   711     ```
+   712
+   713  8. **Optional: Add authentication**
+   714     - Flask-Login for session management
+   715     - Single user: admin password in .env
+   716     - Or: HTTP Basic Auth via nginx reverse proxy
+   717     - Or: Skip auth if LAN-only deployment trusted
+   718
+   719  9. **UI Features** (prioritized):
+   720     - **Must have**:
+   721       - Device grid with current states
+   722       - Toggle buttons for all relays
+   723       - Power on/off for Govee devices
+   724       - Responsive mobile layout
+   725     - **Should have**:
+   726       - Brightness slider for Govee lights (0-100)
+   727       - Color picker for RGB devices
+   728       - Last update timestamp per device
+   729       - Connection status indicators
+   730     - **Nice to have**:
+   731       - Dark/light theme toggle
+   732       - Device grouping (by room/function)
+   733       - Action history log (last 10 actions)
+   734       - Alert status badges (show active Grafana alerts)
+   735
+   736  10. **Testing checklist**:
+   737      - [ ] Build: `docker-compose build control-dashboard`
+   738      - [ ] Start: `iot dashboard-up`
+   739      - [ ] Access: Open `http://dpx-showsite-ops.local:5002` in browser
+   740      - [ ] Device display: Verify all devices show with correct current states
+   741      - [ ] Geist control: Click relay button → verify relay responds, UI updates
+   742      - [ ] X410 control: Click relay 1-4 → verify relays respond, UI updates
+   743      - [ ] Govee control: Toggle power, adjust brightness → verify light responds
+   744      - [ ] Real-time updates: Change device state via CLI → verify UI updates without refresh
+   745      - [ ] Multi-client: Open dashboard in 2 browsers → change in one reflects in other
+   746      - [ ] Mobile: Test on phone → verify responsive layout, touch-friendly buttons
+   747      - [ ] Error handling: Disconnect device → verify "Offline" indicator appears
+   748
+   749  ---
+   750
+   751  ## Relevant Files
+   752
+   753  ### Existing Files (to modify)
+   754  - `telegraf/conf.d/geist-watchdog.conf` - update SNMP community string to RW
+   755  - `docker-compose.yml` - add webhook-receiver service, X410 extra_hosts entry
+   756  - `scripts/manage.sh` - add control CLI commands
+   757  - `.env.example` - add X410_IP, X410_SNMP_COMMUNITY, GEIST_SNMP_RW_COMMUNITY
+   758  - `docs/ROADMAP.md` - merge sections, mark Phase 7+8 as "Physical Control & Alerting"
+   759
+   760  ### New Files (to create)
+   761  - `scripts/geist_control.py` - Geist relay SNMP control (standalone CLI)
+   762  - `scripts/x410_control.py` - X410 relay SNMP control (standalone CLI)
+   763  - `scripts/govee_control.py` - Govee device HTTP API wrapper (standalone CLI)
+   764  - `telegraf/conf.d/x410.conf` - X410 SNMP polling config (based on geist pattern)
+   765  - `services/webhook-receiver/Dockerfile` - Flask webhook receiver
+   766  - `services/webhook-receiver/app.py` - webhook endpoint and routing logic
+   767  - `services/webhook-receiver/config/alert_actions.yaml` - alert → action mappings
+   768  - `services/webhook-receiver/requirements.txt` - Flask, PyYAML dependencies
+   769  - `services/control-dashboard/` - Web GUI Flask app, Dockerfile, HTML/JS frontend (Phase 7)
+   770
+   771  ### Reference Files (existing, for patterns)
+   772  - `docs/mibs_archive/x410-swg_v2d2-device.mib` - X410 OID reference
+   773  - `telegraf/conf.d/geist-watchdog.conf` - SNMP config pattern to replicate
+   774  - `scripts/ble_decoder.py` - Python service pattern for webhook receiver
+   775
+   776  ---
+   777
+   778  ## Verification
+   779
+   780  1. **Geist Relay (Standalone)**: `python scripts/geist_control.py --relay on --ip dpx-geist.local`, verify relay clicks and returns current state
+   781  2. **Geist Relay (Wrapper)**: `iot geist-relay on`, verify relay clicks and state updates in Grafana
+   782  3. **X410 Monitoring**: Query InfluxDB - `SELECT * FROM x410_io WHERE time > now() - 5m`, verify relay states and input values
+   783  4. **X410 Control (Standalone)**: `python scripts/x410_control.py --relay 1 --state on --ip <x410-ip>`, verify relay state change
+   784  5. **X410 Control (Wrapper)**: `iot x410-relay 1 on`, verify relay state change in InfluxDB
+   785  6. **Govee List Devices**: `python scripts/govee_control.py --list`, verify shows Govee stick light and other devices
+   786  7. **Govee Control**: `iot govee-control "stick light" on --brightness 50`, verify light responds
+   787  8. **Webhook Receiver**: `curl -X POST http://localhost:5001/webhook/grafana -d @test_alert.json`, verify device action triggered
+   788  9. **End-to-End Alert**: Manually raise temperature above threshold, verify webhook fires and Geist relay activates
+   789  10. **Grafana Dashboard**: Create monitoring panel showing relay states, alert status, last action timestamp
+   790  11. **Web GUI (Phase 7)**: Open `http://dpx-showsite-ops.local:5002`, verify device status display, click control buttons, verify device responses
+   791
+   792  ---
+   793
+   794  ## Decisions
+   795
+   796  - **Merged Phase 7 & 8**: User confirmed they're the same work (physical control + alerting thresholds)
+   797  - **Priority Order**: 1) Geist relay, 2) X410 (monitor + control), 3) Govee, 4) Grafana webhooks
+   798  - **X410 Credentials**: User has IP/creds for online unit (will provide)
+   799  - **Grafana Integration**: Option 1 (webhook from alert rules → Python script) - easiest native integration
+   800  - **Webhook Receiver**: Separate Flask service (not part of Telegraf) for clean separation of concerns
+   801  - **Alert Actions Config**: YAML file for flexibility without code changes
+   802  - **CLI Integration**: Control scripts are standalone CLIs (can call directly) AND wrapped via `iot` commands for consistency
+   803  - **Standalone Scripts First**: CLI tools ship first for immediate testing, Web GUI built after control proven (Phase 7)
+   804  - **Web GUI Design**: Separate Flask service on port 5002, calls same Python control scripts (avoid code duplication)
+   805
+   806  ---
+   807
+   808  ## Further Considerations
+   809
+   810  1. **Second X410 Unit**: Plan mentions one offline unit - defer integration until second unit is online?
+   811     - Recommendation: Build with single X410 first, add second unit as additional `agents` entry in telegraf config later
+   812  2. **Geist RW Community String**: User needs to provide new credentials or update device config
+   813     - Recommendation: If device web interface allows, create separate "control" community string (keep "public" read-only for Telegraf monitoring)
+   814  3. **Alert Action Logging**: Should webhook actions be logged to InfluxDB for audit trail?
+   815     - Recommendation: Yes - create `control_actions` measurement with fields: device, action, timestamp, triggered_by_alert
+   816  4. **Manual Override Safety**: Should webhook actions be rate-limited or require confirmation for destructive operations?
+   817     - Recommendation: Add `max_actions_per_hour` config and dry-run mode for testing
+   818  5. **Govee Device Discovery**: How to handle dynamic device list from govee2mqtt API?
+   819     - Recommendation: Cache device list on webhook receiver startup, refresh every 5 minutes
+   820  %                                   

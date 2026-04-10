@@ -1,0 +1,46 @@
+# Guest Alert Button System Configuration
+# Button panel (inputs) and lamp controller (relays)
+
+devices:
+  lamp_controller:
+    ip: 192.168.114.111
+    description: "LAMP PENDANT - Relays control colored lights"
+    relays:
+      1: "RED"
+      2: "YELLOW"
+      3: "GREEN"
+      4: "BLUE"
+    inputs:
+      1: "BIG RED BUTTON (clear all)"
+      
+  button_panel:
+    ip: 192.168.114.112
+    description: "BUTTON PANEL - Colored button inputs"
+    inputs:
+      1: "RED BUTTON"
+      2: "YELLOW BUTTON"
+      3: "GREEN BUTTON"
+      4: "BLUE BUTTON"
+
+snmp:
+  # SNMP community string (override via X410_SNMP_COMMUNITY env var)
+  community: "public"
+  # SNMP timeout in seconds (0.3s = ultra-fast response, fail-fast if device slow)
+  timeout: 0.3
+  # Poll interval in milliseconds for button state checking
+  # 75ms = 13 polls/second (ultra-responsive button detection)
+  poll_interval_ms: 75
+
+blink:
+  # Blink frequency in Hz (override via BUTTON_BLINK_HZ env var)
+  frequency_hz: 2.0
+  # Duty cycle (0.5 = 50% on, 50% off)
+  duty_cycle: 0.5
+
+button_hold:
+  # Hold time in seconds to reset individual light
+  reset_threshold_seconds: 10.0
+
+health:
+  # HTTP health/metrics server port
+  port: 8080

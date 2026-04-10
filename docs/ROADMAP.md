@@ -374,6 +374,48 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 
 ---
 
+## ✅ Phase 6.7: Guest Alert Button System (Completed)
+
+**Goal**: Always-running button-to-lamp controller for visual guest alerts
+
+**What we built:**
+- **Architecture**: Two X410 devices via SNMP
+  - Button Panel (192.168.105.112): 4 colored button inputs
+  - Lamp Controller (192.168.105.111): 4 colored lamp relays + big red clear button
+- **Button Behavior**:
+  - Press colored button → corresponding lamp blinks at 2 Hz (configurable)
+  - Hold button >10 seconds → that specific lamp turns OFF
+  - Press big red button → all lamps turn OFF
+- **Implementation**:
+  - Python daemon with 100ms polling (10 polls/second) for responsive button detection
+  - SNMP v2c communication with both X410 devices
+  - Software blink timer for synchronized lamp control
+  - Flask health/metrics endpoint (port 8080) for monitoring
+  - Prometheus-compatible metrics (button presses, SNMP errors, lamp states)
+- **Configuration**: SNMP settings via config.yaml + environment variables
+- **Critical Setup**:
+  - Both X410 devices must have SNMP enabled
+  - Agent Read + Write community: `public`
+  - Manager 1 IP: Docker host or `0.0.0.0`
+  - Lamp controller Input 1 must be enabled for clear button functionality
+
+**Use Cases:**
+- Guest service alerts (red = urgent, yellow = soon, green = ready, blue = info)
+- Kitchen/bar notification system
+- Multi-team coordination without radios
+- Visual status indicators for public-facing staff
+
+**Benefits:**
+- Physical button interface (more reliable than touchscreens during events)
+- Independent blinking lamps prevent missed notifications
+- Big red button provides instant all-clear
+- Hold-to-reset prevents accidental clears
+- Prometheus metrics for monitoring reliability
+
+**Status**: ✅ Complete - deployed and working (100ms polling for responsive buttons)
+
+---
+
 ## � Phase 7: Metrics-Driven Device Control (Planned)
 
 **Goal**: Control lighting and other devices based on sensor metrics and conditions
@@ -915,6 +957,7 @@ This document tracks the evolution of dpx-showsite-ops from initial Govee monito
 **Phase 4**: ✅ Complete (2026-02-24) - BLE decoder dockerized and operational  
 **Phase 5**: ✅ Mostly Complete (2026-03-06) - TFTP/backup/M4300/SNMP operational, dashboard design pending  
 **Phase 6**: 🚧 In Progress - Core complete, Art-Net + Google Sheets testing pending  
+**Phase 6.7**: ✅ Complete (2026-04-09) - Guest Alert Button System deployed and working (100ms polling)  
 **Phase 7**: 📋 Planned - After Phase 4 + Phase 6, requires BLE data and schedule integration  
 **Phase 8**: 📋 Planned - Alert System (foundational for monitoring phases)  
 **Phase 9**: 🧪 POC In Progress (2026-03-06) - LTC monitoring exploration  

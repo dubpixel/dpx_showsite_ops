@@ -1,0 +1,88 @@
+# Relay Controller and Environmental Monitor Configuration
+# Copy to config/relays.conf and customize for your deployment
+#
+# Supports multiple devices of each type:
+#   - Geist Watchdog (environmental monitoring + relay control)
+#   - ControlByWeb X-410 (4 relays + 4 digital inputs)
+#
+# SNMP community strings are set via .env file (secrets)
+# Device inventory (IPs, names, locations) configured here
+
+# ============================================================================
+# Geist Watchdog Environmental Monitors
+# ============================================================================
+# Features: Temperature/humidity sensors, 1 relay output, SNMP monitoring
+# Default SNMP community from .env: GEIST_SNMP_RW_COMMUNITY
+
+[geist-rack-a]
+type = geist
+ip = 192.168.1.214
+location = Server Rack A
+enabled = true
+# Optional: Override default SNMP community for this device
+# snmp_community = custom-private
+
+[geist-rack-b]
+type = geist
+ip = 192.168.1.215
+location = Server Rack B
+enabled = false
+# snmp_community = custom-private
+
+
+# ============================================================================
+# ControlByWeb X-410 Relay Controllers
+# ============================================================================
+# Features: 4 relays + 4 digital inputs, SNMP + web control
+# Default SNMP community from .env: X410_SNMP_COMMUNITY
+# Note: Device names below are "handy names" - actual device metadata
+# (names, port labels, thresholds) are configured locally via device web UI
+
+[x410-tent]
+type = x410
+ip = 192.168.1.50
+location = Tent
+relay_count = 4
+input_count = 4
+enabled = true
+# Optional: Override default SNMP community
+# snmp_community = public
+
+[x410-truck]
+type = x410
+ip = 192.168.1.51
+location = Truck
+relay_count = 4
+input_count = 4
+enabled = false
+# snmp_community = public
+
+
+# ============================================================================
+# Configuration Notes
+# ============================================================================
+#
+# Device Naming Convention:
+#   [type-location-identifier]
+#   Examples: geist-rack-a, x410-stage-left
+#
+# Required Fields:
+#   - type: "geist" or "x410"
+#   - ip: IPv4 address
+#   - location: Human-readable location description
+#   - enabled: true/false (for testing/maintenance)
+#
+# Optional Fields:
+#   - snmp_community: Override default from .env
+#   - relay_count: Number of relays (X410 only, default 4)
+#   - input_count: Number of inputs (X410 only, default 4)
+#
+# SNMP Communities:
+#   Default community strings come from .env file:
+#     - GEIST_SNMP_RW_COMMUNITY (default: private)
+#     - X410_SNMP_COMMUNITY (default: public)
+#   Override per-device using snmp_community field above
+#
+# Telegraf Monitoring:
+#   All enabled devices are automatically added to Telegraf SNMP polling
+#   via telegraf/conf.d/relays.conf (generated from this file)
