@@ -183,7 +183,7 @@ services:
     restart: unless-stopped
     network_mode: host  # Required for accessibility on all network interfaces
     volumes:
-      - ./config/ntp.conf:/etc/chrony/chrony.conf:ro
+      - ./config/ntp.conf:/etc/chrony.conf:ro
     environment:
       - TZ=${TZ:-America/New_York}
     cap_add:

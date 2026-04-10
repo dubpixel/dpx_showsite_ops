@@ -5,11 +5,8 @@ FROM alpine:3.19
 # Install chrony NTP server
 RUN apk add --no-cache chrony tzdata
 
-# Create directory for chrony runtime and config files
-# The default Alpine package creates /etc/chrony/ but we need to ensure
-# the config file exists for Docker volume mount to work
-RUN mkdir -p /var/lib/chrony /run/chrony /etc/chrony && \
-    touch /etc/chrony/chrony.conf && \
+# Create directory for chrony runtime files
+RUN mkdir -p /var/lib/chrony /run/chrony && \
     chown -R chrony:chrony /var/lib/chrony /run/chrony
 
 # Expose NTP port (UDP 123)
@@ -18,5 +15,5 @@ EXPOSE 123/udp
 
 # Run chronyd in foreground mode
 # -d: foreground with logging to stderr
-# -s: set system time from RTC if needed on startup
-ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony/chrony.conf"]
+# -f: config file location (Alpine default is /etc/chrony.conf)
+ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony.conf"]
