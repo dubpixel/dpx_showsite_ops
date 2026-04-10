@@ -985,6 +985,30 @@ case "$1" in
     curl -s http://localhost:8080/metrics
     ;;
   
+  button-rebuild|btn-rebuild)
+    echo "Rebuilding guest alert button container (no cache)..."
+    docker compose build dpx-guest-alert-button --no-cache
+    echo ""
+    echo "✓ Build complete"
+    echo "Start with: iot button-start"
+    ;;
+  
+  button-start|btn-start)
+    echo "Starting guest alert button service..."
+    docker compose up -d dpx-guest-alert-button
+    echo ""
+    echo "✓ Service started"
+    echo "View logs with: iot button-logs"
+    echo "Check status with: iot button-status"
+    ;;
+  
+  button-stop|btn-stop)
+    echo "Stopping guest alert button service..."
+    docker compose stop dpx-guest-alert-button
+    echo ""
+    echo "✓ Service stopped"
+    ;;
+  
   button-restart|btn-restart)
     echo "Restarting guest alert button service..."
     docker compose restart dpx-guest-alert-button
