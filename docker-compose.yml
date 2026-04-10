@@ -238,3 +238,4 @@ volumes:
   tftp-data:
   netgear-backups:
   physical-control-logs:
+  button-logs:
