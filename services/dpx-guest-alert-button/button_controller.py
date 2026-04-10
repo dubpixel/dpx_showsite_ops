@@ -231,15 +231,20 @@ class ButtonController:
         """Poll button states and update lamp state based on button presses and holds."""
         current_time = time.time()
         
+        logging.debug(f"Polling buttons on {self.button_ip}...")
+        
         # Poll colored buttons (1-4) on button panel
         for button_num in range(1, 5):
             button_state = snmp_get_input(self.button_ip, self.snmp_community, button_num)
             
             if button_state is None:
                 # SNMP error - skip this button
+                logging.debug(f"  Button {button_num}: SNMP ERROR")
                 with self.state.lock:
                     self.state.stats['snmp_errors'] += 1
                 continue
+            
+            logging.debug(f"  Button {button_num}: {button_state}")
             
             with self.state.lock:
                 prev_state = self.state.prev_button_state[button_num]
@@ -274,6 +279,7 @@ class ButtonController:
         clear_state = snmp_get_input(self.lamp_ip, self.snmp_community, 1)
         
         if clear_state is not None:
+            logging.debug(f"  Clear button: {clear_state}")
             with self.state.lock:
                 # Detect rising edge (clear button press)
                 if clear_state == STATE_ON and self.state.prev_clear_button_state == STATE_OFF:
@@ -283,6 +289,8 @@ class ButtonController:
                     self.state.stats['clear_presses'] += 1
                 
                 self.state.prev_clear_button_state = clear_state
+        else:
+            logging.debug(f"  Clear button: SNMP ERROR")
         
         # Update last poll time
         with self.state.lock:
@@ -290,6 +298,8 @@ class ButtonController:
     
     def update_relays(self):
         """Update physical relay states based on lamp state (blink toggle)."""
+        logging.debug("Updating relays...")
+        
         with self.state.lock:
             for relay_num in range(1, 5):
                 lamp_mode = self.state.lamp_state[relay_num]
@@ -300,18 +310,22 @@ class ButtonController:
                     self.state.relay_physical_state[relay_num] = new_state
                     
                     snmp_state = STATE_ON if new_state else STATE_OFF
+                    logging.debug(f"  Lamp {relay_num}: BLINK → {snmp_state}")
                     success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, snmp_state)
                     
                     if not success:
+                        logging.debug(f"  Lamp {relay_num}: SNMP SET FAILED")
                         self.state.stats['snmp_errors'] += 1
                 
                 elif lamp_mode == 'off':
                     # Ensure relay is OFF
                     if self.state.relay_physical_state[relay_num]:
                         self.state.relay_physical_state[relay_num] = False
+                        logging.debug(f"  Lamp {relay_num}: OFF")
                         success = snmp_set_relay(self.lamp_ip, self.snmp_community, relay_num, STATE_OFF)
                         
                         if not success:
+                            logging.debug(f"  Lamp {relay_num}: SNMP SET FAILED")
                             self.state.stats['snmp_errors'] += 1
             
             self.state.stats['blink_cycles'] += 1
@@ -575,10 +589,15 @@ def main():
     health_app = create_health_app(controller, state, config)
     
     def run_health_server():
-        health_app.run(host='0.0.0.0', port=health_port, debug=False, use_reloader=False)
+        try:
+            logging.info(f"Flask health server thread starting on 0.0.0.0:{health_port}")
+            health_app.run(host='0.0.0.0', port=health_port, debug=False, use_reloader=False, threaded=True)
+        except Exception as e:
+            logging.error(f"Health server failed to start: {e}", exc_info=True)
     
     health_thread = threading.Thread(target=run_health_server, daemon=True)
     health_thread.start()
+    time.sleep(0.5)  # Give Flask time to bind
     logging.info(f"Health server started on port {health_port}")
     
     # Run main controller (blocks until shutdown)
