@@ -17,6 +17,9 @@ backups/
 __pycache__/
 *.py[cod]
 *$py.class
+venv/
+venv-*/
+.venv/
 
 # OS files
 .DS_Store
