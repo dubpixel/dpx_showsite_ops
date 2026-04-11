@@ -19,7 +19,7 @@ RUN touch /etc/chrony.conf && chmod 644 /etc/chrony.conf
 # Note: When using host networking mode, this is informational only
 EXPOSE 123/udp
 
-# Run chronyd in foreground mode
+# Run chronyd in foreground mode (for Docker)
 # -d: foreground with logging to stderr
-# -f: config file location (Alpine default is /etc/chrony.conf)
-ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony.conf"]
+# -s: set system time from RTC if offset is large on startup
+ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-s"]
