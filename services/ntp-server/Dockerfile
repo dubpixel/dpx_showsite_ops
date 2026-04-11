@@ -1,25 +1,27 @@
 # NTP Server using chrony
 # Syncs time from NIST servers and rebroadcasts to local network devices
-FROM alpine:3.19
+FROM ubuntu:22.04
 
 # Install chrony NTP server
-RUN apk add --no-cache chrony tzdata
+RUN apt-get update && \
+    apt-get install -y chrony tzdata && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create directory for chrony runtime files with correct permissions
-# chronyd runs as the chrony user by default
+# Create directory for chrony runtime files
 RUN mkdir -p /var/lib/chrony /run/chrony && \
-    chown -R chrony:chrony /var/lib/chrony /run/chrony && \
+    chown -R _chrony:_chrony /var/lib/chrony /run/chrony && \
     chmod 750 /run/chrony
 
-# Create empty config file for Docker volume mount
-# Without this, Docker creates /etc/chrony.conf as a directory
-RUN touch /etc/chrony.conf && chmod 644 /etc/chrony.conf
+# Ubuntu chrony expects config at /etc/chrony/chrony.conf
+# Create symlink so we can mount to /etc/chrony.conf (Alpine location)
+RUN ln -sf /etc/chrony.conf /etc/chrony/chrony.conf
 
 # Expose NTP port (UDP 123)
 # Note: When using host networking mode, this is informational only
 EXPOSE 123/udp
 
-# Run chronyd in foreground mode (for Docker)
+# Run chronyd in foreground mode
 # -d: foreground with logging to stderr
-# -s: set system time from RTC if offset is large on startup
-ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-s"]
+# -f: explicitly specify config file location
+ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony.conf"]

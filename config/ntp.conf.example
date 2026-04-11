@@ -33,6 +33,11 @@ dumpdir /var/lib/chrony
 # ACCESS CONTROL
 # ===========================
 
+# Explicitly bind to all interfaces on NTP port
+port 123
+bindaddress 0.0.0.0
+bindaddress ::
+
 # Allow NTP client queries from RFC1918 private networks
 # Devices on these networks can sync time from this server
 
