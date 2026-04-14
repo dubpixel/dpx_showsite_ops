@@ -40,6 +40,9 @@ bindaddress ::
 
 # Allow NTP client queries from RFC1918 private networks
 # Devices on these networks can sync time from this server
+# NOTE: chrony uses "last matching rule wins" semantics.
+# Do NOT add "deny all" after these allows — it would override them and block everyone.
+# Chrony denies all non-allowed hosts by default when any allow directive is present.
 
 # Class C private networks (192.168.x.x)
 allow 192.168.0.0/16
@@ -49,9 +52,6 @@ allow 10.0.0.0/8
 
 # Class B private networks (172.16-31.x.x)
 allow 172.16.0.0/12
-
-# Deny all other networks (public internet)
-deny all
 
 # ===========================
 # LOCAL REFERENCE CLOCK

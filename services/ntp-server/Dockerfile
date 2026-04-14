@@ -21,7 +21,8 @@ RUN ln -sf /etc/chrony.conf /etc/chrony/chrony.conf
 # Note: When using host networking mode, this is informational only
 EXPOSE 123/udp
 
-# Run chronyd in foreground mode
-# -d: foreground with logging to stderr
-# -f: explicitly specify config file location
-ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony.conf"]
+# Run chronyd in foreground mode as root so it can bind to privileged port 123
+# -d: foreground + log to stderr
+# -f: explicitly specify config file
+# -u root: keep root privileges (required to bind UDP port 123)
+ENTRYPOINT ["/usr/sbin/chronyd", "-d", "-f", "/etc/chrony.conf", "-u", "root"]
