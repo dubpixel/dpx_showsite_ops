@@ -175,6 +175,20 @@ services:
       - tftp-server
       - influxdb
 
+  ntp-server:
+    build:
+      context: ./services/ntp-server
+      dockerfile: Dockerfile
+    container_name: ntp-server
+    restart: unless-stopped
+    network_mode: host  # Required for accessibility on all network interfaces
+    volumes:
+      - ./config/ntp.conf:/etc/chrony.conf:ro
+    environment:
+      - TZ=${TZ:-America/New_York}
+    cap_add:
+      - SYS_TIME  # Allow container to set system time if needed
+
   physical-control:
     build:
       context: ./services/physical-control

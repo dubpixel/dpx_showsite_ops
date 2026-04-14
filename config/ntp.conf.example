@@ -1,0 +1,95 @@
+# Chrony NTP Server Configuration
+# Syncs time from NIST servers and serves time to local network devices
+
+# ===========================
+# UPSTREAM TIME SOURCES (NIST)
+# ===========================
+
+# NIST Internet Time Service (round-robin DNS pointing to multiple stratum-1 servers)
+# These servers are operated by the National Institute of Standards and Technology
+pool time.nist.gov iburst
+
+# Alternative: Specify individual NIST servers for redundancy
+# Uncomment these if you prefer explicit server selection over round-robin pool
+# server time-a-g.nist.gov iburst
+# server time-b-g.nist.gov iburst
+# server time-c-g.nist.gov iburst
+# server time-d-g.nist.gov iburst
+
+# iburst: Send burst of polls on startup for faster initial sync
+# prefer: Mark a source as preferred (optional, useful if one source is more reliable)
+
+# ===========================
+# DRIFT FILE & STATE
+# ===========================
+
+# Record rate of system clock gain/loss (improves accuracy on restart)
+driftfile /var/lib/chrony/drift
+
+# Directory for tracking clock measurements
+dumpdir /var/lib/chrony
+
+# ===========================
+# ACCESS CONTROL
+# ===========================
+
+# Explicitly bind to all interfaces on NTP port
+port 123
+bindaddress 0.0.0.0
+bindaddress ::
+
+# Allow NTP client queries from RFC1918 private networks
+# Devices on these networks can sync time from this server
+# NOTE: chrony uses "last matching rule wins" semantics.
+# Do NOT add "deny all" after these allows — it would override them and block everyone.
+# Chrony denies all non-allowed hosts by default when any allow directive is present.
+
+# Class C private networks (192.168.x.x)
+allow 192.168.0.0/16
+
+# Class A private networks (10.x.x.x)
+allow 10.0.0.0/8
+
+# Class B private networks (172.16-31.x.x)
+allow 172.16.0.0/12
+
+# ===========================
+# LOCAL REFERENCE CLOCK
+# ===========================
+
+# If NIST servers become unreachable, serve cached time
+# Stratum 10 indicates "far from reference clock" (low trust level)
+local stratum 10
+
+# ===========================
+# LOGGING & MONITORING
+# ===========================
+
+# Log clock measurements, statistics, and tracking data
+log measurements statistics tracking
+
+# Rate limiting to prevent NTP amplification attacks
+# Limits responses to 1000 packets per 1 interval for any single IP
+ratelimit interval 1 burst 1000
+
+# ===========================
+# PERFORMANCE TUNING
+# ===========================
+
+# Step system clock if offset is larger than 1 second on first 3 updates
+# After initial convergence, slew slowly to avoid time jumps
+makestep 1.0 3
+
+# Allow system clock to be stepped in first update if offset is large
+rtcsync
+
+# ===========================
+# SECURITY
+# ===========================
+
+# Disable chronyc command socket (only allow via Docker exec)
+# Comment out to enable remote management (not recommended)
+cmdport 0
+
+# Bind command socket to localhost only (if cmdport enabled)
+# bindcmdaddress 127.0.0.1

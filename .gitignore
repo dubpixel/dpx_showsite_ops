@@ -17,6 +17,9 @@ backups/
 __pycache__/
 *.py[cod]
 *$py.class
+venv/
+venv-*/
+.venv/
 
 # OS files
 .DS_Store
@@ -42,6 +45,7 @@ telegraf/conf.d/device-overrides.json
 
 # Deployment-specific configs
 config/switches.conf
+config/ntp.conf
 
 # Local backup/temp files
 .env_bu
