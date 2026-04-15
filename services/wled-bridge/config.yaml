@@ -3,15 +3,14 @@
 # ================================================================================
 # Defines pixel zones on the WLED ropelight and what data source drives each zone.
 #
-# Pixel map (200px ropelight):
-#   px   0– 99  →  (dark — not configured)
-#   px 100–111  →  btn_blue    Button status (12px)
-#   px 112–123  →  btn_green   Button status (12px)
-#   px 124–135  →  btn_orange  Button status / yellow lamp (12px)
-#   px 136–147  →  btn_red     Button status (12px)
-#   px 148–149  →  gap (2px)
-#   px 150–174  →  tent_temp   Tent temperature (25px)
-#   px 175–199  →  foh_temp    FOH temperature (25px)
+# Pixel map (100px ropelight, 75px active):
+#   px  0– 11  →  btn_blue    Button status (12px)
+#   px 12– 23  →  btn_green   Button status (12px)
+#   px 24– 35  →  btn_orange  Button status / yellow lamp (12px)
+#   px 36– 47  →  btn_red     Button status (12px)
+#   px 48– 61  →  tent_temp   Tent temperature (14px)
+#   px 62– 74  →  foh_temp    FOH temperature (13px)
+#   px 75– 99  →  (dark — not configured)
 #
 # Source types:
 #   mqtt_temperature  — subscribes to BLE decoder temp topics, filters by room
@@ -24,7 +23,7 @@ wled:
   # Full MQTT base topic — must match WLED Config → Sync Interfaces → MQTT → Device topic
   # WLED subscribes to: {device_topic}/api for JSON segment commands
   device_topic: "${WLED_DEVICE_TOPIC}"
-  led_count: 200
+  led_count: 100
 
 
 zones:
@@ -37,55 +36,55 @@ zones:
   - id: btn_blue
     name: "Blue Button Status"
     pixels:
-      start: 100
-      stop: 112     # exclusive
+      start: 0
+      stop: 12      # exclusive
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/blue/state"
-    color_on:  [0, 100, 255]   # blue
+    color_on:  [0, 100, 255]
     color_off: [0, 0, 0]
 
   - id: btn_green
     name: "Green Button Status"
     pixels:
-      start: 112
-      stop: 124
+      start: 12
+      stop: 24
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/green/state"
-    color_on:  [0, 200, 0]     # green
+    color_on:  [0, 200, 0]
     color_off: [0, 0, 0]
 
   - id: btn_orange
     name: "Orange/Yellow Button Status"
     pixels:
-      start: 124
-      stop: 136
+      start: 24
+      stop: 36
     source:
       type: mqtt_state
-      topic: "${SHOWSITE_NAME}/button/yellow/state"   # lamp is YELLOW relay
-    color_on:  [255, 120, 0]   # orange on the ropelight
+      topic: "${SHOWSITE_NAME}/button/yellow/state"
+    color_on:  [255, 120, 0]
     color_off: [0, 0, 0]
 
   - id: btn_red
     name: "Red Button Status"
     pixels:
-      start: 136
-      stop: 148
+      start: 36
+      stop: 48
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/red/state"
-    color_on:  [255, 0, 0]     # red
+    color_on:  [255, 0, 0]
     color_off: [0, 0, 0]
 
 
-  # ── Temperature Zones (pixels 150–199) ──────────────────────────────────────
+  # ── Temperature Zones (pixels 48–74) ────────────────────────────────────────
 
   - id: tent_temp
     name: "Tent Temperature"
     pixels:
-      start: 150
-      stop: 175     # exclusive
+      start: 48
+      stop: 62      # exclusive — 14px
     source:
       type: mqtt_temperature
       room: "${TENT_SENSOR_ROOM}"
@@ -100,8 +99,8 @@ zones:
   - id: foh_temp
     name: "FOH Temperature"
     pixels:
-      start: 175
-      stop: 200     # exclusive
+      start: 62
+      stop: 75      # exclusive — 13px
     source:
       type: mqtt_temperature
       room: "${FOH_SENSOR_ROOM}"
@@ -112,3 +111,5 @@ zones:
       - { temp_f: 78, rgb: [220, 220,   0] }
       - { temp_f: 85, rgb: [255, 100,   0] }
       - { temp_f: 92, rgb: [255,   0,   0] }
+
+  # px 75–99 — dark (not configured)
