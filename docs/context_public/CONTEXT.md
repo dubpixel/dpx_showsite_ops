@@ -409,7 +409,7 @@ Tent sensor BLE → ESP32 → MQTT raw → ble-decoder
 
 WLED firmware must have MQTT enabled:
 - WLED web UI → Config → Sync Interfaces → MQTT
-- Server IP: `192.168.1.100` (stack VM), Port: `1883`
+- Server IP: `192.168.109.69` (stack VM, VLAN 109), Port: `1883`
 - Device name: must match `WLED_DEVICE_NAME` env var
 
 #### Adding a Zone
