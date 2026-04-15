@@ -226,6 +226,7 @@ services:
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
       - WLED_DEVICE_TOPIC=${WLED_DEVICE_TOPIC:-wled}
       - TENT_SENSOR_ROOM=${TENT_SENSOR_ROOM:-tent}
+      - FOH_SENSOR_ROOM=${FOH_SENSOR_ROOM:-foh}
       - TZ=${TZ}
     networks:
       - iot
@@ -246,6 +247,8 @@ services:
       - X410_SNMP_COMMUNITY=${X410_SNMP_COMMUNITY:-public}
       - BUTTON_BLINK_HZ=${BUTTON_BLINK_HZ:-2.0}
       - LOG_LEVEL=${BUTTON_LOG_LEVEL:-INFO}
+      - BROKER=mosquitto
+      - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
     volumes:
       - ./services/dpx-guest-alert-button/config.yaml:/app/config.yaml:ro
       - button-logs:/var/log/button-controller

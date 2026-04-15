@@ -183,10 +183,12 @@ class ZoneState:
         if self.last_temp_f is None:
             return f"[{self.zone_id}] no data yet"
         age = (datetime.now() - self.last_update).seconds
-        return (
-            f"[{self.zone_id}] {self.last_temp_f:.1f}°F → "
-            f"RGB{tuple(self.last_rgb)} ({age}s ago)"
-        )
+        # last_temp_f is float for temperature zones, string for state zones
+        if isinstance(self.last_temp_f, float):
+            value_str = f"{self.last_temp_f:.1f}°F"
+        else:
+            value_str = str(self.last_temp_f)
+        return f"[{self.zone_id}] {value_str} → RGB{tuple(self.last_rgb)} ({age}s ago)"
 
 
 # ============================================================================
@@ -202,15 +204,25 @@ class WLEDBridge:
             z["id"]: ZoneState(z["id"], z["name"]) for z in self.zones
         }
 
-        # Build room→zone lookup for fast dispatch
-        # room value is lowercased for case-insensitive match
+        # Build routing lookups by source type
+        # Temperature zones: keyed by room name (lowercased)
         self.room_to_zone = {}
-        for zone in self.zones:
-            room = zone["source"].get("room", "").lower()
-            if room:
-                self.room_to_zone[room] = zone
+        # State zones: keyed by exact MQTT topic string
+        self.state_topic_to_zone = {}
 
-        # MQTT topic to subscribe for temperature data
+        for zone in self.zones:
+            src = zone.get("source", {})
+            src_type = src.get("type", "mqtt_temperature")
+            if src_type == "mqtt_temperature":
+                room = src.get("room", "").lower()
+                if room:
+                    self.room_to_zone[room] = zone
+            elif src_type == "mqtt_state":
+                topic = src.get("topic", "")
+                if topic:
+                    self.state_topic_to_zone[topic] = zone
+
+        # MQTT topics
         self.temp_topic = f"{SHOWSITE}/dpx_ops_decoder/+/+/+/+/temperature"
         # WLED subscribes to {device_topic}/api for JSON segment commands
         self.wled_topic = f"{self.wled_device_topic}/api"
@@ -226,8 +238,13 @@ class WLEDBridge:
         if rc == 0:
             log.info(f"Connected to MQTT broker at {BROKER}:{PORT}")
             log.info(f"WLED device topic: {self.wled_device_topic}  →  api: {self.wled_topic}")
+            # Subscribe to temperature wildcard
             client.subscribe(self.temp_topic)
-            log.info(f"Subscribed: {self.temp_topic}")
+            log.info(f"Subscribed (temp):  {self.temp_topic}")
+            # Subscribe to each state zone topic individually
+            for topic in self.state_topic_to_zone:
+                client.subscribe(topic)
+                log.info(f"Subscribed (state): {topic}")
             log.info(f"Active zones: {[z['id'] for z in self.zones]}")
             self._schedule_heartbeat()
         else:
@@ -238,8 +255,16 @@ class WLEDBridge:
             log.warning(f"Unexpected disconnect (rc={rc}), reconnecting...")
 
     def _on_message(self, client, userdata, msg):
+        """Route incoming MQTT messages to the appropriate zone handler."""
+        # Check state zones first (exact topic match)
+        if msg.topic in self.state_topic_to_zone:
+            self._handle_state_message(msg)
+        else:
+            self._handle_temp_message(msg)
+
+    def _handle_temp_message(self, msg):
         """
-        Handle incoming temperature message.
+        Handle temperature message from BLE decoder.
 
         Topic format: {site}/dpx_ops_decoder/{gw}/{room}/{device}/{mac}/temperature
         Indices:        0         1              2    3      4       5       6
@@ -254,21 +279,48 @@ class WLEDBridge:
             return
 
         room = parts[3].lower()
-
         zone = self.room_to_zone.get(room)
         if not zone:
-            return  # This room isn't mapped to any zone
+            return
 
         rgb = interpolate_color(temp_f, zone["gradient"])
-        cmd = build_wled_segment_cmd(zone, rgb)
-
-        self.client.publish(self.wled_topic, cmd)
+        self.client.publish(self.wled_topic, build_wled_segment_cmd(zone, rgb))
 
         zone_id = zone["id"]
         self.zone_states[zone_id].update(temp_f, rgb)
 
         log.info(
             f"[{zone_id}] room={room}  {temp_f:.1f}°F  →  RGB{tuple(rgb)}  "
+            f"→  px {zone['pixels']['start']}–{zone['pixels']['stop'] - 1}  "
+            f"→  {self.wled_topic}"
+        )
+
+    def _handle_state_message(self, msg):
+        """
+        Handle mqtt_state message (e.g. button lamp state).
+
+        Payload: "on" → color_on, anything else → color_off
+        """
+        zone = self.state_topic_to_zone.get(msg.topic)
+        if not zone:
+            return
+
+        try:
+            payload = msg.payload.decode().strip().lower()
+        except Exception:
+            return
+
+        rgb = zone["color_on"] if payload == "on" else zone["color_off"]
+        self.client.publish(self.wled_topic, build_wled_segment_cmd(zone, rgb))
+
+        zone_id = zone["id"]
+        # Reuse ZoneState with temp_f=None — store payload string as display value
+        self.zone_states[zone_id].last_temp_f = payload
+        self.zone_states[zone_id].last_rgb = rgb
+        self.zone_states[zone_id].last_update = datetime.now()
+
+        log.info(
+            f"[{zone_id}] state={payload}  →  RGB{tuple(rgb)}  "
             f"→  px {zone['pixels']['start']}–{zone['pixels']['stop'] - 1}  "
             f"→  {self.wled_topic}"
         )

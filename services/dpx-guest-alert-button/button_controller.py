@@ -32,6 +32,7 @@ from datetime import datetime
 
 import yaml
 from flask import Flask, jsonify, request
+import paho.mqtt.client as mqtt
 
 try:
     from pysnmp.hlapi import (
@@ -220,7 +221,27 @@ class ButtonController:
         self.blink_interval = self.blink_period / 2  # Half period (on/off toggle time)
         
         self.running = False
-        
+
+        # Relay number → lowercase color name (from config)
+        self.relay_colors = {
+            num: color.lower()
+            for num, color in config['devices']['lamp_controller']['relays'].items()
+        }
+
+        # MQTT client for publishing lamp state changes to wled-bridge and other subscribers
+        # Optional — button service continues working if broker is unavailable
+        self.showsite = os.getenv('SHOWSITE_NAME', 'demo_showsite')
+        self._mqtt = mqtt.Client(client_id="dpx_button_controller")
+        self._mqtt_broker = os.getenv('BROKER', 'mosquitto')
+        self._mqtt_connected = False
+        self._mqtt.on_connect = self._on_mqtt_connect
+        self._mqtt.on_disconnect = self._on_mqtt_disconnect
+        try:
+            self._mqtt.connect_async(self._mqtt_broker, 1883, keepalive=60)
+            self._mqtt.loop_start()
+        except Exception as e:
+            logging.warning(f"MQTT unavailable ({e}) — lamp state will not be published")
+
         logging.info(f"ButtonController initialized")
         logging.info(f"  Lamp IP: {self.lamp_ip}")
         logging.info(f"  Button IP: {self.button_ip}")
@@ -229,6 +250,34 @@ class ButtonController:
         logging.info(f"  Blink frequency: {self.blink_frequency}Hz ({self.blink_interval*1000:.0f}ms per toggle)")
         logging.info(f"  Hold reset threshold: {self.hold_threshold}s")
     
+    def _on_mqtt_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            self._mqtt_connected = True
+            logging.info(f"MQTT connected to {self._mqtt_broker}:1883 — publishing lamp states")
+            # Publish current state of all lamps on (re)connect
+            with self.state.lock:
+                for relay_num in range(1, 5):
+                    self._publish_lamp_state(relay_num, self.state.lamp_state[relay_num])
+        else:
+            logging.warning(f"MQTT connect failed (rc={rc})")
+
+    def _on_mqtt_disconnect(self, client, userdata, rc):
+        self._mqtt_connected = False
+        if rc != 0:
+            logging.warning(f"MQTT disconnected (rc={rc}), will retry")
+
+    def _publish_lamp_state(self, relay_num: int, lamp_state: str):
+        """Publish lamp state to MQTT. Call within state.lock or after state is set."""
+        if not self._mqtt_connected:
+            return
+        color = self.relay_colors.get(relay_num, f"relay{relay_num}")
+        topic = f"{self.showsite}/button/{color}/state"
+        payload = "on" if lamp_state == "blink" else "off"
+        try:
+            self._mqtt.publish(topic, payload, retain=True)
+        except Exception as e:
+            logging.debug(f"MQTT publish failed for {topic}: {e}")
+
     def poll_buttons(self):
         """Poll button states and update lamp state based on button presses and holds."""
         current_time = time.time()
@@ -255,6 +304,7 @@ class ButtonController:
                 if button_state == STATE_ON and prev_state == STATE_OFF:
                     logging.info(f"Button {button_num} pressed → Lamp {button_num} BLINK")
                     self.state.lamp_state[button_num] = 'blink'
+                    self._publish_lamp_state(button_num, 'blink')
                     self.state.button_hold_start[button_num] = current_time
                     self.state.stats['button_presses'][button_num] += 1
                 
@@ -266,6 +316,7 @@ class ButtonController:
                         if self.state.lamp_state[button_num] != 'off':
                             logging.info(f"Button {button_num} held {hold_duration:.1f}s → Reset lamp {button_num} OFF")
                             self.state.lamp_state[button_num] = 'off'
+                            self._publish_lamp_state(button_num, 'off')
                             self.state.stats['hold_resets'][button_num] += 1
                         # Clear hold timer to prevent repeated triggers
                         self.state.button_hold_start[button_num] = None
@@ -288,6 +339,7 @@ class ButtonController:
                     logging.info("BIG RED BUTTON pressed → Clear all lamps")
                     for i in range(1, 5):
                         self.state.lamp_state[i] = 'off'
+                        self._publish_lamp_state(i, 'off')
                     self.state.stats['clear_presses'] += 1
                 
                 self.state.prev_clear_button_state = clear_state
@@ -389,6 +441,7 @@ class ButtonController:
         with self.state.lock:
             for i in range(1, 5):
                 self.state.lamp_state[i] = 'off'
+                self._publish_lamp_state(i, 'off')
         logging.info("Manual clear - all lamps OFF")
     
     def reset_lamp(self, lamp_num: int):
@@ -396,6 +449,7 @@ class ButtonController:
         if lamp_num in range(1, 5):
             with self.state.lock:
                 self.state.lamp_state[lamp_num] = 'off'
+                self._publish_lamp_state(lamp_num, 'off')
             logging.info(f"Manual reset - lamp {lamp_num} OFF")
             return True
         return False

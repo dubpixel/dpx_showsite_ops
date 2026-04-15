@@ -3,38 +3,93 @@
 # ================================================================================
 # Defines pixel zones on the WLED ropelight and what data source drives each zone.
 #
-# Pixel map (100px ropelight):
-#   px  0– 24  →  Zone A  (spare / future)
-#   px 25– 49  →  Zone B  (spare / future)
-#   px 50– 74  →  Zone C  (spare / future)
-#   px 75– 99  →  Zone D  = tent_temp  ← active
+# Pixel map (200px ropelight):
+#   px   0– 99  →  (dark — not configured)
+#   px 100–111  →  btn_blue    Button status (12px)
+#   px 112–123  →  btn_green   Button status (12px)
+#   px 124–135  →  btn_orange  Button status / yellow lamp (12px)
+#   px 136–147  →  btn_red     Button status (12px)
+#   px 148–149  →  gap (2px)
+#   px 150–174  →  tent_temp   Tent temperature (25px)
+#   px 175–199  →  foh_temp    FOH temperature (25px)
 #
-# To add a zone: copy a commented example below, uncomment it, set pixels/source/gradient.
+# Source types:
+#   mqtt_temperature  — subscribes to BLE decoder temp topics, filters by room
+#   mqtt_state        — subscribes to a single topic, shows color_on or color_off
+#
 # Env vars in ${VAR} format are expanded at startup.
 # ================================================================================
 
 wled:
-  # Full MQTT base topic as set in WLED Config → Sync Interfaces → MQTT → Device topic
-  # WLED subscribes to {device_topic}/api for JSON segment commands
-  # Example: coachella_26/wled-rambo  →  publishes to coachella_26/wled-rambo/api
+  # Full MQTT base topic — must match WLED Config → Sync Interfaces → MQTT → Device topic
+  # WLED subscribes to: {device_topic}/api for JSON segment commands
   device_topic: "${WLED_DEVICE_TOPIC}"
-  led_count: 100
+  led_count: 200
+
 
 zones:
 
-  # ── Zone D: Tent Temperature (pixels 75–99) ─────────────────────────────────
+  # ── Button Status Zones (pixels 100–147) ────────────────────────────────────
+  # Driven by dpx-guest-alert-button service via MQTT.
+  # Topics: {SHOWSITE}/button/{color}/state  →  "on" or "off"
+  # Lamp colors from config: relay 1=RED, 2=YELLOW, 3=GREEN, 4=BLUE
+
+  - id: btn_blue
+    name: "Blue Button Status"
+    pixels:
+      start: 100
+      stop: 112     # exclusive
+    source:
+      type: mqtt_state
+      topic: "${SHOWSITE_NAME}/button/blue/state"
+    color_on:  [0, 100, 255]   # blue
+    color_off: [0, 0, 0]
+
+  - id: btn_green
+    name: "Green Button Status"
+    pixels:
+      start: 112
+      stop: 124
+    source:
+      type: mqtt_state
+      topic: "${SHOWSITE_NAME}/button/green/state"
+    color_on:  [0, 200, 0]     # green
+    color_off: [0, 0, 0]
+
+  - id: btn_orange
+    name: "Orange/Yellow Button Status"
+    pixels:
+      start: 124
+      stop: 136
+    source:
+      type: mqtt_state
+      topic: "${SHOWSITE_NAME}/button/yellow/state"   # lamp is YELLOW relay
+    color_on:  [255, 120, 0]   # orange on the ropelight
+    color_off: [0, 0, 0]
+
+  - id: btn_red
+    name: "Red Button Status"
+    pixels:
+      start: 136
+      stop: 148
+    source:
+      type: mqtt_state
+      topic: "${SHOWSITE_NAME}/button/red/state"
+    color_on:  [255, 0, 0]     # red
+    color_off: [0, 0, 0]
+
+
+  # ── Temperature Zones (pixels 150–199) ──────────────────────────────────────
+
   - id: tent_temp
     name: "Tent Temperature"
     pixels:
-      start: 75
-      stop: 100   # exclusive (WLED convention — last pixel controlled is 99)
+      start: 150
+      stop: 175     # exclusive
     source:
-      # Room name as it appears in MQTT topic segment 4:
-      #   {site}/dpx_ops_decoder/{gw}/{ROOM}/{device}/{mac}/temperature
-      # Must match the room assigned to the sensor in the Govee app / device-overrides.json
+      type: mqtt_temperature
       room: "${TENT_SENSOR_ROOM}"
     gradient:
-      # Linear interpolation between stops. Values outside range clamp to nearest end.
       - { temp_f: 60, rgb: [  0,  50, 255] }   # Blue   — cold
       - { temp_f: 65, rgb: [  0, 200, 200] }   # Cyan
       - { temp_f: 72, rgb: [  0, 200,   0] }   # Green  — comfortable
@@ -42,46 +97,18 @@ zones:
       - { temp_f: 85, rgb: [255, 100,   0] }   # Orange — hot
       - { temp_f: 92, rgb: [255,   0,   0] }   # Red    — danger
 
-
-  # ── Zone C: (spare — pixels 50–74) ─────────────────────────────────────────
-  # Example: another sensor room, or a solid status color driven by MQTT state
-  #
-  # - id: zone_c_spare
-  #   name: "Spare Zone C"
-  #   pixels:
-  #     start: 50
-  #     stop: 75
-  #   source:
-  #     room: "some_other_room"
-  #   gradient:
-  #     - { temp_f: 60, rgb: [0, 0, 255] }
-  #     - { temp_f: 90, rgb: [255, 0, 0] }
-
-
-  # ── Zone B: (spare — pixels 25–49) ─────────────────────────────────────────
-  # Example: set schedule countdown, network health, etc.
-  #
-  # - id: zone_b_spare
-  #   name: "Spare Zone B"
-  #   pixels:
-  #     start: 25
-  #     stop: 50
-  #   source:
-  #     room: ""
-  #   gradient:
-  #     - { temp_f: 0,  rgb: [0, 255, 0] }
-  #     - { temp_f: 100, rgb: [255, 0, 0] }
-
-
-  # ── Zone A: (spare — pixels 0–24) ──────────────────────────────────────────
-  #
-  # - id: zone_a_spare
-  #   name: "Spare Zone A"
-  #   pixels:
-  #     start: 0
-  #     stop: 25
-  #   source:
-  #     room: ""
-  #   gradient:
-  #     - { temp_f: 0,  rgb: [0, 0, 255] }
-  #     - { temp_f: 100, rgb: [255, 0, 0] }
+  - id: foh_temp
+    name: "FOH Temperature"
+    pixels:
+      start: 175
+      stop: 200     # exclusive
+    source:
+      type: mqtt_temperature
+      room: "${FOH_SENSOR_ROOM}"
+    gradient:
+      - { temp_f: 60, rgb: [  0,  50, 255] }
+      - { temp_f: 65, rgb: [  0, 200, 200] }
+      - { temp_f: 72, rgb: [  0, 200,   0] }
+      - { temp_f: 78, rgb: [220, 220,   0] }
+      - { temp_f: 85, rgb: [255, 100,   0] }
+      - { temp_f: 92, rgb: [255,   0,   0] }
