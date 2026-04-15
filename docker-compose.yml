@@ -215,6 +215,24 @@ services:
     depends_on:
       - govee2mqtt
 
+  wled-bridge:
+    build:
+      context: ./services/wled-bridge
+      dockerfile: Dockerfile
+    container_name: wled-bridge
+    restart: unless-stopped
+    environment:
+      - BROKER=mosquitto
+      - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
+      - WLED_DEVICE_NAME=${WLED_DEVICE_NAME:-wled}
+      - TENT_SENSOR_ROOM=${TENT_SENSOR_ROOM:-tent}
+      - TZ=${TZ}
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
+      - ble-decoder
+
   dpx-guest-alert-button:
     build:
       context: ./services/dpx-guest-alert-button

@@ -1,0 +1,84 @@
+# ================================================================================
+# WLED BRIDGE - ZONE CONFIGURATION
+# ================================================================================
+# Defines pixel zones on the WLED ropelight and what data source drives each zone.
+#
+# Pixel map (100px ropelight):
+#   px  0– 24  →  Zone A  (spare / future)
+#   px 25– 49  →  Zone B  (spare / future)
+#   px 50– 74  →  Zone C  (spare / future)
+#   px 75– 99  →  Zone D  = tent_temp  ← active
+#
+# To add a zone: copy a commented example below, uncomment it, set pixels/source/gradient.
+# Env vars in ${VAR} format are expanded at startup.
+# ================================================================================
+
+wled:
+  device_name: "${WLED_DEVICE_NAME}"  # Must match WLED Config → MQTT → Device name
+  led_count: 100
+
+zones:
+
+  # ── Zone D: Tent Temperature (pixels 75–99) ─────────────────────────────────
+  - id: tent_temp
+    name: "Tent Temperature"
+    pixels:
+      start: 75
+      stop: 100   # exclusive (WLED convention — last pixel controlled is 99)
+    source:
+      # Room name as it appears in MQTT topic segment 4:
+      #   {site}/dpx_ops_decoder/{gw}/{ROOM}/{device}/{mac}/temperature
+      # Must match the room assigned to the sensor in the Govee app / device-overrides.json
+      room: "${TENT_SENSOR_ROOM}"
+    gradient:
+      # Linear interpolation between stops. Values outside range clamp to nearest end.
+      - { temp_f: 60, rgb: [  0,  50, 255] }   # Blue   — cold
+      - { temp_f: 65, rgb: [  0, 200, 200] }   # Cyan
+      - { temp_f: 72, rgb: [  0, 200,   0] }   # Green  — comfortable
+      - { temp_f: 78, rgb: [220, 220,   0] }   # Yellow — warm
+      - { temp_f: 85, rgb: [255, 100,   0] }   # Orange — hot
+      - { temp_f: 92, rgb: [255,   0,   0] }   # Red    — danger
+
+
+  # ── Zone C: (spare — pixels 50–74) ─────────────────────────────────────────
+  # Example: another sensor room, or a solid status color driven by MQTT state
+  #
+  # - id: zone_c_spare
+  #   name: "Spare Zone C"
+  #   pixels:
+  #     start: 50
+  #     stop: 75
+  #   source:
+  #     room: "some_other_room"
+  #   gradient:
+  #     - { temp_f: 60, rgb: [0, 0, 255] }
+  #     - { temp_f: 90, rgb: [255, 0, 0] }
+
+
+  # ── Zone B: (spare — pixels 25–49) ─────────────────────────────────────────
+  # Example: set schedule countdown, network health, etc.
+  #
+  # - id: zone_b_spare
+  #   name: "Spare Zone B"
+  #   pixels:
+  #     start: 25
+  #     stop: 50
+  #   source:
+  #     room: ""
+  #   gradient:
+  #     - { temp_f: 0,  rgb: [0, 255, 0] }
+  #     - { temp_f: 100, rgb: [255, 0, 0] }
+
+
+  # ── Zone A: (spare — pixels 0–24) ──────────────────────────────────────────
+  #
+  # - id: zone_a_spare
+  #   name: "Spare Zone A"
+  #   pixels:
+  #     start: 0
+  #     stop: 25
+  #   source:
+  #     room: ""
+  #   gradient:
+  #     - { temp_f: 0,  rgb: [0, 0, 255] }
+  #     - { temp_f: 100, rgb: [255, 0, 0] }
