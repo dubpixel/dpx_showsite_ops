@@ -1186,11 +1186,11 @@ case "$1" in
       fi
     done
 
-    # Load WLED device name from .env (fall back to 'wled')
-    WLED_DEVICE=$(grep -E '^WLED_DEVICE_NAME=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    # Load WLED device topic from .env (fall back to 'wled')
+    WLED_DEVICE=$(grep -E '^WLED_DEVICE_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
     WLED_DEVICE="${WLED_DEVICE:-wled}"
 
-    TOPIC="wled/${WLED_DEVICE}/api"
+    TOPIC="${WLED_DEVICE}/api"
     PAYLOAD="{\"seg\":[{\"start\":${START},\"stop\":${STOP},\"col\":[[${R},${G},${B}]],\"fx\":0,\"on\":true}]}"
 
     echo "Device:  $WLED_DEVICE"
@@ -1206,9 +1206,9 @@ case "$1" in
 
   wled-off)
     # Turn off all pixels (brightness 0, keeps segments intact)
-    WLED_DEVICE=$(grep -E '^WLED_DEVICE_NAME=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    WLED_DEVICE=$(grep -E '^WLED_DEVICE_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
     WLED_DEVICE="${WLED_DEVICE:-wled}"
-    TOPIC="wled/${WLED_DEVICE}/api"
+    TOPIC="${WLED_DEVICE}/api"
     mosquitto_pub -h localhost -p 1883 -t "$TOPIC" -m '{"on":false}'
     echo "✓ WLED off (wled/${WLED_DEVICE}/api)"
     ;;

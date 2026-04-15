@@ -402,7 +402,7 @@ Tent sensor BLE → ESP32 → MQTT raw → ble-decoder
 
 - **Zone config**: `services/wled-bridge/config.yaml` — zones, pixel ranges, gradient stops
 - **Env vars** (in `.env`):
-  - `WLED_DEVICE_NAME` — must match WLED Config → Sync Interfaces → MQTT → Device name
+  - `WLED_DEVICE_TOPIC` — full MQTT base topic as set in WLED Config → Sync Interfaces → MQTT → Device topic (e.g. `coachella_26/wled-rambo`). Code appends `/api` for JSON commands.
   - `TENT_SENSOR_ROOM` — room name assigned to the tent sensor in Govee app / device-overrides.json
 
 #### WLED Setup (one-time)
@@ -410,7 +410,8 @@ Tent sensor BLE → ESP32 → MQTT raw → ble-decoder
 WLED firmware must have MQTT enabled:
 - WLED web UI → Config → Sync Interfaces → MQTT
 - Server IP: `192.168.109.69` (stack VM, VLAN 109), Port: `1883`
-- Device name: must match `WLED_DEVICE_NAME` env var
+- Device topic: `coachella_26/wled-rambo`
+- Group topic: `coachella_26/all`
 
 #### Adding a Zone
 

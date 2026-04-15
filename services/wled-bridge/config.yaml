@@ -14,7 +14,10 @@
 # ================================================================================
 
 wled:
-  device_name: "${WLED_DEVICE_NAME}"  # Must match WLED Config → MQTT → Device name
+  # Full MQTT base topic as set in WLED Config → Sync Interfaces → MQTT → Device topic
+  # WLED subscribes to {device_topic}/api for JSON segment commands
+  # Example: coachella_26/wled-rambo  →  publishes to coachella_26/wled-rambo/api
+  device_topic: "${WLED_DEVICE_TOPIC}"
   led_count: 100
 
 zones:

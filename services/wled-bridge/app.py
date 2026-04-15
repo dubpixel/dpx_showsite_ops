@@ -57,7 +57,7 @@ log = logging.getLogger(__name__)
 BROKER = os.getenv("BROKER", "localhost")
 PORT = int(os.getenv("MQTT_PORT", "1883"))
 SHOWSITE = os.getenv("SHOWSITE_NAME", "demo_showsite")
-WLED_DEVICE_NAME = os.getenv("WLED_DEVICE_NAME", "wled")
+WLED_DEVICE_TOPIC = os.getenv("WLED_DEVICE_TOPIC", "wled")  # full MQTT base topic, e.g. coachella_26/wled-rambo
 
 CONFIG_FILE = Path(__file__).parent / "config.yaml"
 
@@ -196,7 +196,7 @@ class ZoneState:
 class WLEDBridge:
     def __init__(self, config: dict):
         self.config = config
-        self.wled_name = config["wled"]["device_name"]
+        self.wled_device_topic = config["wled"]["device_topic"]
         self.zones = config.get("zones", [])
         self.zone_states = {
             z["id"]: ZoneState(z["id"], z["name"]) for z in self.zones
@@ -212,7 +212,8 @@ class WLEDBridge:
 
         # MQTT topic to subscribe for temperature data
         self.temp_topic = f"{SHOWSITE}/dpx_ops_decoder/+/+/+/+/temperature"
-        self.wled_topic = f"wled/{self.wled_name}/api"
+        # WLED subscribes to {device_topic}/api for JSON segment commands
+        self.wled_topic = f"{self.wled_device_topic}/api"
 
         self.client = mqtt.Client(client_id="dpx_wled_bridge")
         self.client.on_connect = self._on_connect
@@ -224,7 +225,7 @@ class WLEDBridge:
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             log.info(f"Connected to MQTT broker at {BROKER}:{PORT}")
-            log.info(f"WLED device: {self.wled_name}  →  topic: {self.wled_topic}")
+            log.info(f"WLED device topic: {self.wled_device_topic}  →  api: {self.wled_topic}")
             client.subscribe(self.temp_topic)
             log.info(f"Subscribed: {self.temp_topic}")
             log.info(f"Active zones: {[z['id'] for z in self.zones]}")
@@ -313,7 +314,7 @@ def main():
 
     zones = config.get("zones", [])
     log.info(f"Showsite:    {SHOWSITE}")
-    log.info(f"WLED device: {config['wled']['device_name']}")
+    log.info(f"WLED topic:  {config['wled']['device_topic']}/api")
     log.info(f"LED count:   {config['wled'].get('led_count', 100)}")
     log.info(f"Zones:       {len(zones)}")
     for z in zones:

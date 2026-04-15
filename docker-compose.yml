@@ -224,7 +224,7 @@ services:
     environment:
       - BROKER=mosquitto
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
-      - WLED_DEVICE_NAME=${WLED_DEVICE_NAME:-wled}
+      - WLED_DEVICE_TOPIC=${WLED_DEVICE_TOPIC:-wled}
       - TENT_SENSOR_ROOM=${TENT_SENSOR_ROOM:-tent}
       - TZ=${TZ}
     networks:
