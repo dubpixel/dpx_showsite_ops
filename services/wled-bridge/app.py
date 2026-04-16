@@ -148,6 +148,7 @@ def build_wled_segment_cmd(zone: dict, rgb: list) -> str:
     payload = {
         "seg": [
             {
+                "id":    zone["segment_id"],
                 "start": zone["pixels"]["start"],
                 "stop":  zone["pixels"]["stop"],
                 "col":   [rgb, [0, 0, 0], [0, 0, 0]],  # primary, secondary, tertiary

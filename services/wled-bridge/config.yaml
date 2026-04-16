@@ -34,6 +34,7 @@ zones:
   # Lamp colors from config: relay 1=RED, 2=YELLOW, 3=GREEN, 4=BLUE
 
   - id: btn_blue
+    segment_id: 0
     name: "Blue Button Status"
     pixels:
       start: 0
@@ -45,6 +46,7 @@ zones:
     color_off: [0, 0, 0]
 
   - id: btn_green
+    segment_id: 1
     name: "Green Button Status"
     pixels:
       start: 12
@@ -56,6 +58,7 @@ zones:
     color_off: [0, 0, 0]
 
   - id: btn_orange
+    segment_id: 2
     name: "Orange/Yellow Button Status"
     pixels:
       start: 24
@@ -67,6 +70,7 @@ zones:
     color_off: [0, 0, 0]
 
   - id: btn_red
+    segment_id: 3
     name: "Red Button Status"
     pixels:
       start: 36
@@ -81,6 +85,7 @@ zones:
   # ── Temperature Zones (pixels 48–74) ────────────────────────────────────────
 
   - id: tent_temp
+    segment_id: 4
     name: "Tent Temperature"
     pixels:
       start: 48
@@ -97,6 +102,7 @@ zones:
       - { temp_f: 92, rgb: [255,   0,   0] }   # Red    — danger
 
   - id: foh_temp
+    segment_id: 5
     name: "FOH Temperature"
     pixels:
       start: 62
