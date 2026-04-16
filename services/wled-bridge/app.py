@@ -488,6 +488,14 @@ class WLEDBridge:
             self._text_clear_timer.cancel()
             self._text_clear_timer = None
 
+        # Activate text preset first if configured — loads correct m12/rotate etc.
+        text_preset = self.matrix_cfg.get("text_preset")
+        if text_preset:
+            self.client.publish(
+                self.matrix_api_topic,
+                json.dumps({"ps": int(text_preset)}),
+            )
+
         self.client.publish(
             self.matrix_api_topic,
             build_wled_text_cmd(text, led_count, color, speed, m12),

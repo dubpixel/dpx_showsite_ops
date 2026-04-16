@@ -51,6 +51,7 @@ matrix:
   default_speed: 255              # scroll speed 0–255
   default_ttl: 30                 # seconds before auto-clear
   udp_port: 7777                  # set to 0 to disable UDP listener
+  text_preset: 3                  # WLED preset to activate before each text message (sets m12/rotate correctly)
 
 
 zones:
