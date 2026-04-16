@@ -119,10 +119,7 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "signs": list(SIGNS.values())},
-    )
+    return templates.TemplateResponse(request, "index.html", {"signs": list(SIGNS.values())})
 
 
 @app.post("/blast", response_class=HTMLResponse)
