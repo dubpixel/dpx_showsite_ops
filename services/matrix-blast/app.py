@@ -250,3 +250,28 @@ async def blast(
 @app.get("/health")
 async def health():
     return {"status": "ok", "signs": list(SIGNS.keys())}
+
+
+@app.get("/status")
+async def status():
+    out = {}
+    for sign_id, sign in SIGNS.items():
+        state = _state.get(sign_id)
+        if not state or not state.active:
+            out[sign_id] = {"name": sign["name"], "active": None, "queue": []}
+            continue
+        a = state.active
+        remaining = a.ttl - (time.monotonic() - a.sent_at)
+        out[sign_id] = {
+            "name":  sign["name"],
+            "active": {
+                "text":          a.text,
+                "ttl":           a.ttl,
+                "elapsed_s":     round(time.monotonic() - a.sent_at, 1),
+                "remaining_s":   round(max(0.0, remaining), 1),
+                "locked":        a.lock_remaining() > 0,
+                "lock_remaining_s": round(a.lock_remaining(), 1),
+            },
+            "queue": [{"pos": i + 1, "text": p.text, "ttl": p.ttl} for i, p in enumerate(state.queue)],
+        }
+    return out
