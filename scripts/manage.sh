@@ -1300,12 +1300,54 @@ case "$1" in
     echo "✓ Sent"
     ;;
 
-  web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
-            echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
-            echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
-            echo "govee2mqtt: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8056"
-            echo "Set-Schedule: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8000"
-            echo "Button Health: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8080/health"
+  # ── Matrix Blast web UI ────────────────────────────────────────────────────
+
+  matrix-blast-up)
+    echo "Starting matrix-blast web UI..."
+    cd "$REPO_ROOT" && docker compose up -d matrix-blast
+    echo ""
+    echo "✓ matrix-blast started"
+    SERVER_IP=$(ip addr show eth0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+    echo "Open: http://${SERVER_IP:-<server_ip>}:${MATRIX_BLAST_PORT:-8090}"
+    ;;
+
+  matrix-blast-down)
+    cd "$REPO_ROOT" && docker compose stop matrix-blast
+    echo "✓ matrix-blast stopped"
+    ;;
+
+  matrix-blast-restart)
+    cd "$REPO_ROOT" && docker compose restart matrix-blast
+    echo "✓ matrix-blast restarted"
+    echo "View logs with: iot matrix-blast-logs"
+    ;;
+
+  matrix-blast-rebuild)
+    echo "Rebuilding matrix-blast container..."
+    cd "$REPO_ROOT" && docker compose build matrix-blast
+    echo ""
+    cd "$REPO_ROOT" && docker compose up -d matrix-blast
+    echo "✓ matrix-blast rebuilt and restarted"
+    echo "View logs with: iot matrix-blast-logs"
+    ;;
+
+  matrix-blast-logs)
+    cd "$REPO_ROOT" && docker compose logs --tail="${2:-30}" matrix-blast
+    ;;
+
+  matrix-blast-follow)
+    cd "$REPO_ROOT" && docker compose logs -f matrix-blast
+    ;;
+
+  web)
+            _IP=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            echo "Grafana:       http://${_IP}:3000"
+            echo "InfluxDB:      http://${_IP}:8086"
+            echo "MQTT:          ${_IP}:1883"
+            echo "govee2mqtt:    http://${_IP}:8056"
+            echo "Set-Schedule:  http://${_IP}:${SCHEDULE_PORT:-8000}"
+            echo "Button Health: http://${_IP}:${BUTTON_HEALTH_PORT:-8080}/health"
+            echo "Matrix Blast:  http://${_IP}:${MATRIX_BLAST_PORT:-8090}"
             ;;
   *)
     # Read version from VERSION file
@@ -1443,6 +1485,16 @@ case "$1" in
     echo "    matrix-udp <msg>           Send text via UDP (no MQTT needed, port 7777)"
     echo "                               example:  iot matrix-udp \"SOUND CHECK\""
     echo "                               from net: echo \"TEXT\" | nc -u <server_ip> 7777"
+    echo ""
+    echo "  MATRIX BLAST (Browser UI — type messages from any device on the network)"
+    echo "    matrix-blast-up            Start web UI on port 8090"
+    echo "    matrix-blast-down          Stop web UI"
+    echo "    matrix-blast-restart       Restart web UI (picks up .env changes)"
+    echo "    matrix-blast-rebuild       Rebuild container image and restart"
+    echo "    matrix-blast-logs [n]      View logs (default: 30 lines)"
+    echo "    matrix-blast-follow        Stream logs in real-time"
+    echo "    Signs config:              services/matrix-blast/config.yaml"
+    echo "                               Add entries here for additional signs"
     echo ""
     echo "  NTP TIME SERVER"
     echo "    ntp-start (ntp-up)     Start NTP server (accessible on all network interfaces)"

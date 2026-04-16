@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matrix Blast</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #ffdc00;
+      margin-bottom: 1.75rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 0.35rem;
+    }
+
+    .field { margin-bottom: 1.25rem; }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 0.6rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: #ffdc00;
+    }
+
+    textarea {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 1.2rem;
+      padding: 0.75rem;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea:focus { border-color: #ffdc00; }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #ffdc00;
+      cursor: pointer;
+    }
+
+    .options-toggle {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .options-toggle:hover { color: #999; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .options-grid .field { margin-bottom: 0; }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 3px;
+      border: 1px solid #333;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .speed-row input[type="range"] { flex: 1; }
+    .speed-val {
+      font-size: 0.85rem;
+      color: #ffdc00;
+      width: 2.5rem;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .blast-btn {
+      width: 100%;
+      background: #ffdc00;
+      border: none;
+      border-radius: 5px;
+      color: #111;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 0.15em;
+      padding: 0.85rem;
+      text-transform: uppercase;
+      transition: background 0.1s, opacity 0.1s;
+      margin-top: 0.5rem;
+    }
+    .blast-btn:hover  { background: #ffe933; }
+    .blast-btn:active { opacity: 0.8; }
+    .blast-btn.htmx-request { opacity: 0.5; cursor: wait; }
+
+    #status {
+      min-height: 1.5rem;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    .status-ok  { color: #4caf50; }
+    .status-err { color: #f44336; }
+
+    {% if signs | length <= 1 %}
+    .sign-field { display: none; }
+    {% endif %}
+  </style>
+</head>
+<body>
+  <div class="card" x-data="{
+    showOptions: false,
+    r: 255, g: 220, b: 0,
+    speed: 255,
+    swatchColor() { return `rgb(${this.r},${this.g},${this.b})`; }
+  }">
+    <h1>&#9632; Matrix Blast</h1>
+
+    <form
+      hx-post="/blast"
+      hx-target="#status"
+      hx-swap="innerHTML"
+      hx-on::after-request="setTimeout(() => document.getElementById('status').innerHTML = '', 4000)"
+    >
+      {# Sign selector — hidden when only one sign #}
+      <div class="field sign-field">
+        <label for="sign_id">Sign</label>
+        <select name="sign_id" id="sign_id">
+          {% for sign in signs %}
+          <option value="{{ sign.id }}">{{ sign.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {# Single-sign hidden input #}
+      {% if signs | length == 1 %}
+      <input type="hidden" name="sign_id" value="{{ signs[0].id }}">
+      {% endif %}
+
+      <div class="field">
+        <label for="text">Message</label>
+        <textarea name="text" id="text" placeholder="TYPE YOUR MESSAGE" autocomplete="off" autofocus></textarea>
+      </div>
+
+      {# Options toggle #}
+      <button type="button" class="options-toggle" @click="showOptions = !showOptions">
+        <span x-text="showOptions ? '▲' : '▼'"></span>
+        Options
+      </button>
+
+      <div x-show="showOptions" x-transition>
+        {# Color #}
+        <div class="field">
+          <label>
+            <span class="color-swatch" :style="`background:${swatchColor()}`"></span>
+            Color
+          </label>
+          <div class="options-grid" style="margin-bottom:0">
+            <div class="field">
+              <label>R</label>
+              <input type="number" name="r" min="0" max="255" x-model.number="r">
+            </div>
+            <div class="field">
+              <label>G</label>
+              <input type="number" name="g" min="0" max="255" x-model.number="g">
+            </div>
+            <div class="field">
+              <label>B</label>
+              <input type="number" name="b" min="0" max="255" x-model.number="b">
+            </div>
+          </div>
+        </div>
+
+        {# Speed #}
+        <div class="field">
+          <label>Speed</label>
+          <div class="speed-row">
+            <input type="range" name="speed" min="0" max="255" x-model.number="speed">
+            <span class="speed-val" x-text="speed"></span>
+          </div>
+        </div>
+
+        {# TTL #}
+        <div class="field">
+          <label>TTL (seconds)</label>
+          <input type="number" name="ttl" min="1" max="3600" value="30">
+        </div>
+      </div>
+
+      <button type="submit" class="blast-btn">Blast It</button>
+    </form>
+
+    <div id="status"></div>
+  </div>
+</body>
+</html>

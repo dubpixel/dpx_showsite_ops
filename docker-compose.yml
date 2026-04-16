@@ -240,6 +240,23 @@ services:
       - mosquitto
       - ble-decoder
 
+  matrix-blast:
+    build:
+      context: ./services/matrix-blast
+      dockerfile: Dockerfile
+    container_name: matrix-blast
+    restart: unless-stopped
+    ports:
+      - "${MATRIX_BLAST_PORT:-8090}:8090"
+    environment:
+      - BROKER=mosquitto
+      - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
+      - TZ=${TZ}
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
+
   dpx-guest-alert-button:
     build:
       context: ./services/dpx-guest-alert-button
