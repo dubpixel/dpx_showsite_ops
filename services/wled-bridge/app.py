@@ -432,13 +432,26 @@ class WLEDBridge:
             "DOORS OPEN"
             {"text": "...", "color": [R, G, B], "speed": 0-255, "ttl": seconds}
 
-        Returns (text, color, speed, ttl) using matrix config defaults for any
-        missing JSON fields.
+        Defaults: env vars (WLED_MATRIX_DEFAULT_SPEED / _COLOR / _TTL) override
+        config.yaml values — change them in .env + iot wled-restart, no rebuild needed.
+
+        Returns (text, color, speed, ttl).
         """
         cfg = self.matrix_cfg
-        default_color = cfg.get("default_color", [255, 220, 0])
-        default_speed = int(cfg.get("default_speed", 100))
-        default_ttl   = int(cfg.get("default_ttl", 30))
+
+        # Env vars win over config.yaml defaults — restart is enough to apply changes
+        _cfg_color = cfg.get("default_color", [255, 220, 0])
+        _env_color = os.getenv("WLED_MATRIX_DEFAULT_COLOR", "")
+        if _env_color:
+            try:
+                default_color = [int(x) for x in _env_color.split(",")]
+            except ValueError:
+                default_color = _cfg_color
+        else:
+            default_color = _cfg_color
+
+        default_speed = int(os.getenv("WLED_MATRIX_DEFAULT_SPEED", str(cfg.get("default_speed", 255))))
+        default_ttl   = int(os.getenv("WLED_MATRIX_DEFAULT_TTL",   str(cfg.get("default_ttl",   30))))
 
         try:
             decoded = raw.decode().strip()
