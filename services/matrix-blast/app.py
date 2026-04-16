@@ -42,7 +42,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
 
 # ============================================================================
 # Configuration
@@ -175,9 +174,7 @@ async def _queue_worker() -> None:
             sign = SIGNS[sign_id]
 
             # Full TTL elapsed with nothing queued — restore a random idle preset
-            expired = state.active.is_expired()
-            log.debug(f"[queue_worker] sign={sign_id} expired={expired} queue={len(state.queue)} elapsed={round(time.monotonic() - state.active.sent_at, 1)}s ttl={state.active.ttl}s")
-            if expired and not state.queue:
+            if state.active.is_expired() and not state.queue:
                 log.info(f"[queue_worker] sign={sign_id} TTL expired, going idle")
                 state.active = None
                 api_topic = sign.get("api_topic")

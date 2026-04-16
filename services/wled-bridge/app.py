@@ -131,7 +131,7 @@ def interpolate_color(temp_f: float, gradient: list) -> list:
 # WLED Command Builder
 # ============================================================================
 
-def build_wled_text_cmd(text: str, led_count: int, color: list, speed: int) -> str:
+def build_wled_text_cmd(text: str, led_count: int, color: list, speed: int, rotate: int = 14) -> str:
     """
     Build a WLED JSON segment command that displays scrolling text (fx: 122).
 
@@ -160,6 +160,8 @@ def build_wled_text_cmd(text: str, led_count: int, color: list, speed: int) -> s
                 "n":     text,  # segment name = text to scroll
                 "on":    True,
                 "bri":   200,
+                "rotate": rotate,
+                "pal":   0,     # force Color 1 (no palette) so col is respected
             }
         ]
     }
@@ -459,20 +461,22 @@ class WLEDBridge:
             return None, default_color, default_speed, default_ttl
 
         try:
-            data = json.loads(decoded)
-            text  = str(data.get("text", "")).strip()
-            color = data.get("color", default_color)
-            speed = int(data.get("speed", default_speed))
-            ttl   = int(data.get("ttl", default_ttl))
+            data   = json.loads(decoded)
+            text   = str(data.get("text", "")).strip()
+            color  = data.get("color", default_color)
+            speed  = int(data.get("speed", default_speed))
+            ttl    = int(data.get("ttl", default_ttl))
+            rotate = int(data.get("rotate", 14))
         except (json.JSONDecodeError, TypeError):
-            text  = decoded
-            color = default_color
-            speed = default_speed
-            ttl   = default_ttl
+            text   = decoded
+            color  = default_color
+            speed  = default_speed
+            ttl    = default_ttl
+            rotate = 14
 
-        return text or None, color, speed, ttl
+        return text or None, color, speed, ttl, rotate
 
-    def _dispatch_matrix_text(self, text: str, color: list, speed: int, ttl: int):
+    def _dispatch_matrix_text(self, text: str, color: list, speed: int, ttl: int, rotate: int = 14):
         """
         Send scrolling text to the matrix and schedule a clear after TTL seconds.
         Called by both the MQTT handler and the UDP listener.
@@ -486,11 +490,11 @@ class WLEDBridge:
 
         self.client.publish(
             self.matrix_api_topic,
-            build_wled_text_cmd(text, led_count, color, speed),
+            build_wled_text_cmd(text, led_count, color, speed, rotate),
         )
         log.info(
             f"[matrix] text={text!r}  color=RGB{tuple(color)}  "
-            f"speed={speed}  ttl={ttl}s  →  {self.matrix_api_topic}"
+            f"speed={speed}  rotate={rotate}  ttl={ttl}s  →  {self.matrix_api_topic}"
         )
 
         self._text_clear_timer = Timer(ttl, self._clear_matrix)
@@ -499,11 +503,11 @@ class WLEDBridge:
 
     def _handle_matrix_text(self, msg):
         """Handle a matrix text message arriving via MQTT."""
-        text, color, speed, ttl = self._parse_text_payload(msg.payload)
+        text, color, speed, ttl, rotate = self._parse_text_payload(msg.payload)
         if not text:
             log.warning("[matrix] received empty text payload, ignoring")
             return
-        self._dispatch_matrix_text(text, color, speed, ttl)
+        self._dispatch_matrix_text(text, color, speed, ttl, rotate)
 
     def _clear_matrix(self):
         """Publish a blank (solid black) frame to the matrix after TTL expires."""
@@ -532,12 +536,12 @@ class WLEDBridge:
                     continue
                 except OSError:
                     break
-                text, color, speed, ttl = self._parse_text_payload(data)
+                text, color, speed, ttl, rotate = self._parse_text_payload(data)
                 if not text:
                     log.warning(f"[matrix] UDP empty payload from {addr}, ignoring")
                     continue
                 log.info(f"[matrix] UDP from {addr[0]}:{addr[1]}")
-                self._dispatch_matrix_text(text, color, speed, ttl)
+                self._dispatch_matrix_text(text, color, speed, ttl, rotate)
 
         self._udp_thread = Thread(target=_loop, name="matrix-udp", daemon=True)
         self._udp_thread.start()
