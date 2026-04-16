@@ -134,23 +134,33 @@ _PRESET_CACHE_TTL = 300  # re-fetch every 5 minutes
 
 
 async def _fetch_preset_ids(sign_id: str, wled_host: str) -> list[int]:
-    """Return list of preset IDs from WLED HTTP API, using a short-lived cache."""
+    """Return list of preset IDs from WLED HTTP API, using a short-lived cache.
+
+    Tries /json/presets first (WLED 0.14+), falls back to /presets.json.
+    """
     cached = _preset_cache.get(sign_id)
     if cached and (time.monotonic() - cached[0]) < _PRESET_CACHE_TTL:
         return cached[1]
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get(f"http://{wled_host}/json/presets")
-            resp.raise_for_status()
-            data = resp.json()
-        # Keys are preset IDs as strings; skip key "0" (WLED internal)
-        ids = [int(k) for k in data.keys() if k.isdigit() and k != "0"]
-        _preset_cache[sign_id] = (time.monotonic(), ids)
-        log.info(f"[presets] sign={sign_id} found {len(ids)} presets: {ids}")
-        return ids
-    except Exception as e:
-        log.warning(f"[presets] failed to fetch from {wled_host}: {e}")
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        data = None
+        for path in ("/json/presets", "/presets.json"):
+            try:
+                resp = await client.get(f"http://{wled_host}{path}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    log.info(f"[presets] sign={sign_id} fetched from {path}")
+                    break
+                log.debug(f"[presets] {path} → {resp.status_code}, trying next")
+            except Exception as e:
+                log.debug(f"[presets] {path} error: {e}")
+    if data is None:
+        log.warning(f"[presets] sign={sign_id} could not fetch presets from {wled_host}")
         return cached[1] if cached else []
+    # Keys are preset IDs as strings; skip key "0" (WLED internal placeholder)
+    ids = [int(k) for k in data.keys() if k.isdigit() and k != "0"]
+    _preset_cache[sign_id] = (time.monotonic(), ids)
+    log.info(f"[presets] sign={sign_id} found {len(ids)} presets: {ids}")
+    return ids
 
 
 async def _queue_worker() -> None:
