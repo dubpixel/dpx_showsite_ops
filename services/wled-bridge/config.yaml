@@ -11,7 +11,7 @@
 #   px 37– 48  →  btn_red     Button status (12px)
 #   px 49– 62  →  tent_temp   Tent temperature (14px)
 #   px 63– 75  →  foh_temp    FOH temperature (13px)
-#   px 76– 99  →  dark        Unused — forced black on startup (static)
+#   px 76–100  →  dark        Unused — forced black on startup (static)
 #
 # Source types:
 #   mqtt_temperature  — subscribes to BLE decoder temp topics, filters by room
@@ -127,7 +127,7 @@ zones:
     name: "Unused LEDs (dark)"
     pixels:
       start: 76
-      stop: 100     # exclusive — covers rest of strip
+      stop: 101     # exclusive — strip is 0-100 (101 total incl. fake px 0)
     source:
       type: static
     color: [0, 0, 0]
