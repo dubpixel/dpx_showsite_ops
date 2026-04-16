@@ -13,11 +13,14 @@
 # Signs are defined in config.yaml — add entries there for each new matrix.
 # ================================================================================
 
+import asyncio
 import json
 import logging
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -69,6 +72,75 @@ config = load_config()
 SIGNS = {s["id"]: s for s in config.get("signs", [])}
 
 # ============================================================================
+# Per-sign message queue
+#
+# Active message is protected for the first 50% of its TTL.  Any blasts that
+# arrive during that window are enqueued and dispatched automatically once the
+# lock expires, in order.
+# ============================================================================
+
+@dataclass
+class ActiveMessage:
+    text:    str
+    sent_at: float
+    ttl:     int
+
+    def lock_expires_at(self) -> float:
+        return self.sent_at + self.ttl * 0.5
+
+    def lock_remaining(self) -> float:
+        return max(0.0, self.lock_expires_at() - time.monotonic())
+
+
+@dataclass
+class PendingBlast:
+    text:    str
+    payload: str   # pre-serialised JSON
+    ttl:     int
+
+
+@dataclass
+class SignState:
+    active: ActiveMessage | None = None
+    queue:  list[PendingBlast]   = field(default_factory=list)
+
+
+# sign_id → SignState
+_state: dict[str, SignState] = {}
+
+
+def _sign_state(sign_id: str) -> SignState:
+    if sign_id not in _state:
+        _state[sign_id] = SignState()
+    return _state[sign_id]
+
+
+def _do_publish(sign: dict, blast: PendingBlast) -> None:
+    """Fire-and-forget MQTT publish; raises on failure."""
+    result = mqtt_client.publish(sign["topic"], blast.payload, qos=0)
+    result.wait_for_publish(timeout=3.0)
+    log.info(f"[blast] sign={sign['id']} text={blast.text!r} → {sign['topic']}")
+
+
+async def _queue_worker() -> None:
+    """Background task: drain queues as active-message locks expire."""
+    while True:
+        await asyncio.sleep(0.5)
+        for sign_id, state in _state.items():
+            if not state.active or not state.queue:
+                continue
+            if state.active.lock_remaining() > 0:
+                continue
+            # Lock expired — send next queued message
+            nxt = state.queue.pop(0)
+            sign = SIGNS[sign_id]
+            try:
+                _do_publish(sign, nxt)
+                state.active = ActiveMessage(text=nxt.text, sent_at=time.monotonic(), ttl=nxt.ttl)
+            except Exception as e:
+                log.error(f"[queue_worker] publish failed for sign={sign_id}: {e}")
+
+# ============================================================================
 # MQTT client (persistent connection, shared across requests)
 # ============================================================================
 
@@ -108,7 +180,9 @@ def mqtt_disconnect():
 async def lifespan(app: FastAPI):
     log.info(f"Matrix Blast starting — signs: {list(SIGNS.keys())}")
     mqtt_connect()
+    worker = asyncio.create_task(_queue_worker())
     yield
+    worker.cancel()
     mqtt_disconnect()
     log.info("Matrix Blast stopped")
 
@@ -146,17 +220,27 @@ async def blast(
     if from_name:
         text = f"{from_name}: {text}"
 
+    ttl = max(1, ttl)
     payload = json.dumps({
         "text":  text,
         "color": [max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))],
         "speed": max(0, min(255, speed)),
-        "ttl":   max(1, ttl),
+        "ttl":   ttl,
     })
+    blast = PendingBlast(text=text, payload=payload, ttl=ttl)
+    state = _sign_state(sign_id)
 
+    # If the sign is locked, queue and return position
+    if state.active and state.active.lock_remaining() > 0:
+        state.queue.append(blast)
+        pos = len(state.queue)
+        log.info(f"[blast] queued pos={pos} sign={sign_id} text={text!r}")
+        return HTMLResponse(f'<span class="status-ok">&#9654; Queued (#{pos})</span>')
+
+    # Otherwise send immediately
     try:
-        result = mqtt_client.publish(sign["topic"], payload, qos=0)
-        result.wait_for_publish(timeout=3.0)
-        log.info(f"[blast] sign={sign_id} text={text!r} from={from_name!r} → {sign['topic']}")
+        _do_publish(sign, blast)
+        state.active = ActiveMessage(text=text, sent_at=time.monotonic(), ttl=ttl)
         return HTMLResponse(f'<span class="status-ok">✓ Sent to {sign["name"]}</span>')
     except Exception as e:
         log.error(f"[blast] MQTT publish failed: {e}")
