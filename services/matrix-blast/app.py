@@ -17,11 +17,14 @@ import asyncio
 import json
 import logging
 import os
+import random
 import sys
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import httpx
 
 import paho.mqtt.client as mqtt
 import yaml
@@ -91,6 +94,9 @@ class ActiveMessage:
     def lock_remaining(self) -> float:
         return max(0.0, self.lock_expires_at() - time.monotonic())
 
+    def is_expired(self) -> bool:
+        return time.monotonic() >= self.sent_at + self.ttl
+
 
 @dataclass
 class PendingBlast:
@@ -122,18 +128,64 @@ def _do_publish(sign: dict, blast: PendingBlast) -> None:
     log.info(f"[blast] sign={sign['id']} text={blast.text!r} → {sign['topic']}")
 
 
+# sign_id → (fetched_at, [preset_ids])
+_preset_cache: dict[str, tuple[float, list[int]]] = {}
+_PRESET_CACHE_TTL = 300  # re-fetch every 5 minutes
+
+
+async def _fetch_preset_ids(sign_id: str, wled_host: str) -> list[int]:
+    """Return list of preset IDs from WLED HTTP API, using a short-lived cache."""
+    cached = _preset_cache.get(sign_id)
+    if cached and (time.monotonic() - cached[0]) < _PRESET_CACHE_TTL:
+        return cached[1]
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"http://{wled_host}/json/presets")
+            resp.raise_for_status()
+            data = resp.json()
+        # Keys are preset IDs as strings; skip key "0" (WLED internal)
+        ids = [int(k) for k in data.keys() if k.isdigit() and k != "0"]
+        _preset_cache[sign_id] = (time.monotonic(), ids)
+        log.info(f"[presets] sign={sign_id} found {len(ids)} presets: {ids}")
+        return ids
+    except Exception as e:
+        log.warning(f"[presets] failed to fetch from {wled_host}: {e}")
+        return cached[1] if cached else []
+
+
 async def _queue_worker() -> None:
-    """Background task: drain queues as active-message locks expire."""
+    """Background task: drain queues and restore idle preset when sign goes quiet."""
     while True:
         await asyncio.sleep(0.5)
         for sign_id, state in _state.items():
-            if not state.active or not state.queue:
+            if not state.active:
                 continue
-            if state.active.lock_remaining() > 0:
-                continue
-            # Lock expired — send next queued message
-            nxt = state.queue.pop(0)
+
             sign = SIGNS[sign_id]
+
+            # Full TTL elapsed with nothing queued — restore a random idle preset
+            if state.active.is_expired() and not state.queue:
+                state.active = None
+                api_topic = sign.get("api_topic")
+                wled_host = sign.get("wled_host")
+                if api_topic and wled_host:
+                    try:
+                        ids = await _fetch_preset_ids(sign_id, wled_host)
+                        if ids:
+                            preset = random.choice(ids)
+                            payload = json.dumps({"ps": preset})
+                            result = mqtt_client.publish(api_topic, payload, qos=0)
+                            result.wait_for_publish(timeout=3.0)
+                            log.info(f"[queue_worker] sign={sign_id} idle → preset {preset} (of {len(ids)})")
+                    except Exception as e:
+                        log.error(f"[queue_worker] idle preset failed for sign={sign_id}: {e}")
+                continue
+
+            # Lock expired with messages queued — send next
+            if state.active.lock_remaining() > 0 or not state.queue:
+                continue
+
+            nxt = state.queue.pop(0)
             try:
                 _do_publish(sign, nxt)
                 state.active = ActiveMessage(text=nxt.text, sent_at=time.monotonic(), ttl=nxt.ttl)

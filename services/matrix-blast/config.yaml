@@ -10,4 +10,6 @@ signs:
   - id: matrix
     name: "Main Matrix"
     topic: "${SHOWSITE_NAME}/wled/matrix/text"
+    api_topic: "${WLED_MATRIX_TOPIC}/api"
+    wled_host: "${WLED_MATRIX_HOST}"
     led_count: 170
