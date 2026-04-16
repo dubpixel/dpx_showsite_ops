@@ -274,10 +274,11 @@ async def blast(
 
     ttl = max(1, ttl)
     payload = json.dumps({
-        "text":  text,
-        "color": [max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))],
-        "speed": max(0, min(255, speed)),
-        "ttl":   ttl,
+        "text":   text,
+        "color":  [max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))],
+        "speed":  max(0, min(255, speed)),
+        "ttl":    ttl,
+        "rotate": 14,
     })
     blast = PendingBlast(text=text, payload=payload, ttl=ttl)
     state = _sign_state(sign_id)
