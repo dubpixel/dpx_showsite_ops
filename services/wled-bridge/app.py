@@ -491,10 +491,13 @@ class WLEDBridge:
         # Activate text preset first if configured — loads correct m12/rotate etc.
         text_preset = self.matrix_cfg.get("text_preset")
         if text_preset:
+            log.info(f"[matrix] activating text preset {text_preset} → {self.matrix_api_topic}")
             self.client.publish(
                 self.matrix_api_topic,
                 json.dumps({"ps": int(text_preset)}),
             )
+        else:
+            log.warning("[matrix] no text_preset configured — m12/rotate may be wrong after screensaver")
 
         self.client.publish(
             self.matrix_api_topic,
