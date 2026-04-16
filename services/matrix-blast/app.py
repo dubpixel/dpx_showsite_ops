@@ -252,11 +252,21 @@ async def lifespan(app: FastAPI):
         log.info(f"  sign={sign['id']} api_topic={sign.get('api_topic')!r} wled_host={sign.get('wled_host')!r}")
     mqtt_connect()
     worker = asyncio.create_task(_queue_worker())
-    # Warm the preset cache at startup so we know immediately if the host is reachable
+    # Warm preset cache and fire an initial idle preset on every sign at boot
     for sign_id, sign in SIGNS.items():
         wled_host = sign.get("wled_host")
-        if wled_host:
-            await _fetch_preset_ids(sign_id, wled_host)
+        api_topic = sign.get("api_topic")
+        if not (wled_host and api_topic):
+            continue
+        ids = await _fetch_preset_ids(sign_id, wled_host)
+        if ids:
+            preset = random.choice(ids)
+            try:
+                result = mqtt_client.publish(api_topic, json.dumps({"ps": preset}), qos=0)
+                result.wait_for_publish(timeout=3.0)
+                log.info(f"[startup] sign={sign_id} idle → preset {preset}")
+            except Exception as e:
+                log.error(f"[startup] idle preset failed for sign={sign_id}: {e}")
     yield
     worker.cancel()
     mqtt_disconnect()
