@@ -1105,6 +1105,114 @@ case "$1" in
     echo "Add 'clientlog' directive to enable detailed client logging"
     ;;
 
+  # ── WLED Bridge Service ────────────────────────────────────────────────────
+
+  wled-up)
+    echo "Starting WLED bridge..."
+    cd "$REPO_ROOT" && docker compose up -d wled-bridge
+    echo ""
+    echo "✓ WLED bridge started"
+    echo "View logs with: iot wled-logs"
+    ;;
+
+  wled-down)
+    echo "Stopping WLED bridge..."
+    cd "$REPO_ROOT" && docker compose stop wled-bridge
+    echo ""
+    echo "✓ WLED bridge stopped"
+    ;;
+
+  wled-restart)
+    echo "Restarting WLED bridge..."
+    cd "$REPO_ROOT" && docker compose restart wled-bridge
+    echo ""
+    echo "✓ WLED bridge restarted"
+    echo "View logs with: iot wled-logs"
+    ;;
+
+  wled-rebuild)
+    echo "Rebuilding WLED bridge container..."
+    cd "$REPO_ROOT" && docker compose build wled-bridge
+    echo ""
+    echo "✓ Build complete"
+    cd "$REPO_ROOT" && docker compose up -d wled-bridge
+    echo "✓ WLED bridge restarted with new image"
+    echo "View logs with: iot wled-logs"
+    ;;
+
+  wled-logs)
+    cd "$REPO_ROOT" && docker compose logs --tail="${2:-50}" wled-bridge
+    ;;
+
+  wled-follow)
+    cd "$REPO_ROOT" && docker compose logs -f wled-bridge
+    ;;
+
+  wled-shell)
+    cd "$REPO_ROOT" && docker compose exec wled-bridge /bin/bash
+    ;;
+
+  # ── WLED Direct Pixel Control ───────────────────────────────────────────────
+
+  wled-set)
+    # Publish a segment command directly to WLED via MQTT.
+    # Bypasses wled-bridge — useful for testing individual zones.
+    if [ -z "$6" ]; then
+      echo "Usage: iot wled-set <start> <stop> <r> <g> <b>"
+      echo ""
+      echo "  Sets pixels start through (stop-1) to the given RGB color."
+      echo "  stop is EXCLUSIVE — WLED convention (same as config.yaml)."
+      echo ""
+      echo "Examples:"
+      echo "  iot wled-set 75 100 255 0 0     # pixels 75-99 → red (hot)"
+      echo "  iot wled-set 75 100 0 50 255    # pixels 75-99 → blue (cold)"
+      echo "  iot wled-set 0 100 0 0 0        # blackout all 100px"
+      echo "  iot wled-set 0 25 0 200 0       # pixels 0-24 → green"
+      exit 1
+    fi
+
+    START="$2"
+    STOP="$3"
+    R="$4"
+    G="$5"
+    B="$6"
+
+    # Validate numeric args
+    for arg in "$START" "$STOP" "$R" "$G" "$B"; do
+      if ! [[ "$arg" =~ ^[0-9]+$ ]]; then
+        echo "✗ All arguments must be non-negative integers"
+        echo "Usage: iot wled-set <start> <stop> <r> <g> <b>"
+        exit 1
+      fi
+    done
+
+    # Load WLED device topic from .env (fall back to 'wled')
+    WLED_DEVICE=$(grep -E '^WLED_DEVICE_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    WLED_DEVICE="${WLED_DEVICE:-wled}"
+
+    TOPIC="${WLED_DEVICE}/api"
+    PAYLOAD="{\"seg\":[{\"start\":${START},\"stop\":${STOP},\"col\":[[${R},${G},${B}]],\"fx\":0,\"on\":true}]}"
+
+    echo "Device:  $WLED_DEVICE"
+    echo "Topic:   $TOPIC"
+    echo "Pixels:  ${START}–$((STOP - 1))  (${STOP} exclusive)"
+    echo "Color:   RGB(${R}, ${G}, ${B})"
+    echo "Payload: $PAYLOAD"
+    echo ""
+
+    mosquitto_pub -h localhost -p 1883 -t "$TOPIC" -m "$PAYLOAD"
+    echo "✓ Sent"
+    ;;
+
+  wled-off)
+    # Turn off all pixels (brightness 0, keeps segments intact)
+    WLED_DEVICE=$(grep -E '^WLED_DEVICE_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    WLED_DEVICE="${WLED_DEVICE:-wled}"
+    TOPIC="${WLED_DEVICE}/api"
+    mosquitto_pub -h localhost -p 1883 -t "$TOPIC" -m '{"on":false}'
+    echo "✓ WLED off (wled/${WLED_DEVICE}/api)"
+    ;;
+
   web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
             echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
             echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
@@ -1222,6 +1330,20 @@ case "$1" in
     echo "      (btn-reset)                colors: red, yellow, green, blue"
     echo "                                 example: iot button-reset red"
     echo "    button-metrics (btn-metrics) Show Prometheus metrics"
+    echo ""
+    echo "  WLED BRIDGE (Sensor → Ropelight zone controller)"
+    echo "    wled-up                Start wled-bridge service"
+    echo "    wled-down              Stop wled-bridge service"
+    echo "    wled-restart           Restart wled-bridge service"
+    echo "    wled-rebuild           Rebuild image and restart"
+    echo "    wled-logs [n]          View logs (default: 50 lines)"
+    echo "    wled-follow            Stream logs in real-time"
+    echo "    wled-shell             Open shell in container"
+    echo "    wled-set <s> <e> <r> <g> <b>  Set pixels s through e-1 to RGB color"
+    echo "                           stop is exclusive (WLED convention)"
+    echo "                           examples: iot wled-set 75 100 255 0 0  (red)"
+    echo "                                     iot wled-set 0 100 0 0 0    (blackout)"
+    echo "    wled-off               Turn off all WLED pixels"
     echo ""
     echo "  NTP TIME SERVER"
     echo "    ntp-start (ntp-up)     Start NTP server (accessible on all network interfaces)"

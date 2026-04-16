@@ -357,6 +357,77 @@ iot schedule-dev-logs [n] # View dev logs
 
 **See also**: [set-schedule-development.md](set-schedule-development.md) for detailed development workflow.
 
+### WLED Bridge
+
+**Phase 7 (Partial) - MQTT Sensor → WLED Ropelight** (✅ Deployed)
+
+#### Overview
+
+- **Purpose**: Maps MQTT sensor data to pixel zones on a WLED ropelight using WLED's native MQTT API
+- **Service**: `wled-bridge` (`services/wled-bridge/`)
+- **Initial feature**: Tent temperature sensor drives pixels 75–99 (last 25px of a 100px ropelight)
+- **Zone system**: Full 100px ropelight divided into 4 named zones for future status mapping
+
+#### Pixel Zone Map
+
+```
+px  0– 24  →  Zone A  (spare — future use)
+px 25– 49  →  Zone B  (spare — future use)
+px 50– 74  →  Zone C  (spare — future use)
+px 75– 99  →  Zone D  = Tent Temperature  (active)
+```
+
+#### Data Flow
+
+```
+Tent sensor BLE → ESP32 → MQTT raw → ble-decoder
+  → {SHOWSITE}/dpx_ops_decoder/{gw}/{room}/{device}/{mac}/temperature
+  → wled-bridge (subscribes, filters by room, interpolates color)
+  → wled/{WLED_DEVICE_NAME}/api  (WLED native MQTT segment API)
+  → WLED ropelight pixels 75–99
+```
+
+#### Temperature Color Gradient (Zone D)
+
+| °F   | Color  | RGB           |
+|------|--------|---------------|
+| ≤60  | Blue   | [0, 50, 255]  |
+| 65   | Cyan   | [0, 200, 200] |
+| 72   | Green  | [0, 200, 0]   |
+| 78   | Yellow | [220, 220, 0] |
+| 85   | Orange | [255, 100, 0] |
+| ≥92  | Red    | [255, 0, 0]   |
+
+#### Configuration
+
+- **Zone config**: `services/wled-bridge/config.yaml` — zones, pixel ranges, gradient stops
+- **Env vars** (in `.env`):
+  - `WLED_DEVICE_TOPIC` — full MQTT base topic as set in WLED Config → Sync Interfaces → MQTT → Device topic (e.g. `coachella_26/wled-rambo`). Code appends `/api` for JSON commands.
+  - `TENT_SENSOR_ROOM` — room name assigned to the tent sensor in Govee app / device-overrides.json
+
+#### WLED Setup (one-time)
+
+WLED firmware must have MQTT enabled:
+- WLED web UI → Config → Sync Interfaces → MQTT
+- Server IP: `192.168.109.69` (stack VM, VLAN 109), Port: `1883`
+- Device topic: `coachella_26/wled-rambo`
+- Group topic: `coachella_26/all`
+
+#### Adding a Zone
+
+1. Add a zone block to `services/wled-bridge/config.yaml` (use commented examples as templates)
+2. Set `pixels.start`/`stop`, `source.room`, and `gradient` stops
+3. `iot wled-rebuild` to pick up the new config
+
+#### Management
+
+```bash
+iot up wled-bridge          # Start service
+iot restart wled-bridge     # Restart
+iot logs wled-bridge [n]    # View logs
+iot rebuild wled-bridge     # Rebuild image and restart
+```
+
 ---
 
 ## DOCKER STACK
@@ -367,7 +438,7 @@ iot schedule-dev-logs [n] # View dev logs
 ~/dpx_govee_stack/              (local directory)
 ├── README.md                   ← Quick start guide
 ├── CHANGELOG.md                ← Version history
-├── VERSION                     ← Current version number (2.1.0)
+├── VERSION                     ← Current version number (2.2.0)
 ├── docker-compose.yml          ← Main stack definition
 ├── Dockerfile.ble-decoder      ← BLE decoder container build
 ├── requirements-ble-decoder.txt ← Python dependencies for BLE decoder

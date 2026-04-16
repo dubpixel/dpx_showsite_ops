@@ -16,6 +16,19 @@ All notable changes to dpx-showsite-ops.
 
 ---
 
+## [2.2.0] - 2026-04-15
+
+### Added
+- **WLED MQTT Bridge** (`services/wled-bridge/`) — new service mapping MQTT sensor data to pixel zones on a WLED ropelight via WLED's native MQTT API
+  - Tent temperature sensor drives last 25 pixels (75–99) of a 100px ropelight
+  - Temperature → RGB color via configurable linear gradient (blue=cold, green=comfort, red=hot)
+  - Extensible zone system: full 100px ropelight divided into 4 named zones (A–D) for future status mapping
+  - YAML-driven config (`services/wled-bridge/config.yaml`) with env var expansion — no code changes needed to add zones
+  - Publishes to WLED's MQTT segment API (`wled/{device}/api`) — stays entirely on the MQTT bus, no HTTP
+  - Heartbeat logging every 60s with last known temp and color per zone
+- Added `WLED_DEVICE_NAME` and `TENT_SENSOR_ROOM` env vars to `.env.example`
+- Updated `CONTEXT.md` with WLED Bridge service documentation
+
 ## [2.1.0] - 2026-03-06
 
 ### Added
