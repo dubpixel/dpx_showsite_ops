@@ -48,7 +48,7 @@ matrix:
   led_count: 170
   text_topic: "${SHOWSITE_NAME}/wled/matrix/text"
   default_color: [255, 220, 0]    # yellow
-  default_speed: 100              # scroll speed 0–255
+  default_speed: 255              # scroll speed 0–255
   default_ttl: 30                 # seconds before auto-clear
   udp_port: 7777                  # set to 0 to disable UDP listener
 
