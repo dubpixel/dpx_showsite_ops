@@ -163,6 +163,15 @@ async def _fetch_preset_ids(sign_id: str, wled_host: str) -> list[int]:
     return ids
 
 
+def _screensaver_presets(sign_id: str, sign: dict) -> list[int]:
+    """Return preset IDs eligible for screensaver, excluding the text preset."""
+    ids = _preset_cache.get(sign_id, (None, []))[1]
+    exclude = sign.get("text_preset")
+    if exclude:
+        ids = [i for i in ids if i != int(exclude)]
+    return ids
+
+
 async def _queue_worker() -> None:
     """Background task: drain queues and restore idle preset when sign goes quiet."""
     while True:
@@ -182,8 +191,9 @@ async def _queue_worker() -> None:
                 log.info(f"[queue_worker] sign={sign_id} api_topic={api_topic!r} wled_host={wled_host!r}")
                 if api_topic and wled_host:
                     try:
-                        ids = await _fetch_preset_ids(sign_id, wled_host)
-                        log.info(f"[queue_worker] sign={sign_id} preset pool: {ids}")
+                        await _fetch_preset_ids(sign_id, wled_host)
+                        ids = _screensaver_presets(sign_id, sign)
+                        log.info(f"[queue_worker] sign={sign_id} screensaver pool: {ids}")
                         if ids:
                             preset = random.choice(ids)
                             payload = json.dumps({"ps": preset})
@@ -255,7 +265,8 @@ async def lifespan(app: FastAPI):
         api_topic = sign.get("api_topic")
         if not (wled_host and api_topic):
             continue
-        ids = await _fetch_preset_ids(sign_id, wled_host)
+        await _fetch_preset_ids(sign_id, wled_host)
+        ids = _screensaver_presets(sign_id, sign)
         if ids:
             preset = random.choice(ids)
             try:
