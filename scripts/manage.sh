@@ -1362,6 +1362,38 @@ case "$1" in
     cd "$REPO_ROOT" && docker compose logs -f matrix-blast
     ;;
 
+  matrix-blast-status|mb-status)
+    PORT="${MATRIX_BLAST_PORT:-8090}"
+    if ! curl -sf "http://localhost:${PORT}/health" >/dev/null 2>&1; then
+      echo "✗ matrix-blast is not responding on port ${PORT}"
+      echo "  Start with: iot matrix-blast-up"
+      exit 1
+    fi
+    echo "=== Matrix Blast — Queue Status ==="
+    curl -s "http://localhost:${PORT}/status" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for sign_id, s in data.items():
+    print(f\"\n  [{s['name']}]\")
+    a = s.get('active')
+    if not a:
+        print('    active : (idle)')
+    else:
+        lock = '🔒 locked' if a['locked'] else '🔓 unlocked'
+        print(f\"    active : {a['text']}\")
+        print(f\"    ttl    : {a['elapsed_s']}s elapsed / {a['remaining_s']}s left  {lock}\")
+        if a['locked']:
+            print(f\"    unlock : in {a['lock_remaining_s']}s\")
+    q = s.get('queue', [])
+    if q:
+        print(f\"    queue  : {len(q)} pending\")
+        for m in q:
+            print(f\"      #{m['pos']} — {m['text']}  (ttl={m['ttl']}s)\")
+    else:
+        print('    queue  : (empty)')
+"
+    ;;
+
   web)
             _IP=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
             echo "Grafana:       http://${_IP}:3000"
@@ -1516,6 +1548,8 @@ case "$1" in
     echo "    matrix-blast-rebuild       Rebuild container image and restart"
     echo "    matrix-blast-logs [n]      View logs (default: 30 lines)"
     echo "    matrix-blast-follow        Stream logs in real-time"
+    echo "    matrix-blast-status        Show active message + queue for all signs"
+    echo "      alias: mb-status"
     echo "    Signs config:              services/matrix-blast/config.yaml"
     echo "                               Add entries here for additional signs"
     echo ""
