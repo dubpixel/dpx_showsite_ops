@@ -425,7 +425,8 @@ case "$1" in
   tunnel-grafana)   run_tunnel_background "grafana" 3000 ;;
   tunnel-influxdb)   run_tunnel_background "influxdb" 8086 ;;
   tunnel-schedule)   run_tunnel_background "schedule" 8000 ;;
-  
+  tunnel-matrix)   run_tunnel_background "matrix-blast" 8090 ;;
+
   tunnel-stop)
     TUNNEL_DIR="$HOME/logs/tunnel"
     if [ ! -d "$TUNNEL_DIR" ] || [ -z "$(ls -A "$TUNNEL_DIR"/*.pid 2>/dev/null)" ]; then
@@ -515,7 +516,29 @@ case "$1" in
     fi
     rm -f "$PID_FILE" "$TUNNEL_DIR/schedule.url"
     ;;
-  
+
+  tunnel-stop-matrix)
+    TUNNEL_DIR="$HOME/logs/tunnel"
+    PID_FILE="$TUNNEL_DIR/matrix-blast.pid"
+    if [ ! -f "$PID_FILE" ]; then
+      echo "No matrix-blast tunnel PID file found"
+      exit 0
+    fi
+    PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$PID" ] && ps -p $PID >/dev/null 2>&1; then
+      echo "Stopping matrix-blast tunnel (PID: $PID)..."
+      kill $PID 2>/dev/null
+      sleep 1
+      if ps -p $PID >/dev/null 2>&1; then
+        kill -9 $PID 2>/dev/null
+      fi
+      echo "✓ Matrix-blast tunnel stopped"
+    else
+      echo "Matrix-blast tunnel not running"
+    fi
+    rm -f "$PID_FILE" "$TUNNEL_DIR/matrix-blast.url"
+    ;;
+
   tunnel-status)
     TUNNEL_DIR="$HOME/logs/tunnel"
     if [ ! -d "$TUNNEL_DIR" ] || [ -z "$(ls -A "$TUNNEL_DIR"/*.pid 2>/dev/null)" ]; then
@@ -1527,8 +1550,9 @@ case "$1" in
     echo "    tunnel-grafana         Start tunnel to Grafana (port 3000)"
     echo "    tunnel-influxdb        Start tunnel to InfluxDB (port 8086)"
     echo "    tunnel-schedule        Start tunnel to set-schedule (port 8000)"
+    echo "    tunnel-matrix          Start tunnel to matrix-blast (port 8090)"
     echo "    tunnel-stop            Stop all running tunnels"
-    echo "    tunnel-stop-<name>     Stop specific tunnel (grafana/influxdb/schedule)"
+    echo "    tunnel-stop-<name>     Stop specific tunnel (grafana/influxdb/schedule/matrix)"
     echo "    tunnel-status          Show all tunnels with status and URLs"
     echo "    tunnel-logs [name] [n] View tunnel logs (default: all, 30 lines)"
     echo ""
