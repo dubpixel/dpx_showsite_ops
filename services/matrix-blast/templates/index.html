@@ -203,6 +203,11 @@
         <textarea name="text" id="text" placeholder="TYPE YOUR MESSAGE" autocomplete="off" autofocus></textarea>
       </div>
 
+      <div class="field">
+        <label for="from_name">From <span style="color:#555;font-size:0.65rem;letter-spacing:0">(optional)</span></label>
+        <input type="text" name="from_name" id="from_name" placeholder="your name" autocomplete="off">
+      </div>
+
       {# Options toggle #}
       <button type="button" class="options-toggle" @click="showOptions = !showOptions">
         <span x-text="showOptions ? '▲' : '▼'"></span>

@@ -124,14 +124,15 @@ async def index(request: Request):
 
 @app.post("/blast", response_class=HTMLResponse)
 async def blast(
-    request: Request,
-    sign_id: str  = Form(...),
-    text:    str  = Form(...),
-    r:       int  = Form(255),
-    g:       int  = Form(220),
-    b:       int  = Form(0),
-    speed:   int  = Form(255),
-    ttl:     int  = Form(30),
+    request:   Request,
+    sign_id:   str  = Form(...),
+    text:      str  = Form(...),
+    from_name: str  = Form(""),
+    r:         int  = Form(255),
+    g:         int  = Form(220),
+    b:         int  = Form(0),
+    speed:     int  = Form(255),
+    ttl:       int  = Form(30),
 ):
     sign = SIGNS.get(sign_id)
     if not sign:
@@ -140,6 +141,10 @@ async def blast(
     text = text.strip()
     if not text:
         return HTMLResponse('<span class="status-err">Message cannot be empty.</span>')
+
+    from_name = from_name.strip()
+    if from_name:
+        text = f"{from_name}: {text}"
 
     payload = json.dumps({
         "text":  text,
@@ -151,7 +156,7 @@ async def blast(
     try:
         result = mqtt_client.publish(sign["topic"], payload, qos=0)
         result.wait_for_publish(timeout=3.0)
-        log.info(f"[blast] sign={sign_id} text={text!r} → {sign['topic']}")
+        log.info(f"[blast] sign={sign_id} text={text!r} from={from_name!r} → {sign['topic']}")
         return HTMLResponse(f'<span class="status-ok">✓ Sent to {sign["name"]}</span>')
     except Exception as e:
         log.error(f"[blast] MQTT publish failed: {e}")
