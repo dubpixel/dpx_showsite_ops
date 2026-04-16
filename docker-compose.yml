@@ -221,12 +221,15 @@ services:
       dockerfile: Dockerfile
     container_name: wled-bridge
     restart: unless-stopped
+    ports:
+      - "7777:7777/udp"   # Matrix text UDP listener (iot matrix-udp / nc -u)
     environment:
       - BROKER=mosquitto
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
       - WLED_DEVICE_TOPIC=${WLED_DEVICE_TOPIC:-wled}
       - TENT_SENSOR_ROOM=${TENT_SENSOR_ROOM:-tent}
       - FOH_SENSOR_ROOM=${FOH_SENSOR_ROOM:-foh}
+      - WLED_MATRIX_TOPIC=${WLED_MATRIX_TOPIC:-wled-matrix}
       - TZ=${TZ}
     networks:
       - iot

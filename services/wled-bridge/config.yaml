@@ -27,6 +27,32 @@ wled:
   led_count: 100
 
 
+# ── WLED Matrix (17×10 LED matrix — scrolling text display) ──────────────────
+# Separate WLED device from the ropelight above. Driven exclusively by
+# MQTT text messages and/or UDP datagrams — not by sensor data.
+#
+# One-time WLED device setup (via WLED web UI on the matrix device):
+#   Config → Sync Interfaces → MQTT → enable, broker IP, device topic = ${WLED_MATRIX_TOPIC}
+#   Config → LED Preferences → 2D configuration → width=17, height=10, serpentine, start=bottom-left
+#
+# MQTT topic to publish text to: ${SHOWSITE_NAME}/wled/matrix/text
+# Payload: plain string  OR  JSON {"text":"...","color":[R,G,B],"speed":0-255,"ttl":seconds}
+#
+# UDP port: send a plain string or JSON datagram to blast text without MQTT.
+#   echo "DOORS OPEN" | nc -u <server_ip> 7777
+
+matrix:
+  device_topic: "${WLED_MATRIX_TOPIC}"
+  width: 17
+  height: 10
+  led_count: 170
+  text_topic: "${SHOWSITE_NAME}/wled/matrix/text"
+  default_color: [255, 220, 0]    # yellow
+  default_speed: 100              # scroll speed 0–255
+  default_ttl: 30                 # seconds before auto-clear
+  udp_port: 7777                  # set to 0 to disable UDP listener
+
+
 zones:
 
   # ── Button Status Zones (pixels 100–147) ────────────────────────────────────

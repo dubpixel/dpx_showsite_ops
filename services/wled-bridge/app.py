@@ -20,11 +20,12 @@ import json
 import logging
 import os
 import re
+import socket
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from threading import Timer
+from threading import Thread, Timer
 
 import paho.mqtt.client as mqtt
 import yaml
@@ -130,6 +131,66 @@ def interpolate_color(temp_f: float, gradient: list) -> list:
 # WLED Command Builder
 # ============================================================================
 
+def build_wled_text_cmd(text: str, led_count: int, color: list, speed: int) -> str:
+    """
+    Build a WLED JSON segment command that displays scrolling text (fx: 122).
+
+    WLED's Scrolling Text effect reads the segment name field ('n') as the text
+    to display. Works on both 1D strips and 2D matrices.
+
+    Args:
+        text:      The string to scroll across the display
+        led_count: Total number of LEDs in the segment (e.g. 170 for 17×10 matrix)
+        color:     [R, G, B] primary text color
+        speed:     Scroll speed 0–255
+
+    Returns:
+        JSON string ready to publish to {device_topic}/api
+    """
+    payload = {
+        "seg": [
+            {
+                "id":    0,
+                "start": 0,
+                "stop":  led_count,
+                "fx":    122,   # Scrolling Text
+                "sx":    speed,
+                "ix":    128,
+                "col":   [color, [0, 0, 0], [0, 0, 0]],
+                "n":     text,  # segment name = text to scroll
+                "on":    True,
+                "bri":   200,
+            }
+        ]
+    }
+    return json.dumps(payload)
+
+
+def build_wled_matrix_clear_cmd(led_count: int) -> str:
+    """
+    Build a WLED JSON segment command that blanks the matrix (solid black, fx: 0).
+
+    Args:
+        led_count: Total number of LEDs in the segment
+
+    Returns:
+        JSON string ready to publish to {device_topic}/api
+    """
+    payload = {
+        "seg": [
+            {
+                "id":    0,
+                "start": 0,
+                "stop":  led_count,
+                "fx":    0,
+                "col":   [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                "on":    True,
+            }
+        ]
+    }
+    return json.dumps(payload)
+
+
 def build_wled_segment_cmd(zone: dict, rgb: list) -> str:
     """
     Build a WLED JSON segment command for the given zone and color.
@@ -232,6 +293,20 @@ class WLEDBridge:
         # WLED subscribes to {device_topic}/api for JSON segment commands
         self.wled_topic = f"{self.wled_device_topic}/api"
 
+        # ── Matrix / scrolling text ──────────────────────────────────────────
+        self.matrix_cfg = config.get("matrix")
+        self.matrix_api_topic = None
+        self.matrix_text_sub_topic = None
+        self._text_clear_timer = None
+        self._udp_thread = None
+
+        if self.matrix_cfg:
+            self.matrix_api_topic = f"{self.matrix_cfg['device_topic']}/api"
+            self.matrix_text_sub_topic = self.matrix_cfg["text_topic"]
+            udp_port = int(self.matrix_cfg.get("udp_port", 0))
+            if udp_port:
+                self._start_udp_listener(udp_port)
+
         self.client = mqtt.Client(client_id="dpx_wled_bridge")
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
@@ -256,6 +331,14 @@ class WLEDBridge:
                 rgb = zone.get("color", [0, 0, 0])
                 client.publish(self.wled_topic, build_wled_segment_cmd(zone, rgb))
                 log.info(f"[{zone['id']}] static → RGB{tuple(rgb)} → px {zone['pixels']['start']}–{zone['pixels']['stop'] - 1}")
+            # Subscribe to matrix text topic if configured
+            if self.matrix_cfg:
+                client.subscribe(self.matrix_text_sub_topic)
+                log.info(f"Subscribed (matrix text): {self.matrix_text_sub_topic}")
+                log.info(f"Matrix device topic: {self.matrix_cfg['device_topic']}  →  api: {self.matrix_api_topic}")
+                udp_port = int(self.matrix_cfg.get("udp_port", 0))
+                if udp_port:
+                    log.info(f"Matrix UDP listener: port {udp_port}")
             self._schedule_heartbeat()
         else:
             log.error(f"MQTT connect failed (rc={rc})")
@@ -266,7 +349,11 @@ class WLEDBridge:
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate zone handler."""
-        # Check state zones first (exact topic match)
+        # Matrix text topic takes priority
+        if self.matrix_cfg and msg.topic == self.matrix_text_sub_topic:
+            self._handle_matrix_text(msg)
+            return
+        # Check state zones (exact topic match)
         if msg.topic in self.state_topic_to_zone:
             self._handle_state_message(msg)
         else:
@@ -335,6 +422,113 @@ class WLEDBridge:
             f"→  {self.wled_topic}"
         )
 
+    # ── Matrix / scrolling text ──────────────────────────────────────────────
+
+    def _parse_text_payload(self, raw: bytes) -> tuple:
+        """
+        Parse an incoming text payload (MQTT or UDP).
+
+        Accepts plain string or JSON:
+            "DOORS OPEN"
+            {"text": "...", "color": [R, G, B], "speed": 0-255, "ttl": seconds}
+
+        Returns (text, color, speed, ttl) using matrix config defaults for any
+        missing JSON fields.
+        """
+        cfg = self.matrix_cfg
+        default_color = cfg.get("default_color", [255, 220, 0])
+        default_speed = int(cfg.get("default_speed", 100))
+        default_ttl   = int(cfg.get("default_ttl", 30))
+
+        try:
+            decoded = raw.decode().strip()
+        except Exception:
+            return None, default_color, default_speed, default_ttl
+
+        try:
+            data = json.loads(decoded)
+            text  = str(data.get("text", "")).strip()
+            color = data.get("color", default_color)
+            speed = int(data.get("speed", default_speed))
+            ttl   = int(data.get("ttl", default_ttl))
+        except (json.JSONDecodeError, TypeError):
+            text  = decoded
+            color = default_color
+            speed = default_speed
+            ttl   = default_ttl
+
+        return text or None, color, speed, ttl
+
+    def _dispatch_matrix_text(self, text: str, color: list, speed: int, ttl: int):
+        """
+        Send scrolling text to the matrix and schedule a clear after TTL seconds.
+        Called by both the MQTT handler and the UDP listener.
+        """
+        led_count = int(self.matrix_cfg.get("led_count", 170))
+
+        # Cancel any pending clear from a previous message
+        if self._text_clear_timer is not None:
+            self._text_clear_timer.cancel()
+            self._text_clear_timer = None
+
+        self.client.publish(
+            self.matrix_api_topic,
+            build_wled_text_cmd(text, led_count, color, speed),
+        )
+        log.info(
+            f"[matrix] text={text!r}  color=RGB{tuple(color)}  "
+            f"speed={speed}  ttl={ttl}s  →  {self.matrix_api_topic}"
+        )
+
+        self._text_clear_timer = Timer(ttl, self._clear_matrix)
+        self._text_clear_timer.daemon = True
+        self._text_clear_timer.start()
+
+    def _handle_matrix_text(self, msg):
+        """Handle a matrix text message arriving via MQTT."""
+        text, color, speed, ttl = self._parse_text_payload(msg.payload)
+        if not text:
+            log.warning("[matrix] received empty text payload, ignoring")
+            return
+        self._dispatch_matrix_text(text, color, speed, ttl)
+
+    def _clear_matrix(self):
+        """Publish a blank (solid black) frame to the matrix after TTL expires."""
+        led_count = int(self.matrix_cfg.get("led_count", 170))
+        self.client.publish(self.matrix_api_topic, build_wled_matrix_clear_cmd(led_count))
+        log.info(f"[matrix] TTL expired — cleared  →  {self.matrix_api_topic}")
+        self._text_clear_timer = None
+
+    def _start_udp_listener(self, port: int):
+        """Start a daemon thread that listens for UDP text datagrams."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("0.0.0.0", port))
+            sock.settimeout(1.0)  # allow clean shutdown via daemon exit
+        except OSError as e:
+            log.error(f"[matrix] UDP listener failed to bind port {port}: {e}")
+            return
+
+        def _loop():
+            log.info(f"[matrix] UDP listener ready on port {port}")
+            while True:
+                try:
+                    data, addr = sock.recvfrom(4096)
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                text, color, speed, ttl = self._parse_text_payload(data)
+                if not text:
+                    log.warning(f"[matrix] UDP empty payload from {addr}, ignoring")
+                    continue
+                log.info(f"[matrix] UDP from {addr[0]}:{addr[1]}")
+                self._dispatch_matrix_text(text, color, speed, ttl)
+
+        self._udp_thread = Thread(target=_loop, name="matrix-udp", daemon=True)
+        self._udp_thread.start()
+
     def _schedule_heartbeat(self):
         """Log zone states every 60 seconds."""
         self._heartbeat_timer = Timer(60.0, self._heartbeat)
@@ -357,6 +551,8 @@ class WLEDBridge:
             log.info("Shutting down...")
             if self._heartbeat_timer:
                 self._heartbeat_timer.cancel()
+            if self._text_clear_timer:
+                self._text_clear_timer.cancel()
             self.client.disconnect()
         except Exception as e:
             log.error(f"Fatal error: {e}")
