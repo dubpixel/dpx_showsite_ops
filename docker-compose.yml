@@ -252,7 +252,7 @@ services:
       - BROKER=mosquitto
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
       - WLED_MATRIX_TOPIC=${WLED_MATRIX_TOPIC:-wled-matrix}
-      - WLED_MATRIX_HOST=${WLED_MATRIX_HOST:-}
+      - WLED_MATRIX_HOST=${WLED_MATRIX_HOST:-wled-matrix.local}
       - TZ=${TZ}
     networks:
       - iot
