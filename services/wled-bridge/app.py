@@ -211,6 +211,8 @@ class WLEDBridge:
         # State zones: keyed by exact MQTT topic string
         self.state_topic_to_zone = {}
 
+        self.static_zones = []  # published once on connect
+
         for zone in self.zones:
             src = zone.get("source", {})
             src_type = src.get("type", "mqtt_temperature")
@@ -222,6 +224,8 @@ class WLEDBridge:
                 topic = src.get("topic", "")
                 if topic:
                     self.state_topic_to_zone[topic] = zone
+            elif src_type == "static":
+                self.static_zones.append(zone)
 
         # MQTT topics
         self.temp_topic = f"{SHOWSITE}/dpx_ops_decoder/+/+/+/+/temperature"
@@ -247,6 +251,11 @@ class WLEDBridge:
                 client.subscribe(topic)
                 log.info(f"Subscribed (state): {topic}")
             log.info(f"Active zones: {[z['id'] for z in self.zones]}")
+            # Publish static zones immediately (e.g. dark segment blackout)
+            for zone in self.static_zones:
+                rgb = zone.get("color", [0, 0, 0])
+                client.publish(self.wled_topic, build_wled_segment_cmd(zone, rgb))
+                log.info(f"[{zone['id']}] static → RGB{tuple(rgb)} → px {zone['pixels']['start']}–{zone['pixels']['stop'] - 1}")
             self._schedule_heartbeat()
         else:
             log.error(f"MQTT connect failed (rc={rc})")

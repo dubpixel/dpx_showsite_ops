@@ -3,14 +3,15 @@
 # ================================================================================
 # Defines pixel zones on the WLED ropelight and what data source drives each zone.
 #
-# Pixel map (100px ropelight, 75px active):
-#   px  0– 11  →  btn_blue    Button status (12px)
-#   px 12– 23  →  btn_green   Button status (12px)
-#   px 24– 35  →  btn_orange  Button status / yellow lamp (12px)
-#   px 36– 47  →  btn_red     Button status (12px)
-#   px 48– 61  →  tent_temp   Tent temperature (14px)
-#   px 62– 74  →  foh_temp    FOH temperature (13px)
-#   px 75– 99  →  (dark — not configured)
+# Pixel map (100px ropelight — px 0 reserved as system fake LED):
+#   px  0       →  (reserved — system fake LED, never touched)
+#   px  1– 12  →  btn_blue    Button status (12px)
+#   px 13– 24  →  btn_green   Button status (12px)
+#   px 25– 36  →  btn_orange  Button status / yellow lamp (12px)
+#   px 37– 48  →  btn_red     Button status (12px)
+#   px 49– 62  →  tent_temp   Tent temperature (14px)
+#   px 63– 75  →  foh_temp    FOH temperature (13px)
+#   px 76– 99  →  dark        Unused — forced black on startup (static)
 #
 # Source types:
 #   mqtt_temperature  — subscribes to BLE decoder temp topics, filters by room
@@ -37,8 +38,8 @@ zones:
     segment_id: 0
     name: "Blue Button Status"
     pixels:
-      start: 0
-      stop: 12      # exclusive
+      start: 1
+      stop: 13      # exclusive — 12px
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/blue/state"
@@ -49,8 +50,8 @@ zones:
     segment_id: 1
     name: "Green Button Status"
     pixels:
-      start: 12
-      stop: 24
+      start: 13
+      stop: 25
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/green/state"
@@ -61,8 +62,8 @@ zones:
     segment_id: 2
     name: "Orange/Yellow Button Status"
     pixels:
-      start: 24
-      stop: 36
+      start: 25
+      stop: 37
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/yellow/state"
@@ -73,8 +74,8 @@ zones:
     segment_id: 3
     name: "Red Button Status"
     pixels:
-      start: 36
-      stop: 48
+      start: 37
+      stop: 49
     source:
       type: mqtt_state
       topic: "${SHOWSITE_NAME}/button/red/state"
@@ -82,14 +83,14 @@ zones:
     color_off: [0, 0, 0]
 
 
-  # ── Temperature Zones (pixels 48–74) ────────────────────────────────────────
+  # ── Temperature Zones (pixels 49–75) ────────────────────────────────────────
 
   - id: tent_temp
     segment_id: 4
     name: "Tent Temperature"
     pixels:
-      start: 48
-      stop: 62      # exclusive — 14px
+      start: 49
+      stop: 63      # exclusive — 14px
     source:
       type: mqtt_temperature
       room: "${TENT_SENSOR_ROOM}"
@@ -105,8 +106,8 @@ zones:
     segment_id: 5
     name: "FOH Temperature"
     pixels:
-      start: 62
-      stop: 75      # exclusive — 13px
+      start: 63
+      stop: 76      # exclusive — 13px
     source:
       type: mqtt_temperature
       room: "${FOH_SENSOR_ROOM}"
@@ -118,4 +119,15 @@ zones:
       - { temp_f: 85, rgb: [255, 100,   0] }
       - { temp_f: 92, rgb: [255,   0,   0] }
 
-  # px 75–99 — dark (not configured)
+
+  # ── Dark segment — forced black on startup (px 76–99) ───────────────────────
+
+  - id: dark
+    segment_id: 6
+    name: "Unused LEDs (dark)"
+    pixels:
+      start: 76
+      stop: 100     # exclusive — covers rest of strip
+    source:
+      type: static
+    color: [0, 0, 0]
