@@ -231,8 +231,15 @@ def mqtt_disconnect():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info(f"Matrix Blast starting — signs: {list(SIGNS.keys())}")
+    for sign in SIGNS.values():
+        log.info(f"  sign={sign['id']} api_topic={sign.get('api_topic')!r} wled_host={sign.get('wled_host')!r}")
     mqtt_connect()
     worker = asyncio.create_task(_queue_worker())
+    # Warm the preset cache at startup so we know immediately if the host is reachable
+    for sign_id, sign in SIGNS.items():
+        wled_host = sign.get("wled_host")
+        if wled_host:
+            await _fetch_preset_ids(sign_id, wled_host)
     yield
     worker.cancel()
     mqtt_disconnect()
@@ -303,6 +310,23 @@ async def blast(
 @app.get("/health")
 async def health():
     return {"status": "ok", "signs": list(SIGNS.keys())}
+
+
+@app.get("/debug")
+async def debug():
+    return {
+        "signs": {
+            sign_id: {
+                "api_topic": sign.get("api_topic"),
+                "wled_host": sign.get("wled_host"),
+                "preset_cache": _preset_cache.get(sign_id, {}) and {
+                    "age_s": round(time.monotonic() - _preset_cache[sign_id][0], 1),
+                    "ids":   _preset_cache[sign_id][1],
+                } if sign_id in _preset_cache else None,
+            }
+            for sign_id, sign in SIGNS.items()
+        }
+    }
 
 
 @app.get("/status")
