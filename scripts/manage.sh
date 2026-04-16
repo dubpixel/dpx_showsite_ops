@@ -1213,12 +1213,141 @@ case "$1" in
     echo "✓ WLED off (wled/${WLED_DEVICE}/api)"
     ;;
 
-  web)      echo "Grafana:  http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):3000"
-            echo "InfluxDB: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8086"
-            echo "MQTT:     $(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):1883"
-            echo "govee2mqtt: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8056"
-            echo "Set-Schedule: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8000"
-            echo "Button Health: http://$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1):8080/health"
+  # ── WLED Matrix — scrolling text display ──────────────────────────────────
+
+  matrix-text)
+    # Blast scrolling text to the matrix via MQTT.
+    # Usage: iot matrix-text "YOUR TEXT" [ttl_seconds]
+    if [ -z "$2" ]; then
+      echo "Usage: iot matrix-text \"YOUR TEXT\" [ttl_seconds]"
+      echo ""
+      echo "Examples:"
+      echo "  iot matrix-text \"DOORS OPEN\""
+      echo "  iot matrix-text \"STAGE 1 NOW\" 60"
+      exit 1
+    fi
+    MATRIX_TOPIC=$(grep -E '^WLED_MATRIX_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    MATRIX_TOPIC="${MATRIX_TOPIC:-wled-matrix}"
+    SHOWSITE=$(grep -E '^SHOWSITE_NAME=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    SHOWSITE="${SHOWSITE:-demo_showsite}"
+    TEXT="$2"
+    TTL="${3:-30}"
+    PAYLOAD="{\"text\":\"${TEXT}\",\"ttl\":${TTL}}"
+    PUB_TOPIC="${SHOWSITE}/wled/matrix/text"
+    echo "Topic:   $PUB_TOPIC"
+    echo "Payload: $PAYLOAD"
+    mosquitto_pub -h localhost -p 1883 -t "$PUB_TOPIC" -m "$PAYLOAD"
+    echo "✓ Sent — matrix will clear in ${TTL}s"
+    ;;
+
+  matrix-text-json)
+    # Blast scrolling text with full JSON control (text, color, speed, ttl).
+    # Usage: iot matrix-text-json '{"text":"...","color":[R,G,B],"speed":N,"ttl":N}'
+    if [ -z "$2" ]; then
+      echo "Usage: iot matrix-text-json '<json>'"
+      echo ""
+      echo "JSON fields:"
+      echo "  text    (string)      The message to scroll"
+      echo "  color   ([R,G,B])     Text color (0-255 each). Default: [255,220,0] yellow"
+      echo "  speed   (0-255)       Scroll speed. Default: 100"
+      echo "  ttl     (seconds)     Auto-clear after this many seconds. Default: 30"
+      echo ""
+      echo "Examples:"
+      echo "  iot matrix-text-json '{\"text\":\"DOORS OPEN\"}'"
+      echo "  iot matrix-text-json '{\"text\":\"GO\",\"color\":[255,0,100],\"speed\":200,\"ttl\":10}'"
+      echo "  iot matrix-text-json '{\"text\":\"SOUND CHECK\",\"color\":[0,200,255],\"speed\":80,\"ttl\":60}'"
+      exit 1
+    fi
+    SHOWSITE=$(grep -E '^SHOWSITE_NAME=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    SHOWSITE="${SHOWSITE:-demo_showsite}"
+    PUB_TOPIC="${SHOWSITE}/wled/matrix/text"
+    echo "Topic:   $PUB_TOPIC"
+    echo "Payload: $2"
+    mosquitto_pub -h localhost -p 1883 -t "$PUB_TOPIC" -m "$2"
+    echo "✓ Sent"
+    ;;
+
+  matrix-clear)
+    # Immediately clear the matrix (solid black) via MQTT.
+    MATRIX_TOPIC=$(grep -E '^WLED_MATRIX_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+    MATRIX_TOPIC="${MATRIX_TOPIC:-wled-matrix}"
+    TOPIC="${MATRIX_TOPIC}/api"
+    PAYLOAD='{"seg":[{"id":0,"start":0,"stop":170,"fx":0,"col":[[0,0,0],[0,0,0],[0,0,0]],"on":true}]}'
+    echo "Topic:   $TOPIC"
+    mosquitto_pub -h localhost -p 1883 -t "$TOPIC" -m "$PAYLOAD"
+    echo "✓ Matrix cleared"
+    ;;
+
+  matrix-udp)
+    # Send scrolling text to the matrix via UDP (bypasses MQTT).
+    # Requires netcat (nc) on the server.
+    # Usage: iot matrix-udp "YOUR TEXT"
+    if [ -z "$2" ]; then
+      echo "Usage: iot matrix-udp \"YOUR TEXT\""
+      echo ""
+      echo "Examples:"
+      echo "  iot matrix-udp \"SOUND CHECK\""
+      echo "  iot matrix-udp '{\"text\":\"GO\",\"color\":[0,255,0],\"speed\":200,\"ttl\":15}'"
+      echo ""
+      echo "Also works from any machine on the network:"
+      echo "  echo \"DOORS OPEN\" | nc -u <server_ip> 7777"
+      exit 1
+    fi
+    SERVER_IP=$(ip addr show eth0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+    SERVER_IP="${SERVER_IP:-127.0.0.1}"
+    echo "Sending UDP to $SERVER_IP:7777"
+    echo "$2" | nc -u -w1 "$SERVER_IP" 7777
+    echo "✓ Sent"
+    ;;
+
+  # ── Matrix Blast web UI ────────────────────────────────────────────────────
+
+  matrix-blast-up)
+    echo "Starting matrix-blast web UI..."
+    cd "$REPO_ROOT" && docker compose up -d matrix-blast
+    echo ""
+    echo "✓ matrix-blast started"
+    SERVER_IP=$(ip addr show eth0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+    echo "Open: http://${SERVER_IP:-<server_ip>}:${MATRIX_BLAST_PORT:-8090}"
+    ;;
+
+  matrix-blast-down)
+    cd "$REPO_ROOT" && docker compose stop matrix-blast
+    echo "✓ matrix-blast stopped"
+    ;;
+
+  matrix-blast-restart)
+    cd "$REPO_ROOT" && docker compose restart matrix-blast
+    echo "✓ matrix-blast restarted"
+    echo "View logs with: iot matrix-blast-logs"
+    ;;
+
+  matrix-blast-rebuild)
+    echo "Rebuilding matrix-blast container..."
+    cd "$REPO_ROOT" && docker compose build matrix-blast
+    echo ""
+    cd "$REPO_ROOT" && docker compose up -d matrix-blast
+    echo "✓ matrix-blast rebuilt and restarted"
+    echo "View logs with: iot matrix-blast-logs"
+    ;;
+
+  matrix-blast-logs)
+    cd "$REPO_ROOT" && docker compose logs --tail="${2:-30}" matrix-blast
+    ;;
+
+  matrix-blast-follow)
+    cd "$REPO_ROOT" && docker compose logs -f matrix-blast
+    ;;
+
+  web)
+            _IP=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            echo "Grafana:       http://${_IP}:3000"
+            echo "InfluxDB:      http://${_IP}:8086"
+            echo "MQTT:          ${_IP}:1883"
+            echo "govee2mqtt:    http://${_IP}:8056"
+            echo "Set-Schedule:  http://${_IP}:${SCHEDULE_PORT:-8000}"
+            echo "Button Health: http://${_IP}:${BUTTON_HEALTH_PORT:-8080}/health"
+            echo "Matrix Blast:  http://${_IP}:${MATRIX_BLAST_PORT:-8090}"
             ;;
   *)
     # Read version from VERSION file
@@ -1344,6 +1473,28 @@ case "$1" in
     echo "                           examples: iot wled-set 75 100 255 0 0  (red)"
     echo "                                     iot wled-set 0 100 0 0 0    (blackout)"
     echo "    wled-off               Turn off all WLED pixels"
+    echo ""
+    echo "  WLED MATRIX (17×10 LED matrix — scrolling text display)"
+    echo "    matrix-text <msg> [ttl]    Blast scrolling text. TTL in seconds (default: 30)"
+    echo "                               examples: iot matrix-text \"DOORS OPEN\""
+    echo "                                         iot matrix-text \"STAGE 1 NOW\" 60"
+    echo "    matrix-text-json <json>    Full JSON payload blast"
+    echo "                               examples: iot matrix-text-json '{\"text\":\"GO\",\"color\":[255,0,100],\"speed\":200,\"ttl\":10}'"
+    echo "                               fields:   text (string), color ([R,G,B]), speed (0-255), ttl (seconds)"
+    echo "    matrix-clear               Clear matrix immediately (solid black)"
+    echo "    matrix-udp <msg>           Send text via UDP (no MQTT needed, port 7777)"
+    echo "                               example:  iot matrix-udp \"SOUND CHECK\""
+    echo "                               from net: echo \"TEXT\" | nc -u <server_ip> 7777"
+    echo ""
+    echo "  MATRIX BLAST (Browser UI — type messages from any device on the network)"
+    echo "    matrix-blast-up            Start web UI on port 8090"
+    echo "    matrix-blast-down          Stop web UI"
+    echo "    matrix-blast-restart       Restart web UI (picks up .env changes)"
+    echo "    matrix-blast-rebuild       Rebuild container image and restart"
+    echo "    matrix-blast-logs [n]      View logs (default: 30 lines)"
+    echo "    matrix-blast-follow        Stream logs in real-time"
+    echo "    Signs config:              services/matrix-blast/config.yaml"
+    echo "                               Add entries here for additional signs"
     echo ""
     echo "  NTP TIME SERVER"
     echo "    ntp-start (ntp-up)     Start NTP server (accessible on all network interfaces)"

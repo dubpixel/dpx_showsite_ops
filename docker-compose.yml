@@ -221,18 +221,41 @@ services:
       dockerfile: Dockerfile
     container_name: wled-bridge
     restart: unless-stopped
+    ports:
+      - "7777:7777/udp"   # Matrix text UDP listener (iot matrix-udp / nc -u)
     environment:
       - BROKER=mosquitto
       - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
       - WLED_DEVICE_TOPIC=${WLED_DEVICE_TOPIC:-wled}
       - TENT_SENSOR_ROOM=${TENT_SENSOR_ROOM:-tent}
       - FOH_SENSOR_ROOM=${FOH_SENSOR_ROOM:-foh}
+      - WLED_MATRIX_TOPIC=${WLED_MATRIX_TOPIC:-wled-matrix}
+      - WLED_MATRIX_DEFAULT_SPEED=${WLED_MATRIX_DEFAULT_SPEED:-255}
+      - WLED_MATRIX_DEFAULT_COLOR=${WLED_MATRIX_DEFAULT_COLOR:-255,220,0}
+      - WLED_MATRIX_DEFAULT_TTL=${WLED_MATRIX_DEFAULT_TTL:-30}
       - TZ=${TZ}
     networks:
       - iot
     depends_on:
       - mosquitto
       - ble-decoder
+
+  matrix-blast:
+    build:
+      context: ./services/matrix-blast
+      dockerfile: Dockerfile
+    container_name: matrix-blast
+    restart: unless-stopped
+    ports:
+      - "${MATRIX_BLAST_PORT:-8090}:8090"
+    environment:
+      - BROKER=mosquitto
+      - SHOWSITE_NAME=${SHOWSITE_NAME:-demo_showsite}
+      - TZ=${TZ}
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
 
   dpx-guest-alert-button:
     build:

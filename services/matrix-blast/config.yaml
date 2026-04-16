@@ -1,0 +1,13 @@
+# ================================================================================
+# MATRIX BLAST — SIGN DEFINITIONS
+# ================================================================================
+# Add an entry here for each scrolling sign on the network.
+# topic: the MQTT topic wled-bridge subscribes to for text messages.
+#        Must match the text_topic in wled-bridge/config.yaml for that device.
+# ================================================================================
+
+signs:
+  - id: matrix
+    name: "Main Matrix"
+    topic: "${SHOWSITE_NAME}/wled/matrix/text"
+    led_count: 170
