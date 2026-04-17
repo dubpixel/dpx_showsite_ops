@@ -176,7 +176,11 @@
     r: 255, g: 220, b: 0,
     speed: 255,
     pal: 0,
-    swatchColor() { return this.pal == 0 ? `rgb(${this.r},${this.g},${this.b})` : '#555'; }
+    msg: '',
+    maxLen: {{ max_text_len }},
+    swatchColor() { return this.pal == 0 ? `rgb(${this.r},${this.g},${this.b})` : '#555'; },
+    charCount() { return this.msg.length; },
+    overLimit() { return this.msg.length > this.maxLen; }
   }">
     <h1>&#9632; Matrix Blast <a href="/messages" style="font-size:0.65rem;letter-spacing:0.1em;color:#555;text-decoration:none;float:right;padding-top:0.2rem" onmouseover="this.style.color='#999'" onmouseout="this.style.color='#555'">History &#9654;</a></h1>
 
@@ -201,8 +205,15 @@
       {% endif %}
 
       <div class="field">
-        <label for="text">Message</label>
-        <textarea name="text" id="text" placeholder="TYPE YOUR MESSAGE" autocomplete="off" autofocus></textarea>
+        <label for="text" style="display:flex;justify-content:space-between;align-items:baseline">
+          <span>Message</span>
+          <span x-text="charCount() + ' / ' + maxLen"
+                :style="overLimit() ? 'color:#f44336' : 'color:#555'"
+                style="font-size:0.65rem;letter-spacing:0;font-variant-numeric:tabular-nums"></span>
+        </label>
+        <textarea name="text" id="text" placeholder="TYPE YOUR MESSAGE" autocomplete="off" autofocus
+                  x-model="msg"
+                  :style="overLimit() ? 'border-color:#f44336' : ''"></textarea>
       </div>
 
       <div class="field">

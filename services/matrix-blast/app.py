@@ -76,6 +76,7 @@ def load_config():
 
 config = load_config()
 SIGNS = {s["id"]: s for s in config.get("signs", [])}
+MAX_TEXT_LEN: int = int(config.get("max_text_len", 200))
 
 # ============================================================================
 # Per-sign message queue
@@ -345,7 +346,10 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {"signs": list(SIGNS.values())})
+    return templates.TemplateResponse(request, "index.html", {
+        "signs": list(SIGNS.values()),
+        "max_text_len": MAX_TEXT_LEN,
+    })
 
 
 @app.post("/blast", response_class=HTMLResponse)
@@ -368,6 +372,8 @@ async def blast(
     text = text.strip()
     if not text:
         return HTMLResponse('<span class="status-err">Message cannot be empty.</span>')
+    if len(text) > MAX_TEXT_LEN:
+        return HTMLResponse(f'<span class="status-err">Too long — max {MAX_TEXT_LEN} characters ({len(text)} typed).</span>')
 
     from_name = from_name.strip()
     if from_name:

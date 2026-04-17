@@ -548,7 +548,7 @@ class WLEDBridge:
                 return ids
             except Exception as e:
                 log.debug(f"[matrix] preset fetch {path}: {e}")
-        self._screensaver_ids = []
+        # Don't cache failure — allow retry on next _clear_matrix call
         return []
 
     def _clear_matrix(self):
