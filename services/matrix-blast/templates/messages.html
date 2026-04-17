@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recent Blasts</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -122,6 +123,113 @@
       font-size: 0.85rem;
       text-align: center;
       padding: 2rem 0;
+    }
+
+    /* Live block */
+    .live-block {
+      border: 1px solid #2a2a2a;
+      border-left: 3px solid #ffdc00;
+      border-radius: 4px;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.75rem;
+      background: #1f1f1f;
+    }
+
+    .live-now {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ffdc00;
+      flex-shrink: 0;
+      animation: blink 1s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    .live-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffdc00;
+      flex: 1;
+    }
+
+    .live-ttl {
+      font-size: 0.65rem;
+      color: #555;
+    }
+
+    .skip-btn {
+      background: none;
+      border: 1px solid #333;
+      border-radius: 3px;
+      color: #666;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      padding: 0.15rem 0.45rem;
+      text-transform: uppercase;
+      transition: border-color 0.1s, color 0.1s;
+      flex-shrink: 0;
+    }
+    .skip-btn:hover { border-color: #ffdc00; color: #ffdc00; }
+    .skip-btn:active { opacity: 0.7; }
+    .skip-btn.htmx-request { opacity: 0.4; cursor: wait; }
+
+    .live-text {
+      font-size: 1rem;
+      color: #e0e0e0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .queue-list {
+      margin-top: 0.45rem;
+      border-top: 1px solid #2a2a2a;
+      padding-top: 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .queue-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .queue-pos {
+      font-size: 0.6rem;
+      color: #444;
+      flex-shrink: 0;
+      width: 1.5rem;
+    }
+
+    .queue-text {
+      font-size: 0.8rem;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .section-divider {
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #333;
+      margin: 0.5rem 0 0.6rem;
     }
 
     .pulse {

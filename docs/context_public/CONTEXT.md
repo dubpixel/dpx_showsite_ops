@@ -422,10 +422,70 @@ WLED firmware must have MQTT enabled:
 #### Management
 
 ```bash
-iot up wled-bridge          # Start service
-iot restart wled-bridge     # Restart
-iot logs wled-bridge [n]    # View logs
-iot rebuild wled-bridge     # Rebuild image and restart
+iot wled-up                 # Start service
+iot wled-restart            # Restart (picks up .env changes)
+iot wled-rebuild            # Rebuild image and restart (code changes)
+iot wled-logs [n]           # View logs
+iot wled-follow             # Stream logs in real-time
+```
+
+---
+
+### Matrix Blast
+
+**Web UI for blasting scrolling text to WLED LED matrices** (✅ Deployed)
+
+#### Overview
+
+- **Purpose**: Browser form that lets operators type messages and send them to one or more WLED matrix signs via MQTT
+- **Service**: `matrix-blast` (`services/matrix-blast/`)
+- **Port**: `8090` (`MATRIX_BLAST_PORT` env var)
+- **Config**: `services/matrix-blast/config.yaml` — define signs (MQTT topic, WLED host, text_preset, led_count)
+
+#### Endpoints
+
+| URL | Purpose |
+|-----|---------|
+| `http://<server>:8090/` | Blast form |
+| `http://<server>:8090/messages` | Recent blast history (auto-refreshes every 5s) |
+| `http://<server>:8090/status` | JSON — active message + queue per sign |
+| `http://<server>:8090/health` | Health check |
+
+Note: no `.html` extension on any URL.
+
+#### Features
+
+- **Palette selector** — Solid (uses RGB picker), Rainbow (11), Party (6), Fire (35), Lava (8), Ocean (9), Aurora (49). Palette number maps directly to WLED's built-in palette index; when non-zero, WLED colors the text using the palette instead of the solid RGB value.
+- **RGB color picker** — shown only when Solid palette is selected
+- **Speed** (0–255) — scroll speed
+- **TTL** — auto-clear after N seconds; first 50% of TTL is "locked" (new blasts queue)
+- **Message queue** — blasts arriving during lock window are queued and dispatched in order
+- **History page** (`/messages`) — last 100 blasts with color swatch, palette badge, age ("2m ago"); HTMX polls `/messages/feed` every 5s
+
+#### MQTT Payload
+
+```json
+{
+  "text": "DOORS OPEN",
+  "color": [255, 220, 0],
+  "speed": 255,
+  "ttl": 30,
+  "rotate": 14,
+  "pal": 0
+}
+```
+
+`pal: 0` = solid color; non-zero = WLED palette index. `rotate` maps to WLED `m12` (2D transform for the scrolling text effect).
+
+#### Management
+
+```bash
+iot matrix-blast-rebuild    # Rebuild image + restart (required after code changes)
+iot matrix-blast-restart    # Restart only (for .env / config changes, no rebuild)
+iot matrix-blast-logs [n]   # View logs
+iot matrix-blast-follow     # Stream logs in real-time
+iot matrix-blast-status     # Show active message + queue (alias: mb-status)
+iot tunnel-matrix           # Start Cloudflare tunnel to port 8090
 ```
 
 ---

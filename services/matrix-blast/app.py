@@ -32,6 +32,7 @@ import paho.mqtt.client as mqtt
 import yaml
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # ============================================================================
@@ -334,6 +335,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
@@ -447,6 +449,24 @@ async def status():
 def _messages_context() -> dict:
     """Build the template context for the messages feed."""
     now = time.monotonic()
+
+    # Live state: active message + queue per sign
+    live = []
+    for sign_id, sign in SIGNS.items():
+        state = _state.get(sign_id)
+        if not state or not state.active:
+            continue
+        a = state.active
+        remaining = max(0.0, a.ttl - (now - a.sent_at))
+        live.append({
+            "sign_id":   sign_id,
+            "sign_name": sign["name"],
+            "text":      a.text,
+            "remaining": int(remaining),
+            "locked":    a.lock_remaining() > 0,
+            "queue":     [{"pos": i + 1, "text": p.text} for i, p in enumerate(state.queue)],
+        })
+
     records = []
     for m in _message_log:
         elapsed = now - m.sent_monotonic
@@ -466,7 +486,7 @@ def _messages_context() -> dict:
             "age":        age,
             "color_hex":  "#{:02x}{:02x}{:02x}".format(*m.color) if m.pal == 0 else "#555555",
         })
-    return {"messages": records, "signs": list(SIGNS.values())}
+    return {"messages": records, "signs": list(SIGNS.values()), "live": live}
 
 
 @app.get("/messages", response_class=HTMLResponse)
@@ -478,3 +498,29 @@ async def messages_page(request: Request):
 async def messages_feed(request: Request):
     ctx = _messages_context()
     return templates.TemplateResponse(request, "messages_feed.html", ctx)
+
+
+@app.post("/skip/{sign_id}", response_class=HTMLResponse)
+async def skip(request: Request, sign_id: str):
+    sign = SIGNS.get(sign_id)
+    if not sign:
+        return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
+
+    state = _sign_state(sign_id)
+    if not state.active:
+        return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
+
+    if state.queue:
+        nxt = state.queue.pop(0)
+        try:
+            _do_publish(sign, nxt)
+            state.active = ActiveMessage(text=nxt.text, sent_at=time.monotonic(), ttl=nxt.ttl)
+            _log_blast(nxt.text, nxt.payload, sign_id, sign["name"])
+            log.info(f"[skip] sign={sign_id} advanced to next queued message: {nxt.text!r}")
+        except Exception as e:
+            log.error(f"[skip] publish failed for sign={sign_id}: {e}")
+    else:
+        log.info(f"[skip] sign={sign_id} cleared active message: {state.active.text!r}")
+        state.active = None
+
+    return templates.TemplateResponse(request, "messages_feed.html", _messages_context())

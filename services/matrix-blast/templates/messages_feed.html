@@ -2,6 +2,37 @@
      hx-get="/messages/feed"
      hx-trigger="every 5s"
      hx-swap="outerHTML">
+
+  {# ── Live: active + queued ────────────────────────────────────────────── #}
+  {% if live %}
+    {% for s in live %}
+    <div class="live-block">
+      <div class="live-now">
+        <span class="live-dot"></span>
+        <span class="live-label">On Air{% if signs | length > 1 %} · {{ s.sign_name }}{% endif %}</span>
+        <span class="live-ttl">{{ s.remaining }}s</span>
+        <button class="skip-btn"
+                hx-post="/skip/{{ s.sign_id }}"
+                hx-target="#feed"
+                hx-swap="outerHTML">{% if s.queue %}Next ›{% else %}Clear{% endif %}</button>
+      </div>
+      <div class="live-text" title="{{ s.text }}">{{ s.text | truncate(70, True, '…') }}</div>
+      {% if s.queue %}
+      <div class="queue-list">
+        {% for q in s.queue %}
+        <div class="queue-row">
+          <span class="queue-pos">#{{ q.pos }}</span>
+          <span class="queue-text" title="{{ q.text }}">{{ q.text | truncate(60, True, '…') }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="section-divider">History</div>
+  {% endif %}
+
+  {# ── History ──────────────────────────────────────────────────────────── #}
   {% if messages %}
     {% for m in messages %}
     <div class="msg-row">
@@ -17,4 +48,5 @@
   {% else %}
     <div class="msg-empty">No messages yet.</div>
   {% endif %}
+
 </div>

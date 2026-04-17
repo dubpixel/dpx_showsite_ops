@@ -353,6 +353,31 @@ iot schedule-dev-shell   # Open shell in dev container
 - View-only mode: append `/` to URL
 - Operator mode: append `/edit` to URL
 
+### Matrix Blast
+
+Browser UI for sending scrolling text to WLED LED matrix signs via MQTT.
+
+**Access**: `http://<server-ip>:8090`
+
+| URL | Purpose |
+|-----|---------|
+| `/` | Blast form |
+| `/messages` | Recent blast history (live, auto-refreshes every 5s) |
+| `/status` | JSON — active message + queue per sign |
+
+**Palette options**: Solid (RGB picker), Rainbow, Party, Fire, Lava, Ocean, Aurora — maps to WLED's built-in palette indices.
+
+```bash
+iot matrix-blast-rebuild    # Rebuild image + restart  ← use after code changes
+iot matrix-blast-restart    # Restart only             ← use for .env/config changes
+iot matrix-blast-logs [n]   # View logs
+iot matrix-blast-follow     # Stream logs in real-time
+iot matrix-blast-status     # Show active message + queue  (alias: mb-status)
+iot tunnel-matrix           # Cloudflare tunnel to port 8090
+```
+
+Config: `services/matrix-blast/config.yaml`
+
 ### M4300 Network Backup Management
 
 Automate Netgear M4300 switch configuration backups via TFTP (Phase 5):
