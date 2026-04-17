@@ -255,11 +255,11 @@ async def _queue_worker() -> None:
 
             sign = SIGNS[sign_id]
 
-            # Full TTL elapsed with nothing queued — clear internal state.
-            # wled-bridge owns the actual WLED transition (screensaver preset).
+            # Full TTL elapsed with nothing queued — clear and restore screensaver.
             if state.active.is_expired() and not state.queue:
                 log.info(f"[queue_worker] sign={sign_id} TTL expired, going idle")
                 state.active = None
+                await _activate_screensaver(sign_id, sign)
                 continue
 
             # Lock expired with messages queued — send next
