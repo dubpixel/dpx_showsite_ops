@@ -14,12 +14,14 @@
 # ================================================================================
 
 import asyncio
+import datetime
 import json
 import logging
 import os
 import random
 import sys
 import time
+from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -121,6 +123,55 @@ def _sign_state(sign_id: str) -> SignState:
     return _state[sign_id]
 
 
+# ============================================================================
+# Message history log (in-process, last 100 blasts)
+# ============================================================================
+
+PALETTE_NAMES = {
+    0:  "Solid",
+    6:  "Party",
+    8:  "Lava",
+    9:  "Ocean",
+    11: "Rainbow",
+    35: "Fire",
+    49: "Aurora",
+}
+
+
+@dataclass
+class MessageRecord:
+    text:          str
+    color:         list
+    pal:           int
+    sign_id:       str
+    sign_name:     str
+    sent_wall:     str    # HH:MM:SS wall-clock time
+    sent_monotonic: float  # time.monotonic() for "X min ago" computation
+
+
+_message_log: deque = deque(maxlen=100)
+
+
+def _log_blast(text: str, payload_json: str, sign_id: str, sign_name: str) -> None:
+    """Parse payload JSON and prepend a MessageRecord to the history log."""
+    try:
+        data  = json.loads(payload_json)
+        color = data.get("color", [255, 220, 0])
+        pal   = int(data.get("pal", 0))
+    except Exception:
+        color = [255, 220, 0]
+        pal   = 0
+    _message_log.appendleft(MessageRecord(
+        text=text,
+        color=color,
+        pal=pal,
+        sign_id=sign_id,
+        sign_name=sign_name,
+        sent_wall=datetime.datetime.now().strftime("%H:%M:%S"),
+        sent_monotonic=time.monotonic(),
+    ))
+
+
 def _do_publish(sign: dict, blast: PendingBlast) -> None:
     """Fire-and-forget MQTT publish; raises on failure."""
     result = mqtt_client.publish(sign["topic"], blast.payload, qos=0)
@@ -213,6 +264,7 @@ async def _queue_worker() -> None:
             try:
                 _do_publish(sign, nxt)
                 state.active = ActiveMessage(text=nxt.text, sent_at=time.monotonic(), ttl=nxt.ttl)
+                _log_blast(nxt.text, nxt.payload, sign_id, sign["name"])
             except Exception as e:
                 log.error(f"[queue_worker] publish failed for sign={sign_id}: {e}")
 
@@ -301,6 +353,7 @@ async def blast(
     b:         int  = Form(0),
     speed:     int  = Form(255),
     ttl:       int  = Form(30),
+    pal:       int  = Form(0),
 ):
     sign = SIGNS.get(sign_id)
     if not sign:
@@ -321,21 +374,23 @@ async def blast(
         "speed":  max(0, min(255, speed)),
         "ttl":    ttl,
         "rotate": 14,
+        "pal":    max(0, min(69, pal)),
     })
-    blast = PendingBlast(text=text, payload=payload, ttl=ttl)
+    pending = PendingBlast(text=text, payload=payload, ttl=ttl)
     state = _sign_state(sign_id)
 
     # If the sign is locked, queue and return position
     if state.active and state.active.lock_remaining() > 0:
-        state.queue.append(blast)
+        state.queue.append(pending)
         pos = len(state.queue)
         log.info(f"[blast] queued pos={pos} sign={sign_id} text={text!r}")
         return HTMLResponse(f'<span class="status-ok">&#9654; Queued (#{pos})</span>')
 
     # Otherwise send immediately
     try:
-        _do_publish(sign, blast)
+        _do_publish(sign, pending)
         state.active = ActiveMessage(text=text, sent_at=time.monotonic(), ttl=ttl)
+        _log_blast(text, payload, sign_id, sign["name"])
         return HTMLResponse(f'<span class="status-ok">✓ Sent to {sign["name"]}</span>')
     except Exception as e:
         log.error(f"[blast] MQTT publish failed: {e}")
@@ -387,3 +442,39 @@ async def status():
             "queue": [{"pos": i + 1, "text": p.text, "ttl": p.ttl} for i, p in enumerate(state.queue)],
         }
     return out
+
+
+def _messages_context() -> dict:
+    """Build the template context for the messages feed."""
+    now = time.monotonic()
+    records = []
+    for m in _message_log:
+        elapsed = now - m.sent_monotonic
+        if elapsed < 60:
+            age = f"{int(elapsed)}s ago"
+        elif elapsed < 3600:
+            age = f"{int(elapsed // 60)}m ago"
+        else:
+            age = f"{int(elapsed // 3600)}h ago"
+        records.append({
+            "text":       m.text,
+            "color":      m.color,
+            "pal":        m.pal,
+            "pal_name":   PALETTE_NAMES.get(m.pal, f"Palette {m.pal}"),
+            "sign_name":  m.sign_name,
+            "sent_wall":  m.sent_wall,
+            "age":        age,
+            "color_hex":  "#{:02x}{:02x}{:02x}".format(*m.color) if m.pal == 0 else "#555555",
+        })
+    return {"messages": records, "signs": list(SIGNS.values())}
+
+
+@app.get("/messages", response_class=HTMLResponse)
+async def messages_page(request: Request):
+    return templates.TemplateResponse(request, "messages.html", _messages_context())
+
+
+@app.get("/messages/feed", response_class=HTMLResponse)
+async def messages_feed(request: Request):
+    ctx = _messages_context()
+    return templates.TemplateResponse(request, "messages_feed.html", ctx)

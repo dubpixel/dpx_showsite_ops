@@ -1,0 +1,20 @@
+<div id="feed"
+     hx-get="/messages/feed"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+  {% if messages %}
+    {% for m in messages %}
+    <div class="msg-row">
+      <span class="msg-swatch" style="background:{{ m.color_hex }}"></span>
+      <div class="msg-body">
+        <span class="msg-text" title="{{ m.text }}">{{ m.text | truncate(70, True, '…') }}</span>
+        {% if m.pal != 0 %}<span class="msg-badge">{{ m.pal_name }}</span>{% endif %}
+        {% if signs | length > 1 %}<span class="msg-sign">{{ m.sign_name }}</span>{% endif %}
+      </div>
+      <span class="msg-time" title="{{ m.sent_wall }}">{{ m.age }}</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="msg-empty">No messages yet.</div>
+  {% endif %}
+</div>
