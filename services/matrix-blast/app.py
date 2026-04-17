@@ -189,11 +189,11 @@ def _influx_write(record: "MessageRecord") -> None:
             Point("matrix_blast")
             .tag("sign_id", record.sign_id)
             .tag("sign_name", record.sign_name)
-            .field("text", record.text)
-            .field("color_r", record.color[0])
-            .field("color_g", record.color[1])
-            .field("color_b", record.color[2])
-            .field("pal", record.pal)
+            .field("payload", json.dumps({
+                "text":  record.text,
+                "color": record.color,
+                "pal":   record.pal,
+            }))
         )
         _influx_write_api.write(bucket=INFLUX_BUCKET, record=point)
     except Exception as e:
@@ -208,26 +208,25 @@ def _influx_load_history() -> None:
         flux = f'''
 from(bucket: "{INFLUX_BUCKET}")
   |> range(start: -30d)
-  |> filter(fn: (r) => r._measurement == "matrix_blast")
-  |> pivot(rowKey:["_time"], columnKey: ["_field"], value: "_value")
+  |> filter(fn: (r) => r._measurement == "matrix_blast" and r._field == "payload")
   |> sort(columns: ["_time"], desc: true)
   |> limit(n: 100)
 '''
         tables = query_api.query(flux)
-        now_wall  = time.time()
-        now_mono  = time.monotonic()
+        now_wall = time.time()
+        now_mono = time.monotonic()
         rows: list[MessageRecord] = []
         for table in tables:
             for rec in table.records:
                 epoch = rec.get_time().timestamp()
+                try:
+                    data = json.loads(rec.get_value())
+                except Exception:
+                    continue
                 rows.append(MessageRecord(
-                    text=str(rec.values.get("text", "")),
-                    color=[
-                        int(rec.values.get("color_r", 255)),
-                        int(rec.values.get("color_g", 220)),
-                        int(rec.values.get("color_b", 0)),
-                    ],
-                    pal=int(rec.values.get("pal", 0)),
+                    text=str(data.get("text", "")),
+                    color=data.get("color", [255, 220, 0]),
+                    pal=int(data.get("pal", 0)),
                     sign_id=str(rec.values.get("sign_id", "")),
                     sign_name=str(rec.values.get("sign_name", "")),
                     sent_wall=datetime.datetime.fromtimestamp(epoch).strftime("%H:%M:%S"),
