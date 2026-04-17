@@ -43,6 +43,7 @@ wled:
 
 matrix:
   device_topic: "${WLED_MATRIX_TOPIC}"
+  wled_host: "${WLED_MATRIX_HOST}"   # IP or hostname for HTTP preset fetch
   width: 17
   height: 10
   led_count: 170

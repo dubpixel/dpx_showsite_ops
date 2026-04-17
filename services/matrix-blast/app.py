@@ -224,6 +224,26 @@ def _screensaver_presets(sign_id: str, sign: dict) -> list[int]:
     return ids
 
 
+async def _activate_screensaver(sign_id: str, sign: dict) -> None:
+    """Fetch screensaver preset pool and publish a random one to the sign."""
+    api_topic = sign.get("api_topic")
+    wled_host = sign.get("wled_host")
+    if not (api_topic and wled_host):
+        return
+    try:
+        await _fetch_preset_ids(sign_id, wled_host)
+        ids = _screensaver_presets(sign_id, sign)
+        if ids:
+            preset = random.choice(ids)
+            result = mqtt_client.publish(api_topic, json.dumps({"ps": preset}), qos=0)
+            result.wait_for_publish(timeout=3.0)
+            log.info(f"[screensaver] sign={sign_id} → preset {preset}")
+        else:
+            log.warning(f"[screensaver] sign={sign_id} no screensaver presets available")
+    except Exception as e:
+        log.error(f"[screensaver] sign={sign_id} failed: {e}")
+
+
 async def _queue_worker() -> None:
     """Background task: drain queues and restore idle preset when sign goes quiet."""
     while True:
@@ -234,27 +254,11 @@ async def _queue_worker() -> None:
 
             sign = SIGNS[sign_id]
 
-            # Full TTL elapsed with nothing queued — restore a random idle preset
+            # Full TTL elapsed with nothing queued — clear internal state.
+            # wled-bridge owns the actual WLED transition (screensaver preset).
             if state.active.is_expired() and not state.queue:
                 log.info(f"[queue_worker] sign={sign_id} TTL expired, going idle")
                 state.active = None
-                api_topic = sign.get("api_topic")
-                wled_host = sign.get("wled_host")
-                log.info(f"[queue_worker] sign={sign_id} api_topic={api_topic!r} wled_host={wled_host!r}")
-                if api_topic and wled_host:
-                    try:
-                        await _fetch_preset_ids(sign_id, wled_host)
-                        ids = _screensaver_presets(sign_id, sign)
-                        log.info(f"[queue_worker] sign={sign_id} screensaver pool: {ids}")
-                        if ids:
-                            preset = random.choice(ids)
-                            payload = json.dumps({"ps": preset})
-                            log.info(f"[queue_worker] sign={sign_id} publishing preset {preset} to {api_topic!r}")
-                            result = mqtt_client.publish(api_topic, payload, qos=0)
-                            result.wait_for_publish(timeout=3.0)
-                            log.info(f"[queue_worker] sign={sign_id} idle → preset {preset} ✓")
-                    except Exception as e:
-                        log.error(f"[queue_worker] idle preset failed for sign={sign_id}: {e}")
                 continue
 
             # Lock expired with messages queued — send next
@@ -523,6 +527,7 @@ async def skip(request: Request, sign_id: str):
     else:
         log.info(f"[skip] sign={sign_id} cleared active message: {state.active.text!r}")
         state.active = None
+        await _activate_screensaver(sign_id, sign)
 
     return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
 

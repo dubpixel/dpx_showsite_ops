@@ -19,10 +19,12 @@
 import json
 import logging
 import os
+import random
 import re
 import socket
 import sys
 import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from threading import Thread, Timer
@@ -316,6 +318,7 @@ class WLEDBridge:
         self.client.on_disconnect = self._on_disconnect
 
         self._heartbeat_timer = None
+        self._screensaver_ids = None  # cached after first fetch
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
@@ -523,12 +526,43 @@ class WLEDBridge:
             return
         self._dispatch_matrix_text(text, color, speed, ttl, m12, pal)
 
+    def _get_screensaver_ids(self) -> list:
+        """Return screensaver preset IDs (all presets except text_preset), cached."""
+        if self._screensaver_ids is not None:
+            return self._screensaver_ids
+        wled_host = self.matrix_cfg.get("wled_host", "")
+        if not wled_host:
+            self._screensaver_ids = []
+            return []
+        text_preset = self.matrix_cfg.get("text_preset")
+        for path in ("/json/presets", "/presets.json"):
+            try:
+                url = f"http://{wled_host}{path}"
+                with urllib.request.urlopen(url, timeout=3) as resp:
+                    data = json.loads(resp.read())
+                ids = [int(k) for k in data.keys() if k.isdigit() and k != "0"]
+                if text_preset:
+                    ids = [i for i in ids if i != int(text_preset)]
+                self._screensaver_ids = ids
+                log.info(f"[matrix] screensaver preset pool: {ids}")
+                return ids
+            except Exception as e:
+                log.debug(f"[matrix] preset fetch {path}: {e}")
+        self._screensaver_ids = []
+        return []
+
     def _clear_matrix(self):
-        """Publish a blank (solid black) frame to the matrix after TTL expires."""
-        led_count = int(self.matrix_cfg.get("led_count", 170))
-        self.client.publish(self.matrix_api_topic, build_wled_matrix_clear_cmd(led_count))
-        log.info(f"[matrix] TTL expired — cleared  →  {self.matrix_api_topic}")
+        """After TTL expires, activate a random screensaver preset (or blank if none configured)."""
         self._text_clear_timer = None
+        ids = self._get_screensaver_ids()
+        if ids:
+            preset = random.choice(ids)
+            self.client.publish(self.matrix_api_topic, json.dumps({"ps": preset}))
+            log.info(f"[matrix] TTL expired → screensaver preset {preset}  →  {self.matrix_api_topic}")
+        else:
+            led_count = int(self.matrix_cfg.get("led_count", 170))
+            self.client.publish(self.matrix_api_topic, build_wled_matrix_clear_cmd(led_count))
+            log.info(f"[matrix] TTL expired — cleared (no screensaver presets)  →  {self.matrix_api_topic}")
 
     def _start_udp_listener(self, port: int):
         """Start a daemon thread that listens for UDP text datagrams."""
