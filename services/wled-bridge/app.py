@@ -345,6 +345,8 @@ class WLEDBridge:
                 udp_port = int(self.matrix_cfg.get("udp_port", 0))
                 if udp_port:
                     log.info(f"Matrix UDP listener: port {udp_port}")
+                # Pre-fetch screensaver preset IDs so cache is warm before first TTL fires
+                Thread(target=self._get_screensaver_ids, name="preset-prefetch", daemon=True).start()
             self._schedule_heartbeat()
         else:
             log.error(f"MQTT connect failed (rc={rc})")
@@ -547,7 +549,8 @@ class WLEDBridge:
                 log.info(f"[matrix] screensaver preset pool: {ids}")
                 return ids
             except Exception as e:
-                log.debug(f"[matrix] preset fetch {path}: {e}")
+                log.warning(f"[matrix] preset fetch {path} failed: {e}")
+        log.warning(f"[matrix] could not fetch screensaver presets from {wled_host} — will retry next TTL")
         # Don't cache failure — allow retry on next _clear_matrix call
         return []
 
