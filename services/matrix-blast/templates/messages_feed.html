@@ -23,6 +23,12 @@
         <div class="queue-row">
           <span class="queue-pos">#{{ q.pos }}</span>
           <span class="queue-text" title="{{ q.text }}">{{ q.text | truncate(60, True, '…') }}</span>
+          {% if q.pos > 1 %}
+          <button class="bump-btn"
+                  hx-post="/bump/{{ s.sign_id }}/{{ q.pos }}"
+                  hx-target="#feed"
+                  hx-swap="outerHTML">↑</button>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -43,6 +49,12 @@
         {% if signs | length > 1 %}<span class="msg-sign">{{ m.sign_name }}</span>{% endif %}
       </div>
       <span class="msg-time" title="{{ m.sent_wall }}">{{ m.age }}</span>
+      <button class="replay-btn"
+              hx-post="/replay"
+              hx-vals='{"sign_id": {{ m.sign_id | tojson }}, "text": {{ m.text | tojson }}, "r": {{ m.color[0] }}, "g": {{ m.color[1] }}, "b": {{ m.color[2] }}, "pal": {{ m.pal }}}'
+              hx-target="#feed"
+              hx-swap="outerHTML"
+              title="Replay">↺</button>
     </div>
     {% endfor %}
   {% else %}

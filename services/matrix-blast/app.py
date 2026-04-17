@@ -481,6 +481,7 @@ def _messages_context() -> dict:
             "color":      m.color,
             "pal":        m.pal,
             "pal_name":   PALETTE_NAMES.get(m.pal, f"Palette {m.pal}"),
+            "sign_id":    m.sign_id,
             "sign_name":  m.sign_name,
             "sent_wall":  m.sent_wall,
             "age":        age,
@@ -522,5 +523,57 @@ async def skip(request: Request, sign_id: str):
     else:
         log.info(f"[skip] sign={sign_id} cleared active message: {state.active.text!r}")
         state.active = None
+
+    return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
+
+
+@app.post("/bump/{sign_id}/{pos}", response_class=HTMLResponse)
+async def bump(request: Request, sign_id: str, pos: int):
+    """Move a queued message (1-indexed pos) to the front of the queue."""
+    state = _sign_state(sign_id)
+    idx = pos - 1
+    if 0 < idx < len(state.queue):
+        state.queue.insert(0, state.queue.pop(idx))
+        log.info(f"[bump] sign={sign_id} moved queue pos {pos} to front: {state.queue[0].text!r}")
+    return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
+
+
+@app.post("/replay", response_class=HTMLResponse)
+async def replay(
+    request: Request,
+    sign_id: str = Form(...),
+    text:    str = Form(...),
+    r:       int = Form(255),
+    g:       int = Form(220),
+    b:       int = Form(0),
+    pal:     int = Form(0),
+):
+    sign = SIGNS.get(sign_id)
+    if not sign or not text.strip():
+        return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
+
+    ttl = 30  # use default TTL for replays
+    payload = json.dumps({
+        "text":   text,
+        "color":  [max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))],
+        "speed":  255,
+        "ttl":    ttl,
+        "rotate": 14,
+        "pal":    max(0, min(69, pal)),
+    })
+    pending = PendingBlast(text=text, payload=payload, ttl=ttl)
+    state = _sign_state(sign_id)
+
+    if state.active and state.active.lock_remaining() > 0:
+        state.queue.append(pending)
+        log.info(f"[replay] queued sign={sign_id} text={text!r}")
+    else:
+        try:
+            _do_publish(sign, pending)
+            state.active = ActiveMessage(text=text, sent_at=time.monotonic(), ttl=ttl)
+            _log_blast(text, payload, sign_id, sign["name"])
+            log.info(f"[replay] sent sign={sign_id} text={text!r}")
+        except Exception as e:
+            log.error(f"[replay] MQTT publish failed: {e}")
 
     return templates.TemplateResponse(request, "messages_feed.html", _messages_context())
