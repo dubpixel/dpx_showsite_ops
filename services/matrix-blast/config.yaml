@@ -6,7 +6,7 @@
 #        Must match the text_topic in wled-bridge/config.yaml for that device.
 # ================================================================================
 
-max_text_len: 200   # characters — WLED truncates at its own limit (32–255 depending on version)
+max_text_len: 50    # characters — WLED display limit is ~70 chars; 50 keeps scrolling snappy
 
 signs:
   - id: matrix
