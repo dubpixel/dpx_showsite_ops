@@ -255,10 +255,15 @@ services:
       - WLED_MATRIX_TOPIC=${WLED_MATRIX_TOPIC:-wled-matrix}
       - WLED_MATRIX_HOST=${WLED_MATRIX_HOST:-wled-matrix.local}
       - TZ=${TZ}
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-home}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-sensors}
     networks:
       - iot
     depends_on:
       - mosquitto
+      - influxdb
 
   dpx-guest-alert-button:
     build:

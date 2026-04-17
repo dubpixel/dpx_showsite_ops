@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 import paho.mqtt.client as mqtt
 import yaml
@@ -55,6 +57,11 @@ PORT      = int(os.getenv("MQTT_PORT", "1883"))
 SHOWSITE  = os.getenv("SHOWSITE_NAME", "demo_showsite")
 
 CONFIG_FILE = Path(__file__).parent / "config.yaml"
+
+INFLUX_URL    = os.getenv("INFLUXDB_URL", "")
+INFLUX_TOKEN  = os.getenv("INFLUXDB_TOKEN", "")
+INFLUX_ORG    = os.getenv("INFLUXDB_ORG", "home")
+INFLUX_BUCKET = os.getenv("INFLUXDB_BUCKET", "sensors")
 
 
 def expand_env(value):
@@ -153,6 +160,86 @@ class MessageRecord:
 
 _message_log: deque = deque(maxlen=100)
 
+# ============================================================================
+# InfluxDB persistence — write each blast as a point, reload history on boot
+# ============================================================================
+
+_influx_client: InfluxDBClient | None = None
+_influx_write_api = None
+
+
+def _influx_init() -> None:
+    global _influx_client, _influx_write_api
+    if not (INFLUX_URL and INFLUX_TOKEN):
+        log.warning("[influx] INFLUXDB_URL or INFLUXDB_TOKEN not set — message history will not persist across restarts")
+        return
+    try:
+        _influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+        _influx_write_api = _influx_client.write_api(write_options=SYNCHRONOUS)
+        log.info(f"[influx] client ready → {INFLUX_URL} bucket={INFLUX_BUCKET}")
+    except Exception as e:
+        log.warning(f"[influx] init failed: {e}")
+
+
+def _influx_write(record: "MessageRecord") -> None:
+    if not _influx_write_api:
+        return
+    try:
+        point = (
+            Point("matrix_blast")
+            .tag("sign_id", record.sign_id)
+            .tag("sign_name", record.sign_name)
+            .field("text", record.text)
+            .field("color_r", record.color[0])
+            .field("color_g", record.color[1])
+            .field("color_b", record.color[2])
+            .field("pal", record.pal)
+        )
+        _influx_write_api.write(bucket=INFLUX_BUCKET, record=point)
+    except Exception as e:
+        log.warning(f"[influx] write failed: {e}")
+
+
+def _influx_load_history() -> None:
+    if not _influx_client:
+        return
+    try:
+        query_api = _influx_client.query_api()
+        flux = f'''
+from(bucket: "{INFLUX_BUCKET}")
+  |> range(start: -30d)
+  |> filter(fn: (r) => r._measurement == "matrix_blast")
+  |> pivot(rowKey:["_time"], columnKey: ["_field"], value: "_value")
+  |> sort(columns: ["_time"], desc: true)
+  |> limit(n: 100)
+'''
+        tables = query_api.query(flux)
+        now_wall  = time.time()
+        now_mono  = time.monotonic()
+        rows: list[MessageRecord] = []
+        for table in tables:
+            for rec in table.records:
+                epoch = rec.get_time().timestamp()
+                rows.append(MessageRecord(
+                    text=str(rec.values.get("text", "")),
+                    color=[
+                        int(rec.values.get("color_r", 255)),
+                        int(rec.values.get("color_g", 220)),
+                        int(rec.values.get("color_b", 0)),
+                    ],
+                    pal=int(rec.values.get("pal", 0)),
+                    sign_id=str(rec.values.get("sign_id", "")),
+                    sign_name=str(rec.values.get("sign_name", "")),
+                    sent_wall=datetime.datetime.fromtimestamp(epoch).strftime("%H:%M:%S"),
+                    sent_monotonic=now_mono - (now_wall - epoch),
+                ))
+        # rows are newest-first; load oldest-first so newest ends up at front of deque
+        for r in reversed(rows):
+            _message_log.appendleft(r)
+        log.info(f"[influx] loaded {len(rows)} message(s) into history")
+    except Exception as e:
+        log.warning(f"[influx] failed to load history: {e}")
+
 
 def _log_blast(text: str, payload_json: str, sign_id: str, sign_name: str) -> None:
     """Parse payload JSON and prepend a MessageRecord to the history log."""
@@ -163,7 +250,7 @@ def _log_blast(text: str, payload_json: str, sign_id: str, sign_name: str) -> No
     except Exception:
         color = [255, 220, 0]
         pal   = 0
-    _message_log.appendleft(MessageRecord(
+    record = MessageRecord(
         text=text,
         color=color,
         pal=pal,
@@ -171,7 +258,9 @@ def _log_blast(text: str, payload_json: str, sign_id: str, sign_name: str) -> No
         sign_name=sign_name,
         sent_wall=datetime.datetime.now().strftime("%H:%M:%S"),
         sent_monotonic=time.monotonic(),
-    ))
+    )
+    _message_log.appendleft(record)
+    _influx_write(record)
 
 
 def _do_publish(sign: dict, blast: PendingBlast) -> None:
@@ -315,6 +404,8 @@ async def lifespan(app: FastAPI):
     log.info(f"Matrix Blast starting — signs: {list(SIGNS.keys())}")
     for sign in SIGNS.values():
         log.info(f"  sign={sign['id']} api_topic={sign.get('api_topic')!r} wled_host={sign.get('wled_host')!r}")
+    _influx_init()
+    _influx_load_history()
     mqtt_connect()
     worker = asyncio.create_task(_queue_worker())
     # Warm preset cache and fire an initial idle preset on every sign at boot
