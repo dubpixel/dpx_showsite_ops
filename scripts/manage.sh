@@ -30,7 +30,7 @@ run_tunnel_background() {
   }
   
   # Check for existing tunnel on this port
-  EXISTING_PID=$(pgrep -f "cloudflared tunnel --url.*:$PORT\b")
+  EXISTING_PID=$(pgrep -f "cloudflared tunnel.*--url.*:$PORT\b")
   if [ -n "$EXISTING_PID" ]; then
     echo "⚠️  $NAME tunnel already running (PID: $EXISTING_PID)"
     if [ -f "$URL_FILE" ]; then
@@ -59,7 +59,7 @@ run_tunnel_background() {
   > "$LOG_FILE"
   
   # Start tunnel in background
-  nohup cloudflared tunnel --url http://localhost:$PORT >"$LOG_FILE" 2>&1 &
+  nohup cloudflared tunnel --config /dev/null --url http://localhost:$PORT >"$LOG_FILE" 2>&1 &
   TUNNEL_PID=$!
   echo $TUNNEL_PID > "$PID_FILE"
   
