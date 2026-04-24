@@ -91,6 +91,32 @@ run_tunnel_background() {
   return 0
 }
 
+# ── Govee BLE helpers (Theengs Gateway → MQTT → BLE GATT) ─────────────────────
+
+_govee_ble_build_cmd() {
+  # Build a 20-byte Govee BLE command hex string.
+  # Takes hex byte args (e.g. "33" "01" "01"), pads to 19, appends XOR checksum.
+  local bytes=("$@")
+  while [ ${#bytes[@]} -lt 19 ]; do bytes+=("00"); done
+  local chk=0
+  for b in "${bytes[@]}"; do chk=$(( chk ^ 16#$b )); done
+  local hex=""
+  for b in "${bytes[@]}"; do hex+="$b"; done
+  printf "%s%02x" "$hex" "$chk"
+}
+
+_govee_ble_send() {
+  # Send a GATT write to a Govee BLE device via Theengs Gateway command topic.
+  # Args: <mac> <20-byte-hex-value>
+  local mac="$1"
+  local value="$2"
+  local payload
+  payload=$(printf '{"id":"%s","serviceUUID":"00010203-0405-0607-0809-0a0b0c0d1910","characteristicUUID":"00010203-0405-0607-0809-0a0b0c0d2b11","value":"%s","write":true}' "$mac" "$value")
+  docker exec mosquitto mosquitto_pub -t "home/TheengsGateway/commands/MQTTtoBT" -m "$payload"
+}
+
+# ───────────────────────────────────────────────────────────────────────────────
+
 case "$1" in
   up)       docker compose up -d ;;
   down)     docker compose down ;;
@@ -1404,6 +1430,92 @@ for sign_id, s in data.items():
             echo "Button Health: http://${_IP}:${BUTTON_HEALTH_PORT:-8080}/health"
             echo "Matrix Blast:  http://${_IP}:${MATRIX_BLAST_PORT:-8090}"
             ;;
+  # ── Govee H612D BLE Light Control ─────────────────────────────────────────────
+  # Sends GATT commands via Theengs Gateway MQTT command topic.
+  # Override MAC with H612D_MAC env var (e.g. in .env) for a different unit.
+
+  h612d-on)
+    MAC="${H612D_MAC:-DB:48:45:06:4B:3E}"
+    CMD=$(_govee_ble_build_cmd 33 01 01)
+    _govee_ble_send "$MAC" "$CMD"
+    echo "✓ H612D on ($MAC)"
+    ;;
+
+  h612d-off)
+    MAC="${H612D_MAC:-DB:48:45:06:4B:3E}"
+    CMD=$(_govee_ble_build_cmd 33 01 00)
+    _govee_ble_send "$MAC" "$CMD"
+    echo "✓ H612D off ($MAC)"
+    ;;
+
+  h612d-brightness)
+    if [ -z "$2" ]; then
+      echo "Usage: iot h612d-brightness <0-100>"
+      exit 1
+    fi
+    if ! [[ "$2" =~ ^[0-9]+$ ]] || [ "$2" -gt 100 ]; then
+      echo "✗ Brightness must be 0-100"
+      exit 1
+    fi
+    MAC="${H612D_MAC:-DB:48:45:06:4B:3E}"
+    BRIGHT=$(printf "%02x" "$2")
+    CMD=$(_govee_ble_build_cmd 33 04 "$BRIGHT")
+    _govee_ble_send "$MAC" "$CMD"
+    echo "✓ H612D brightness → $2% ($MAC)"
+    ;;
+
+  h612d-color)
+    MAC="${H612D_MAC:-DB:48:45:06:4B:3E}"
+    case "$2" in
+      red)     R="ff"; G="00"; B="00" ;;
+      green)   R="00"; G="ff"; B="00" ;;
+      blue)    R="00"; G="00"; B="ff" ;;
+      white)   R="ff"; G="ff"; B="ff" ;;
+      yellow)  R="ff"; G="ff"; B="00" ;;
+      cyan)    R="00"; G="ff"; B="ff" ;;
+      magenta) R="ff"; G="00"; B="ff" ;;
+      orange)  R="ff"; G="a5"; B="00" ;;
+      purple)  R="80"; G="00"; B="80" ;;
+      pink)    R="ff"; G="c0"; B="cb" ;;
+      warm)    R="ff"; G="8c"; B="00" ;;
+      "")
+        echo "Usage: iot h612d-color <preset|r g b>"
+        echo "Presets: red green blue white yellow cyan magenta orange purple pink warm"
+        echo "Example: iot h612d-color 255 128 0"
+        exit 1
+        ;;
+      *)
+        if [ -z "$3" ] || [ -z "$4" ]; then
+          echo "Usage: iot h612d-color <preset|r g b>"
+          echo "Presets: red green blue white yellow cyan magenta orange purple pink warm"
+          echo "Example: iot h612d-color 255 128 0"
+          exit 1
+        fi
+        for val in "$2" "$3" "$4"; do
+          if ! [[ "$val" =~ ^[0-9]+$ ]] || [ "$val" -gt 255 ]; then
+            echo "✗ RGB values must be 0-255"
+            exit 1
+          fi
+        done
+        R=$(printf "%02x" "$2")
+        G=$(printf "%02x" "$3")
+        B=$(printf "%02x" "$4")
+        ;;
+    esac
+    CMD=$(_govee_ble_build_cmd 33 05 02 "$R" "$G" "$B")
+    _govee_ble_send "$MAC" "$CMD"
+    echo "✓ H612D color → #${R}${G}${B} ($MAC)"
+    ;;
+
+  h612d-status)
+    MAC="${H612D_MAC:-DB:48:45:06:4B:3E}"
+    TOPIC="home/TheengsGateway/BTtoMQTT/$(echo "$MAC" | tr -d ':')"
+    echo "Waiting for H612D advertisement ($MAC)..."
+    docker exec mosquitto mosquitto_sub -t "$TOPIC" -C 1 | python3 -m json.tool
+    ;;
+
+  # ───────────────────────────────────────────────────────────────────────────────
+
   *)
     # Read version from VERSION file
     VERSION="$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo 'unknown')"
@@ -1605,6 +1717,15 @@ for sign_id, s in data.items():
     echo "    backup                 Backup Grafana + InfluxDB volumes to ~/backups/"
     echo "    clear-retained [topic] Clear retained MQTT messages (default: all topics)"
     echo "                           examples: iot clear-retained / iot clear-retained 'gv2mqtt/#'"
+    echo ""
+    echo "  GOVEE H612D BLE LIGHTS (via Theengs Gateway → MQTT → GATT)"
+    echo "    h612d-on               Power on"
+    echo "    h612d-off              Power off"
+    echo "    h612d-brightness <n>   Set brightness 0-100"
+    echo "    h612d-color <preset>   Set color: red green blue white yellow cyan magenta orange purple pink warm"
+    echo "    h612d-color <r> <g> <b>  Set color by RGB (0-255 each)"
+    echo "    h612d-status           Show current BLE advertisement"
+    echo "    Default MAC:           DB:48:45:06:4B:3E  (override with H612D_MAC= in .env)"
     echo ""
     echo "  ESP32 CONFIG"
     echo "    esp32-enable           Python decodes only - raw manufacturerdata, Govee sensors only"
