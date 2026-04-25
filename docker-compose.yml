@@ -297,17 +297,14 @@ services:
     image: ghcr.io/theengs/gateway
     container_name: theengs-gateway
     restart: unless-stopped
+    network_mode: host
     privileged: true
     environment:
-      - MQTT_HOST=mosquitto
+      - MQTT_HOST=localhost
       - MQTT_PORT=1883
-      - LOG_LEVEL=WARNING
+      - MQTT_LOG_LEVEL=WARNING
     volumes:
       - /var/run/dbus:/var/run/dbus
-    networks:
-      - iot
-    depends_on:
-      - mosquitto
 
   govee-ble-control:
     build:
