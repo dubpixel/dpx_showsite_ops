@@ -156,7 +156,9 @@ case "$1" in
   lf)       docker logs grafana 2>&1 | tail -${2:-30} ;;
   lb)       docker logs ble-decoder 2>&1 | tail -${2:-30} ;;
   lp)       docker logs physical-control 2>&1 | tail -${2:-30} ;;
-  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana ble-decoder physical-control; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
+  la)       for c in govee2mqtt telegraf mosquitto influxdb grafana ble-decoder physical-control theengs-gateway govee-ble-control; do echo "=== $c ===" && docker logs $c 2>&1 | tail -${2:-10} && echo; done ;;
+  lth)      docker logs theengs-gateway 2>&1 | tail -${2:-30} ;;
+  lbc)      docker logs govee-ble-control 2>&1 | tail -${2:-30} ;;
   query)    docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-30m}) |> limit(n:${3:-5})" ;;
   query-tags) docker exec influxdb influx query --org home --token my-super-secret-token "from(bucket:\"sensors\") |> range(start: -${2:-5m}) |> limit(n:${3:-20})" ;;
   mqtt)     docker exec mosquitto mosquitto_sub -t "${2:-gv2mqtt/#}" -v -C ${3:-5} | ts '[%H:%M:%S]' ;;
@@ -1430,6 +1432,39 @@ for sign_id, s in data.items():
             echo "Button Health: http://${_IP}:${BUTTON_HEALTH_PORT:-8080}/health"
             echo "Matrix Blast:  http://${_IP}:${MATRIX_BLAST_PORT:-8090}"
             ;;
+  # ── Bluetooth / USB-IP ─────────────────────────────────────────────────────────
+
+  bt-install)
+    echo "Installing usbip-bt systemd service..."
+    sudo cp "$REPO_ROOT/services/usbip-bt.service" /etc/systemd/system/usbip-bt.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable usbip-bt
+    sudo systemctl start usbip-bt
+    echo "✓ usbip-bt installed and started"
+    echo "  Edit /etc/systemd/system/usbip-bt.service to update host IP when you set a static address"
+    ;;
+
+  bt-attach)
+    WINDOWS_IP="${2:-10.109.0.212}"
+    BUSID="${3:-3-10}"
+    echo "Attaching BT adapter from $WINDOWS_IP busid $BUSID..."
+    sudo modprobe vhci-hcd
+    sudo usbip attach -r "$WINDOWS_IP" -b "$BUSID"
+    sleep 1
+    hciconfig
+    ;;
+
+  bt-status)
+    echo "=== Bluetooth Adapter ==="
+    hciconfig 2>/dev/null || echo "  (none — run: iot bt-attach)"
+    echo ""
+    echo "=== usbip-bt Service ==="
+    systemctl status usbip-bt --no-pager -l 2>/dev/null | head -10 || echo "  (not installed — run: iot bt-install)"
+    echo ""
+    echo "=== BlueZ ==="
+    systemctl status bluetooth --no-pager -l | head -5
+    ;;
+
   # ── Govee H612D BLE Light Control ─────────────────────────────────────────────
   # Sends GATT commands via Theengs Gateway MQTT command topic.
   # Override MAC with H612D_MAC env var (e.g. in .env) for a different unit.
@@ -1568,6 +1603,8 @@ for sign_id, s in data.items():
     echo "    lf [n]                 grafana logs"
     echo "    lb [n]                 ble-decoder logs"
     echo "    lp [n]                 physical-control logs"
+    echo "    lth [n]                theengs-gateway logs"
+    echo "    lbc [n]                govee-ble-control logs"
     echo "    la [n]                 ALL containers (default 10 each)"
     echo ""
     echo "  DATA"
@@ -1717,6 +1754,11 @@ for sign_id, s in data.items():
     echo "    backup                 Backup Grafana + InfluxDB volumes to ~/backups/"
     echo "    clear-retained [topic] Clear retained MQTT messages (default: all topics)"
     echo "                           examples: iot clear-retained / iot clear-retained 'gv2mqtt/#'"
+    echo ""
+    echo "  BLUETOOTH / USB-IP"
+    echo "    bt-install             Install usbip-bt systemd service (persists across reboots)"
+    echo "    bt-attach [ip] [busid] Manually attach BT adapter (default: 10.109.0.212, 3-10)"
+    echo "    bt-status              Show adapter, usbip service, and BlueZ status"
     echo ""
     echo "  GOVEE H612D BLE LIGHTS (via Theengs Gateway → MQTT → GATT)"
     echo "    h612d-on               Power on"

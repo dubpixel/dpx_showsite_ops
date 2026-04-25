@@ -1,0 +1,14 @@
+[Unit]
+Description=USB/IP attach Bluetooth adapter from Windows host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/sbin/modprobe vhci-hcd
+ExecStart=/usr/bin/usbip attach -r 10.109.0.212 -b 3-10
+# Update the IP above when you set a static/reserved address for the Windows host
+
+[Install]
+WantedBy=multi-user.target

@@ -293,6 +293,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  theengs-gateway:
+    image: ghcr.io/theengs/gateway
+    container_name: theengs-gateway
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - LOG_LEVEL=WARNING
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
+
+  govee-ble-control:
+    build:
+      context: ./services/govee-ble-control
+      dockerfile: Dockerfile
+    container_name: govee-ble-control
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - BROKER=mosquitto
+      - MQTT_PORT=1883
+      - COMMAND_TOPIC=home/TheengsGateway/commands/MQTTtoBT
+      - LOG_LEVEL=INFO
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+    networks:
+      - iot
+    depends_on:
+      - mosquitto
+
 networks:
   iot:
     driver: bridge
