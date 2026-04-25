@@ -294,7 +294,7 @@ services:
         max-file: "3"
 
   theengs-gateway:
-    image: ghcr.io/theengs/gateway
+    image: theengs/gateway
     container_name: theengs-gateway
     restart: unless-stopped
     network_mode: host
