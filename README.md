@@ -52,7 +52,9 @@ Operations stack for DPX show sites. Unified platform for IoT monitoring, enviro
 **Future:** Additional sensor types, metrics-driven automation workflows, consumables tracking, LTC monitoring — see roadmap for details
 
 **Key features:**
-- **Govee IoT Stack**: Temperature/humidity monitoring via Govee sensors (cloud API + BLE)
+- **Govee IoT Stack**: Temperature/humidity monitoring via Govee sensors (cloud API + BLE) --
+  see [`docs/GOVEE_BLE_PROTOCOL.md`](docs/GOVEE_BLE_PROTOCOL.md) for confirmed BLE decode formats
+  and a scan-mode gotcha that silently drops the H5051/H5074
 - **ESP32 BLE Gateways**: Real-time BLE data collection (<5 sec latency)
 - **SNMP Monitoring**: Environmental and system monitoring (Geist Watchdog, ControlByWeb X-410, D3 SMC)
 - **Network Backups**: Automated Netgear M4300 switch configuration backups via TFTP
